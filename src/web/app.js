@@ -1,24 +1,5 @@
 export function renderApp(request, env) {
-  return new Response(`<!doctype html>
-<html lang="ru">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>${env.APP_NAME || "Ok Music"}</title>
-  <link rel="stylesheet" href="/app.css">
-</head>
-<body>
-  <main class="app">
-    <header><h1>Ok Music</h1><p>Музыка под твоё настроение</p></header>
-    <section id="view" class="view"></section>
-    <nav>
-      <button data-view="mood">Моё настроение</button>
-      <button data-view="search">Поиск</button>
-      <button data-view="library">Плейлисты</button>
-    </nav>
-    <footer>Ok_music_llc<br>© 2026–2027. Все права защищены.<br>Источники: Hitmos.me · Zaycev.net · Zvuch.com · My.Mail.ru Music</footer>
-  </main>
-  <script type="module" src="/client.js"></script>
-</body>
-</html>`, { headers: { "content-type": "text/html; charset=utf-8" } });
+  const appName = env.APP_NAME || "Ok Music";
+  const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${appName}</title><style>:root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif}body{margin:0;background:#101116;color:#f5f5f5}.app{max-width:720px;margin:0 auto;min-height:100vh;padding:20px;box-sizing:border-box}header{padding:18px 0}.view{min-height:55vh}nav{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;position:sticky;bottom:8px}button,input{padding:12px 10px;border:0;border-radius:12px;background:#242630;color:inherit}input{width:100%;box-sizing:border-box;margin:8px 0}footer{margin-top:20px;padding:16px 0;opacity:.65;font-size:12px;text-align:center}</style></head><body><main class="app"><header><h1>Ok Music</h1><p>Музыка под твоё настроение</p></header><section id="view" class="view"></section><nav><button data-view="mood">Моё настроение</button><button data-view="search">Поиск</button><button data-view="library">Плейлисты</button></nav><footer>Ok_music_llc<br>© 2026–2027. Все права защищены.<br>Источники: Hitmos.me · Zaycev.net · Zvuch.com · My.Mail.ru Music</footer></main><script>const view=document.querySelector("#view");const views={mood:()=>'<h2>Моё настроение</h2><p>Подборка на основе твоих лайков и выбранного настроения.</p><button>Следующий трек</button>',search:()=>'<h2>Поиск</h2><input id="q" placeholder="Исполнитель или трек"><button id="search">Найти</button><div id="results"></div>',library:()=>'<h2>Плейлисты и понравившиеся</h2><p>Здесь появятся твои лайки и плейлисты.</p>'};function render(name){view.innerHTML=views[name]();if(name==="search")document.querySelector("#search").onclick=async()=>{const q=document.querySelector("#q").value.trim();const r=await fetch("/api/search?q="+encodeURIComponent(q));const data=await r.json();document.querySelector("#results").textContent=JSON.stringify(data.tracks)}}document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>render(b.dataset.view));render("mood");</script></body></html>`;
+  return new Response(html,{headers:{"content-type":"text/html; charset=utf-8"}});
 }
