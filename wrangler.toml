@@ -1,0 +1,12 @@
+name = "ok-music-free-open"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+APP_NAME = "Ok Music"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ok-music-db"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
