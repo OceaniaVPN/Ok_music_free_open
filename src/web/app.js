@@ -18,7 +18,7 @@ export function renderApp(request, env) {
     </nav>
     <footer>Ok_music_llc<br>© 2026–2027. Все права защищены.<br>Источники: Hitmos.me · Zaycev.net · Zvuch.com · My.Mail.ru Music</footer>
   </main>
-  <script type="module" src="/app.js"></script>
+  <script type="module" src="/client.js"></script>
 </body>
 </html>`, { headers: { "content-type": "text/html; charset=utf-8" } });
 }
