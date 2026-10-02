@@ -4,3 +4,4 @@ compatibility_date = "2026-10-01"
 
 [vars]
 APP_NAME = "Ok Music"
+JAMENDO_CLIENT_ID = "84646146"
