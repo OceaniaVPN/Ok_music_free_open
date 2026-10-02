@@ -175,25 +175,6 @@ function providerErrors(youtubeResult, jamendoResult) {
 export async function handleApi(request, env) {
   const url = new URL(request.url);
 
-  // Load YouTube embeds through our own origin first. This gives the WebView a
-  // real enclosing HTTP context before the request is redirected to YouTube.
-  const embedPrefix = "/api/youtube-embed/";
-  const videoId = url.pathname.startsWith(embedPrefix) ? url.pathname.slice(embedPrefix.length) : "";
-  if (/^[A-Za-z0-9_-]{11}$/.test(videoId)) {
-    const target = new URL("https://www.youtube.com/embed/" + videoId);
-    for (const key of ["autoplay", "playsinline", "enablejsapi", "origin", "widget_referrer", "rel"]) {
-      const value = url.searchParams.get(key);
-      if (value !== null) target.searchParams.set(key, value);
-    }
-    return new Response(null, {
-      status: 302,
-      headers: {
-        "Location": target.toString(),
-        "Referrer-Policy": "origin"
-      }
-    });
-  }
-
   if (url.pathname === "/api/health") {
     return Response.json({
       ok: true,
