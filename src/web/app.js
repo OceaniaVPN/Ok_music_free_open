@@ -251,9 +251,9 @@ function updateMediaSession(){
   artist:current.artist||"",
   album:current.album||"Ok Music",
   artwork:artwork?[
-   {src:artwork,sizes:"96x96",type:"image/jpeg"},
-   {src:artwork,sizes:"192x192",type:"image/jpeg"},
-   {src:artwork,sizes:"512x512",type:"image/jpeg"}
+   {src:artwork,sizes:"96x96"},
+   {src:artwork,sizes:"192x192"},
+   {src:artwork,sizes:"512x512"}
   ]:[]
  });
  setMediaAction("play",()=>audio.play().catch(()=>{}));
