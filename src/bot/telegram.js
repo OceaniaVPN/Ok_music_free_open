@@ -1,33 +1,35 @@
-async function telegramApi(env, method, body) {
-  const token = String(env.TELEGRAM_BOT_TOKEN || "").trim();
-  if (!token) throw new Error("TELEGRAM_BOT_TOKEN is not configured");
-
-  const response = await fetch("https://api.telegram.org/bot" + token + "/" + method, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body)
-  });
-
-  const data = await response.json();
-  if (!data.ok) throw new Error(data.description || ("Telegram API " + response.status));
-  return data;
-}
-
 function appUrl(request, env) {
   return String(env.TELEGRAM_WEBAPP_URL || new URL(request.url).origin).replace(/\/$/, "");
 }
 
+function commandText(update) {
+  return String(update?.message?.text || update?.channel_post?.text || "")
+    .trim()
+    .toLowerCase();
+}
+
+function chatId(update) {
+  return update?.message?.chat?.id ?? update?.channel_post?.chat?.id ?? null;
+}
+
 export async function handleTelegramWebhook(request, env) {
-  const update = await request.json();
-  const message = update?.message;
-  const chatId = message?.chat?.id;
+  try {
+    const update = await request.json();
+    const id = chatId(update);
 
-  if (!chatId) return Response.json({ ok: true });
+    if (id === null) return Response.json({ ok: true });
 
-  const text = String(message?.text || "").trim().toLowerCase();
-  if (text === "/start" || text === "/app" || text === "/music") {
-    await telegramApi(env, "sendMessage", {
-      chat_id: chatId,
+    const text = commandText(update);
+    const isStart = /^\/(start|app|music)(?:@[^\s]+)?(?:\s|$)/.test(text);
+
+    if (!isStart) return Response.json({ ok: true });
+
+    // Telegram allows a webhook to answer directly with a Bot API method.
+    // This avoids a second network request from the Worker and makes /start
+    // independent of TELEGRAM_BOT_TOKEN being available at runtime.
+    return Response.json({
+      method: "sendMessage",
+      chat_id: id,
       text: "🎵 Ok Music\n\nОткрой музыкальный плеер прямо в Telegram.",
       reply_markup: {
         inline_keyboard: [[{
@@ -36,7 +38,9 @@ export async function handleTelegramWebhook(request, env) {
         }]]
       }
     });
+  } catch (error) {
+    // Always acknowledge Telegram so a malformed/non-message update cannot
+    // turn into a webhook 500/retry loop.
+    return Response.json({ ok: true });
   }
-
-  return Response.json({ ok: true });
 }
