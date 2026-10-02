@@ -32,8 +32,11 @@ function parseZaycevSearch(html,limit){
     const texts=links.map(x=>stripHtml(x[2])).filter(Boolean);
     const title=stripHtml(trackLink[2])||"Без названия";
     const artist=texts.find(x=>x!==title&&x.length<160)||"Неизвестный исполнитель";
-    const imgMatch=chunk.match(/<(?:img|source)\b[^>]*(?:src|data-src|data-original)=["']([^"']+)["']/i);
-    const image=imgMatch?imgMatch[1]:"";
+    const imgTag=chunk.match(/<(?:img|source)\b[^>]*>/i);
+    const attrs=imgTag?imgTag[0]:"";
+    const imageMatch=attrs.match(/(?:src|data-src|data-original|data-lazy-src|poster)=["']([^"']+)["']/i);
+    const srcsetMatch=attrs.match(/(?:srcset|data-srcset)=["']([^"']+)["']/i);
+    const image=imageMatch?imageMatch[1]:(srcsetMatch?srcsetMatch[1].split(",")[0].trim().split(/\s+/)[0]:"");
     const dm=stripHtml(chunk).match(/\b(\d{1,2}:\d{2})\b/);
     seen.add(id);out.push({id,title,artist,image,duration:dm?parseDuration(dm[1]):0,sourceUrl:new URL(trackLink[1],ZAYCEV_BASE).href});
     if(out.length>=limit)break;
@@ -174,27 +177,91 @@ export async function handleApi(request,env){
   }
 
   if(url.pathname==="/api/recommendations"){
-    const seed=(url.searchParams.get("seed")||"").trim(),mood=(url.searchParams.get("mood")||"").trim(),genres=(url.searchParams.get("genres")||"").trim(),moods=(url.searchParams.get("moods")||"").trim(),artists=(url.searchParams.get("artists")||"").trim(),now=(url.searchParams.get("now")||"").trim(),liked=(url.searchParams.get("liked")||"").trim(),refresh=(url.searchParams.get("refresh")||"").trim(),limit=Math.min(Math.max(Number(url.searchParams.get("limit")||16),6),40);
-    const base=[artists,genres,moods,mood,now,liked,seed].filter(Boolean).join(", ");
-    const artistQueries=artists.split(/[,;]+/).map(x=>x.trim()).filter(Boolean).slice(0,8); const queries=[...artistQueries,...artistQueries.map(a=>a+" "+genres),artists+" "+genres,genres+" "+moods,artists+" "+now,base,mood+" "+genres+" "+artists].map(x=>x.replace(/\s+/g," ").trim()).filter(Boolean);
-    const refreshQueries=refresh?[...queries,...artistQueries.map(a=>a+" "+genres+" "+refresh.slice(-4)),genres+" "+moods+" "+refresh.slice(-4),artists+" "+now+" "+refresh.slice(-4)]:queries;
-    const uniqueQueries=[...new Set(refreshQueries)].filter(Boolean).slice(0,8);
-    const fetchLimit=Math.min(30,Math.max(18,limit*2));
+    const seed=(url.searchParams.get("seed")||"").trim(),
+      mood=(url.searchParams.get("mood")||"").trim(),
+      genres=(url.searchParams.get("genres")||"").trim(),
+      moods=(url.searchParams.get("moods")||"").trim(),
+      artists=(url.searchParams.get("artists")||"").trim(),
+      likedArtistsRaw=(url.searchParams.get("likedArtists")||"").trim(),
+      now=(url.searchParams.get("now")||"").trim(),
+      liked=(url.searchParams.get("liked")||"").trim(),
+      excludeRaw=(url.searchParams.get("exclude")||"").trim(),
+      refresh=(url.searchParams.get("refresh")||"").trim(),
+      limit=Math.min(Math.max(Number(url.searchParams.get("limit")||16),6),40);
+    const preferredArtists=[...new Set([...artists.split(/[,;]+/),...likedArtistsRaw.split(/[,;]+/)].map(x=>x.trim()).filter(Boolean))].slice(0,12);
+    const artistQueries=preferredArtists.slice(0,8);
+    const tasteTerms=[genres,moods,now].filter(Boolean).join(" ");
+    const base=[preferredArtists.join(", "),genres,moods,now,liked,seed].filter(Boolean).join(", ");
+    const queries=[...artistQueries,...artistQueries.map(a=>a+" "+tasteTerms),genres+" "+moods,preferredArtists.join(" ")+" "+now,base,mood+" "+genres+" "+preferredArtists.join(" ")].map(x=>x.replace(/\s+/g," ").trim()).filter(Boolean);
+    const refreshTail=refresh?refresh.slice(-6):"";
+    const refreshQueries=refresh?[...queries,...artistQueries.map(a=>a+" "+genres+" "+refreshTail),genres+" "+moods+" "+refreshTail,now+" "+refreshTail]:queries;
+    const uniqueQueries=[...new Set(refreshQueries)].filter(Boolean).slice(0,10);
+    const fetchLimit=Math.min(40,Math.max(24,limit*3));
     const [zr,jr]=await Promise.all([
       Promise.allSettled(uniqueQueries.map(q=>fetchZaycevSearch(q,fetchLimit))),
-      Promise.allSettled(uniqueQueries.slice(0,5).map(q=>searchJamendo(q,8,env)))
+      Promise.allSettled(uniqueQueries.slice(0,6).map(q=>searchJamendo(q,10,env)))
     ]);
-    const zaycev=zr.flatMap(r=>r.status==="fulfilled"?r.value:[]),jam=jr.flatMap(r=>r.status==="fulfilled"?r.value:[]);
+    const zaycev=zr.flatMap(r=>r.status==="fulfilled"?r.value:[]),
+      jam=jr.flatMap(r=>r.status==="fulfilled"?r.value:[]);
     const pool=[],seen=new Set();
-    for(const list of [zaycev,jam]) for(const t of list) if(t&&!seen.has(t.id)){seen.add(t.id);pool.push(t)}
-    const errors=[...zr.filter(r=>r.status==="rejected").map(r=>"Zaycev.net: "+(r.reason?.message||"ошибка")),...jr.filter(r=>r.status==="rejected").map(r=>"Jamendo: "+(r.reason?.message||"ошибка"))];
-    const wanted=artistQueries.map(x=>x.toLowerCase());
-    const preferred=pool.filter(t=>wanted.some(a=>String(t.artist||"").toLowerCase().includes(a)));
-    const rest=pool.filter(t=>!wanted.some(a=>String(t.artist||"").toLowerCase().includes(a)));
+    for(const list of [zaycev,jam]) for(const t of list){
+      if(!t||!t.id||seen.has(t.id))continue;
+      seen.add(t.id);pool.push(t);
+    }
+    const excluded=new Set(excludeRaw.split(",").map(x=>x.trim()).filter(Boolean));
+    const wanted=preferredArtists.map(x=>x.toLowerCase());
+    const genreTerms=genres.split(/[,;]+/).map(x=>x.trim().toLowerCase()).filter(Boolean);
+    const moodTerms=moods.split(/[,;]+/).map(x=>x.trim().toLowerCase()).filter(Boolean);
+    const nowTerms=now.toLowerCase().split(/\s+/).filter(x=>x.length>2);
+    const likedText=liked.toLowerCase();
+    const score=(t)=>{
+      if(excluded.has(t.id))return -100000;
+      const artist=String(t.artist||"").toLowerCase(), title=String(t.title||"").toLowerCase(), genre=String(t.genre||"").toLowerCase();
+      let s=0;
+      for(const a of wanted){
+        if(!a)continue;
+        if(artist===a)s+=140;
+        else if(artist.startsWith(a))s+=110;
+        else if(artist.includes(a))s+=80;
+        else if(title.includes(a))s+=20;
+      }
+      for(const g of genreTerms)if(g&&(genre.includes(g)||title.includes(g)||artist.includes(g)))s+=18;
+      for(const m of moodTerms)if(m&&(title.includes(m)||artist.includes(m)||genre.includes(m)))s+=8;
+      for(const n of nowTerms)if(title.includes(n)||artist.includes(n)||genre.includes(n))s+=3;
+      if(likedText.includes(artist)&&artist)s+=20;
+      if(t.source==="Zaycev.net")s+=3;
+      return s;
+    };
     let h=0;for(const ch of (refresh||seed||"okmusic"))h=(h*31+ch.charCodeAt(0))>>>0;
-    const rotate=(arr)=>arr.length?arr.map((_,i)=>arr[(i+(h%arr.length))%arr.length]):[];
-    const final=[...rotate(preferred),...rotate(rest)].slice(0,limit);
-    return Response.json({ok:true,mode:base?"personalized":"discovery",profile:{genres,moods,artists,now},providers:[...(zaycev.length?["Zaycev.net"]:[]),...(jam.length?["Jamendo"]:[])],tracks:final,errors});
+    const jitter=(t)=>{let n=h;for(const c of String(t.id))n=(n*33+c.charCodeAt(0))>>>0;return (n%1000)/100000};
+    const ranked=pool.filter(t=>score(t)>-100000).map(t=>({t,s:score(t)+jitter(t)})).sort((a,b)=>b.s-a.s);
+    const preferred=ranked.filter(x=>wanted.some(a=>a&&String(x.t.artist||"").toLowerCase().includes(a)));
+    const rest=ranked.filter(x=>!wanted.some(a=>a&&String(x.t.artist||"").toLowerCase().includes(a)));
+    const final=[];
+    const used=new Set();
+    const add=(t)=>{
+      if(!t||used.has(t.id))return false;
+      used.add(t.id);final.push(t);return true;
+    };
+    // If there are enough favorite-artist candidates, reserve roughly half the mix for them.
+    const preferredTarget=Math.min(Math.ceil(limit/2),preferred.length);
+    for(const x of preferred.slice(0,preferredTarget))add(x.t);
+    const buckets=new Map();
+    for(const x of [...preferred.slice(preferredTarget),...rest]){
+      const key=String(x.t.artist||"Неизвестный").toLowerCase();
+      if(!buckets.has(key))buckets.set(key,[]);
+      buckets.get(key).push(x.t);
+    }
+    while(final.length<limit){
+      let added=false;
+      for(const list of buckets.values()){
+        const t=list.shift();
+        if(add(t)){added=true;if(final.length>=limit)break;}
+      }
+      if(!added)break;
+    }
+    const errors=[...zr.filter(r=>r.status==="rejected").map(r=>"Zaycev.net: "+(r.reason?.message||"ошибка")),...jr.filter(r=>r.status==="rejected").map(r=>"Jamendo: "+(r.reason?.message||"ошибка"))];
+    return Response.json({ok:true,mode:base?"personalized":"discovery",profile:{genres,moods,artists:preferredArtists.join(", "),now},providers:[...(zaycev.length?["Zaycev.net"]:[]),...(jam.length?["Jamendo"]:[])],tracks:final,errors});
   }
   return Response.json({ok:false,error:"Not found"},{status:404});
 }
