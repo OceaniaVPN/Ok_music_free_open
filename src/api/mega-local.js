@@ -11,8 +11,8 @@ function parseName(name){
   return {artist:"Ключник",title:base||"Без названия"};
 }
 
-function megaAudioUrl(fileId){
-  return "mega://"+encodeURIComponent(JSON.stringify({folder:MEGA_FOLDER_URL,id:fileId}));
+function megaAudioUrl(fileId,name){
+  return "mega://"+encodeURIComponent(JSON.stringify({folder:MEGA_FOLDER_URL,id:fileId,name}));
 }
 
 async function loadCatalog(){
@@ -30,7 +30,7 @@ async function loadCatalog(){
         artist,
         album:"",
         image:"",
-        audio:megaAudioUrl(file.nodeId),
+        audio:megaAudioUrl(file.nodeId,file.name),
         duration:0,
         license:"",
         source:"🔐 Ключник",
