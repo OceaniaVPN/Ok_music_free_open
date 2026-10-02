@@ -136,9 +136,22 @@ function drawPlayer(){if(!current){playerEl.className="player";return}
  if(current.youtubeId){
    const ytOrigin=location.origin;
    const ytReferrer=location.href.split("#")[0];
-   const ytUrl="/api/youtube-embed/"+encodeURIComponent(current.youtubeId)+"?autoplay=1&playsinline=1&enablejsapi=1&origin="+encodeURIComponent(ytOrigin)+"&widget_referrer="+encodeURIComponent(ytReferrer)+"&rel=0";
-   playerEl.innerHTML='<div class="yt-frame"><iframe title="YouTube Music" src="'+ytUrl+'" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div><div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+' · YouTube Music</span><small id="ytStatus" style="display:block;color:var(--muted);font-size:10px;margin-top:4px">Ожидаю ответ YouTube…</small></div><div class="pc"><button id="closeYT" class="big">■</button></div>';
+   const ytUrl="https://www.youtube.com/embed/"+encodeURIComponent(current.youtubeId)+"?autoplay=1&playsinline=1&enablejsapi=1&origin="+encodeURIComponent(ytOrigin)+"&widget_referrer="+encodeURIComponent(ytReferrer)+"&rel=0";
+   playerEl.innerHTML='<div class="yt-frame"><iframe id="ytFrame" title="YouTube Music" src="'+ytUrl+'" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div><div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+' · YouTube Music</span><small id="ytStatus" style="display:block;color:var(--muted);font-size:10px;margin-top:4px">Загрузка YouTube…</small></div><div class="pc"><button id="closeYT" class="big">■</button></div>';
    document.querySelector("#closeYT").onclick=()=>{current=null;playing=false;playerEl.className="player";};
+   const ytStatus=document.querySelector("#ytStatus");
+   const ytFallback=()=>{
+     if(!current?.youtubeId||!ytStatus)return;
+     ytStatus.innerHTML='YouTube ограничил воспроизведение в этом WebView. <button id="ytOpen" style="padding:4px 8px;border-radius:9px;font-size:10px">Открыть в Telegram</button>';
+     const open=document.querySelector("#ytOpen");
+     if(open)open.onclick=()=>{
+       const url="https://www.youtube.com/watch?v="+encodeURIComponent(current.youtubeId);
+       if(window.Telegram?.WebApp?.openLink) window.Telegram.WebApp.openLink(url,{try_instant_view:false});
+       else window.open(url,"_blank","noopener,noreferrer");
+     };
+   };
+   window.clearTimeout(window._ytFallbackTimer);
+   window._ytFallbackTimer=window.setTimeout(ytFallback,7000);
    return;
  }
  playerEl.innerHTML='<div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>';
@@ -154,10 +167,11 @@ window.addEventListener("message",e=>{
   const text=code===153?"YouTube не получил HTTP Referer / идентификацию клиента":code===101||code===150?"Видео запрещено для встраивания":code===100?"Видео удалено или приватное":"Ошибка YouTube "+code;
   toast(text);
   const s=document.querySelector("#ytStatus");if(s)s.textContent=text;
+  if(code===153||code===100||code===101||code===150) window.clearTimeout(window._ytFallbackTimer);
  }
  if(data?.event==="onAutoplayBlocked"){
   toast("YouTube заблокировал автоматический запуск — нажми ▶ в плеере");
-  const s=document.querySelector("#ytStatus");if(s)s.textContent="Автозапуск заблокирован WebView";
+  const s=document.querySelector("#ytStatus");if(s)s.textContent="Автозапуск заблокирован WebView — нажми ▶ в YouTube";
  }
 });
 audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
