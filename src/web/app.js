@@ -53,6 +53,37 @@ let tracks=[], current=null, currentIndex=-1, audio=new Audio(), nextAudio=new A
 audio.preload="auto";
 nextAudio.preload="auto";
 nextAudio.setAttribute("aria-hidden","true");
+const AUDIO_KEY="okmusic:audio";
+const eqBands=["60","250","1K","4K","12K"];
+let audioFx={eq:[0,0,0,0,0]};
+try{audioFx={...audioFx,...JSON.parse(localStorage.getItem(AUDIO_KEY)||"{}")}}catch{}
+function saveAudioFx(){localStorage.setItem(AUDIO_KEY,JSON.stringify(audioFx))}
+let audioCtx=null,audioSource=null,eqNodes=[],fxReady=false;
+function initAudioFx(){
+ if(fxReady)return true;
+ try{
+  audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  audioSource=audioCtx.createMediaElementSource(audio);
+  const freqs=[60,250,1000,4000,12000];
+  eqNodes=freqs.map((f,i)=>{
+   const n=audioCtx.createBiquadFilter();
+   n.type=i===0?"lowshelf":i===4?"highshelf":"peaking";
+   n.frequency.value=f;
+   n.Q.value=i===0||i===4?0.7:1.1;
+   n.gain.value=Number(audioFx.eq[i]||0);
+   return n;
+  });
+  eqNodes.reduce((a,b)=>a.connect(b),audioSource);
+  eqNodes[4].connect(audioCtx.destination);
+  fxReady=true;
+  return true;
+ }catch(e){return false}
+}
+function setEq(i,v){
+ audioFx.eq[i]=Number(v);
+ if(eqNodes[i])eqNodes[i].gain.value=Number(v);
+ saveAudioFx();
+}
 const demos=[
 {id:"demo-1",title:"Midnight Waves",artist:"Ok Music",image:"",audio:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",source:"Demo"},
 {id:"demo-2",title:"Neon Drive",artist:"Ok Music",image:"",audio:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",source:"Demo"},
