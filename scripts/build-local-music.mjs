@@ -63,7 +63,7 @@ async function readEmbeddedCover(file,hash){
     fs.writeFileSync(out,picture.data);
     return {metadata,picture:{url:"/music/covers/"+name}};
   }catch(error){
-    console.warn("🔑 Ключник metadata:",path.basename(file),error?.message||error);
+    console.warn("🔐 Ключник metadata:",path.basename(file),error?.message||error);
     return {metadata:null,picture:null};
   }
 }
@@ -97,12 +97,12 @@ async function main(){
     tracks.push({
       id:"key-"+hash,title,artist,album,image,
       audio:"/music/"+encPath(rel),duration,license:"",
-      source:"🔑 Ключник",sourceUrl:"/music/"+encPath(rel),
+      source:"🔐 Ключник",sourceUrl:"/music/"+encPath(rel),
       genre:Array.isArray(metadata?.common?.genre)?metadata.common.genre.filter(Boolean).join("; "):""
     });
   }
   tracks.sort((a,b)=>a.title.localeCompare(b.title,"ru"));
   fs.writeFileSync(generated,"export const LOCAL_MUSIC = "+JSON.stringify(tracks,null,2)+";\n");
-  console.log("🔑 Ключник: "+tracks.length+" tracks, embedded covers extracted");
+  console.log("🔐 Ключник: "+tracks.length+" tracks, embedded covers extracted");
 }
 await main();
