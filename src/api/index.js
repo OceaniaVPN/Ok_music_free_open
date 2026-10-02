@@ -1,6 +1,6 @@
-import YTMusic from "ytmusic-api";
-
-let ytmusicPromise;
+const YT_MUSIC_API_KEY = "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30";
+const YT_MUSIC_CLIENT_VERSION = "1.20260707.12.00";
+const YT_MUSIC_SEARCH_PARAMS = "Eg-KAQwIARAAGAAgACgAMABqChAEEAMQCRAFEAo=";
 
 function uniqueTracks(tracks, limit) {
   const seen = new Set();
@@ -27,46 +27,118 @@ function normalizeJamendo(t) {
   };
 }
 
-function normalizeYTMusic(t) {
-  const id = String(t?.videoId || "").trim();
-  if (!id) return null;
-  const thumbnails = Array.isArray(t.thumbnails) ? t.thumbnails : [];
+function collectNodes(value, key, out = []) {
+  if (!value || typeof value !== "object") return out;
+  if (Array.isArray(value)) {
+    for (const item of value) collectNodes(item, key, out);
+    return out;
+  }
+  if (value[key] && typeof value[key] === "object") out.push(value[key]);
+  for (const child of Object.values(value)) collectNodes(child, key, out);
+  return out;
+}
+
+function firstText(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map(firstText).filter(Boolean).join("");
+  if (typeof value === "object") {
+    if (typeof value.text === "string") return value.text;
+    if (value.simpleText) return value.simpleText;
+    if (Array.isArray(value.runs)) return value.runs.map(firstText).join("");
+  }
+  return "";
+}
+
+function parseDuration(value) {
+  const text = firstText(value);
+  if (!text) return 0;
+  const parts = text.split(":").map(Number);
+  if (parts.some(Number.isNaN)) return 0;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return parts[0] || 0;
+}
+
+function normalizeYTMusic(item) {
+  const videoId = String(item?.playlistItemData?.videoId || "").trim();
+  if (!videoId) return null;
+
+  const columns = Array.isArray(item.flexColumns)
+    ? item.flexColumns.flatMap(column => column?.musicResponsiveListItemFlexColumnRenderer?.text?.runs || [])
+    : [];
+
+  const texts = columns.map(run => ({
+    text: String(run?.text || "").trim(),
+    browseId: String(run?.navigationEndpoint?.browseEndpoint?.browseId || "")
+  })).filter(x => x.text);
+
+  const title = firstText(item.flexColumns?.[0]?.musicResponsiveListItemFlexColumnRenderer?.text)
+    || texts[0]?.text
+    || "Без названия";
+
+  const artist = texts.find(x => x.browseId.startsWith("UC"))?.text
+    || texts[1]?.text
+    || "Неизвестный исполнитель";
+
+  const album = texts.find(x => x.browseId.startsWith("MPRE"))?.text || "";
+
+  const thumbnails = item.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails
+    || item.thumbnails
+    || [];
+
+  const durationText = item.fixedColumns?.[0]?.musicResponsiveListItemFixedColumnRenderer?.text;
+
   return {
-    id: "ytmusic-" + id,
-    youtubeId: id,
-    title: String(t.name || "Без названия"),
-    artist: String(t.artist?.name || "Неизвестный исполнитель"),
-    album: String(t.album?.name || ""),
+    id: "ytmusic-" + videoId,
+    youtubeId: videoId,
+    title,
+    artist,
+    album,
     image: String(thumbnails.at(-1)?.url || ""),
     audio: "",
-    duration: Number(t.duration || 0),
+    duration: parseDuration(durationText),
     license: "",
     source: "YouTube Music",
-    sourceUrl: "https://music.youtube.com/watch?v=" + encodeURIComponent(id),
+    sourceUrl: "https://music.youtube.com/watch?v=" + encodeURIComponent(videoId),
     genre: ""
   };
 }
 
-async function getYTMusic() {
-  if (!ytmusicPromise) {
-    ytmusicPromise = (async () => {
-      const client = new YTMusic();
-      await client.initialize({ GL: "RU", HL: "ru" });
-      return client;
-    })();
-  }
-  try {
-    return await ytmusicPromise;
-  } catch (error) {
-    ytmusicPromise = null;
-    throw error;
-  }
-}
-
 async function searchYouTubeMusic(q, limit) {
-  const client = await getYTMusic();
-  const songs = await client.searchSongs(q);
-  return uniqueTracks(songs.map(normalizeYTMusic).filter(Boolean), limit);
+  const endpoint = new URL("https://music.youtube.com/youtubei/v1/search");
+  endpoint.searchParams.set("key", YT_MUSIC_API_KEY);
+  endpoint.searchParams.set("alt", "json");
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "origin": "https://music.youtube.com",
+      "accept": "application/json"
+    },
+    body: JSON.stringify({
+      context: {
+        client: {
+          clientName: "WEB_REMIX",
+          clientVersion: YT_MUSIC_CLIENT_VERSION,
+          hl: "ru",
+          gl: "RU",
+          platform: "DESKTOP"
+        }
+      },
+      query: q,
+      params: YT_MUSIC_SEARCH_PARAMS
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error("YouTube Music HTTP " + response.status);
+  }
+
+  const data = await response.json();
+  const items = collectNodes(data, "musicResponsiveListItemRenderer");
+  return uniqueTracks(items.map(normalizeYTMusic).filter(Boolean), limit);
 }
 
 async function searchJamendo(q, limit, env) {
@@ -104,9 +176,9 @@ export async function handleApi(request, env) {
     return Response.json({
       ok: true,
       service: env.APP_NAME || "Ok Music",
-      version: "5.0",
+      version: "6.0",
       providers: ["YouTube Music", "Jamendo"],
-      youtubeMusic: { configured: true, apiKeyRequired: false }
+      youtubeMusic: { configured: true, apiKeyRequired: false, mode: "direct-inner-tube" }
     });
   }
 
