@@ -40,6 +40,7 @@ button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--line);ba
 const view=document.querySelector("#view"), playerEl=document.querySelector("#player"), modal=document.querySelector("#modal"), toastEl=document.querySelector("#toast");
 const KEY="okmusic:v2"; const state=JSON.parse(localStorage.getItem(KEY)||'{"liked":[],"playlists":[]}');
 let tracks=[], current=null, audio=new Audio(), playing=false;
+audio.preload="auto";
 const demos=[
 {id:"demo-1",title:"Midnight Waves",artist:"Ok Music",image:"",audio:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",source:"Demo"},
 {id:"demo-2",title:"Neon Drive",artist:"Ok Music",image:"",audio:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",source:"Demo"},
@@ -124,8 +125,9 @@ function updateMediaSession(){
   album:current.album||"Ok Music",
   artwork:current.image?[{src:current.image,sizes:"300x300"}]:[]
  });
- navigator.mediaSession.setActionHandler("play",()=>audio.play());
+ navigator.mediaSession.setActionHandler("play",()=>audio.play().catch(()=>{}));
  navigator.mediaSession.setActionHandler("pause",()=>audio.pause());
+ navigator.mediaSession.playbackState=playing?"playing":"paused";
  navigator.mediaSession.setActionHandler("seekbackward",()=>{audio.currentTime=Math.max(0,audio.currentTime-10)});
  navigator.mediaSession.setActionHandler("seekforward",()=>{audio.currentTime=Math.min(audio.duration||Infinity,audio.currentTime+10)});
 }
@@ -157,8 +159,8 @@ window.addEventListener("message",e=>{
   const s=document.querySelector("#ytStatus");if(s)s.textContent="Автозапуск заблокирован WebView";
  }
 });
-audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration)}
-audio.onplay=()=>{playing=true;updateMediaSession()};audio.onpause=()=>{playing=false;drawPlayer()};audio.onended=()=>{playing=false;drawPlayer()}
+audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
+audio.onplay=()=>{playing=true;if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer()};audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer()};audio.onended=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()};audio.onerror=()=>{toast("Не удалось загрузить аудио");playing=false;drawPlayer()}
 document.querySelector("#closeModal").onclick=()=>modal.classList.remove("open");modal.onclick=e=>{if(e.target===modal)modal.classList.remove("open")};
 document.querySelector("#createPlaylist").onclick=()=>{const name=document.querySelector("#playlistName").value.trim();if(!name)return toast("Введи название");state.playlists.unshift({id:"pl-"+Date.now(),name,tracks:[]});save();document.querySelector("#playlistName").value="";modal.classList.remove("open");library();toast("Плейлист создан ✨")}
 function render(name){document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));({home,mood,search:searchView,library}[name]||home)()}
