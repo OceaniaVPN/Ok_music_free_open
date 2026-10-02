@@ -177,9 +177,9 @@ export async function handleApi(request, env) {
 
   // Load YouTube embeds through our own origin first. This gives the WebView a
   // real enclosing HTTP context before the request is redirected to YouTube.
-  const embedMatch = url.pathname.match(/^\\/api\\/youtube-embed\\/([A-Za-z0-9_-]{11})$/);
-  if (embedMatch) {
-    const videoId = embedMatch[1];
+  const embedPrefix = "/api/youtube-embed/";
+  const videoId = url.pathname.startsWith(embedPrefix) ? url.pathname.slice(embedPrefix.length) : "";
+  if (/^[A-Za-z0-9_-]{11}$/.test(videoId)) {
     const target = new URL("https://www.youtube.com/embed/" + videoId);
     for (const key of ["autoplay", "playsinline", "enablejsapi", "origin", "widget_referrer", "rel"]) {
       const value = url.searchParams.get(key);
