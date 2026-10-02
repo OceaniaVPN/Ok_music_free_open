@@ -6,13 +6,15 @@ export async function handleApi(request, env) {
   }
 
   if (url.pathname === "/api/search") {
-    const q = (url.searchParams.get("q") || "").trim().toLowerCase();
-    const demo = [
-      { id: "demo-1", title: "Демо-трек", artist: "Ok Music", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
-      { id: "demo-2", title: "Демо-трек 2", artist: "Ok Music", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" }
-    ];
-    const tracks = q ? demo.filter(t => (t.title + " " + t.artist).toLowerCase().includes(q)) : demo;
-    return Response.json({ ok: true, query: q, tracks });
+    const q = (url.searchParams.get("q") || "").trim();
+    const zaycevUrl = "https://zaycev.net/search.html?query_search=" + encodeURIComponent(q);
+    return Response.json({
+      ok: true,
+      query: q,
+      source: "ZAYCEV.NET",
+      sourceUrl: zaycevUrl,
+      tracks: q ? [{ id: "zaycev-search", title: "Результаты поиска ZAYCEV.NET", artist: "Открыть оригинальный каталог", source: "ZAYCEV.NET", url: zaycevUrl }] : []
+    });
   }
 
   if (url.pathname === "/api/recommendations") {
