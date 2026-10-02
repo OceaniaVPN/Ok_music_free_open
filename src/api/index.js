@@ -153,13 +153,24 @@ export async function handleApi(request,env){
     const seed=(url.searchParams.get("seed")||"").trim(),mood=(url.searchParams.get("mood")||"").trim(),genres=(url.searchParams.get("genres")||"").trim(),moods=(url.searchParams.get("moods")||"").trim(),artists=(url.searchParams.get("artists")||"").trim(),now=(url.searchParams.get("now")||"").trim(),liked=(url.searchParams.get("liked")||"").trim(),refresh=(url.searchParams.get("refresh")||"").trim(),limit=Math.min(Math.max(Number(url.searchParams.get("limit")||16),6),40);
     const base=[artists,genres,moods,mood,now,liked,seed].filter(Boolean).join(", ");
     const artistQueries=artists.split(/[,;]+/).map(x=>x.trim()).filter(Boolean).slice(0,8); const queries=[...artistQueries,...artistQueries.map(a=>a+" "+genres),artists+" "+genres,genres+" "+moods,artists+" "+now,base,mood+" "+genres+" "+artists].map(x=>x.replace(/\s+/g," ").trim()).filter(Boolean);
-    const uniqueQueries=[...new Set(queries)].slice(0,5);
-    const [zr,jr]=await Promise.all([Promise.allSettled(uniqueQueries.map(q=>fetchZaycevSearch(q,Math.min(10,limit)))),Promise.allSettled(uniqueQueries.slice(0,3).map(q=>searchJamendo(q,4,env)))]);
-    const zaycev=zr.flatMap(r=>r.status==="fulfilled"?r.value:[]),jam=jr.flatMap(r=>r.status==="fulfilled"?r.value:[]),final=[],seen=new Set();
-    for(let i=0;i<Math.max(zaycev.length,jam.length)&&final.length<limit;i++)for(const list of [zaycev,jam]){const t=list[i];if(t&&!seen.has(t.id)){seen.add(t.id);final.push(t)}}
+    const refreshQueries=refresh?[...queries,...artistQueries.map(a=>a+" "+genres+" "+refresh.slice(-4)),genres+" "+moods+" "+refresh.slice(-4),artists+" "+now+" "+refresh.slice(-4)]:queries;
+    const uniqueQueries=[...new Set(refreshQueries)].filter(Boolean).slice(0,8);
+    const fetchLimit=Math.min(30,Math.max(18,limit*2));
+    const [zr,jr]=await Promise.all([
+      Promise.allSettled(uniqueQueries.map(q=>fetchZaycevSearch(q,fetchLimit))),
+      Promise.allSettled(uniqueQueries.slice(0,5).map(q=>searchJamendo(q,8,env)))
+    ]);
+    const zaycev=zr.flatMap(r=>r.status==="fulfilled"?r.value:[]),jam=jr.flatMap(r=>r.status==="fulfilled"?r.value:[]);
+    const pool=[],seen=new Set();
+    for(const list of [zaycev,jam]) for(const t of list) if(t&&!seen.has(t.id)){seen.add(t.id);pool.push(t)}
     const errors=[...zr.filter(r=>r.status==="rejected").map(r=>"Zaycev.net: "+(r.reason?.message||"ошибка")),...jr.filter(r=>r.status==="rejected").map(r=>"Jamendo: "+(r.reason?.message||"ошибка"))];
-    if(refresh&&final.length>1){let h=0;for(const ch of refresh)h=(h*31+ch.charCodeAt(0))>>>0;const shift=h%final.length;final.push(...final.splice(0,shift))}
-    return Response.json({ok:true,mode:base?"personalized":"discovery",profile:{genres,moods,artists,now},providers:[...(zaycev.length?["Zaycev.net"]:[]),...(jam.length?["Jamendo"]:[])],tracks:final.slice(0,limit),errors});
+    const wanted=artistQueries.map(x=>x.toLowerCase());
+    const preferred=pool.filter(t=>wanted.some(a=>String(t.artist||"").toLowerCase().includes(a)));
+    const rest=pool.filter(t=>!wanted.some(a=>String(t.artist||"").toLowerCase().includes(a)));
+    let h=0;for(const ch of (refresh||seed||"okmusic"))h=(h*31+ch.charCodeAt(0))>>>0;
+    const rotate=(arr)=>arr.length?arr.map((_,i)=>arr[(i+(h%arr.length))%arr.length]):[];
+    const final=[...rotate(preferred),...rotate(rest)].slice(0,limit);
+    return Response.json({ok:true,mode:base?"personalized":"discovery",profile:{genres,moods,artists,now},providers:[...(zaycev.length?["Zaycev.net"]:[]),...(jam.length?["Jamendo"]:[])],tracks:final,errors});
   }
   return Response.json({ok:false,error:"Not found"},{status:404});
 }
