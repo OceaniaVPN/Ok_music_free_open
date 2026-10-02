@@ -226,30 +226,28 @@ export async function handleApi(request, env) {
   }
 
   if (url.pathname === "/api/recommendations") {
-    const seed = (url.searchParams.get("seed") || "").trim();
-    const mood = (url.searchParams.get("mood") || "").trim();
-    const query = [seed, mood].filter(Boolean).join(" ").trim() || "популярная музыка";
-    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 12), 6), 30);
-
-    const [youtubeResult, jamendoResult] = await Promise.allSettled([
-      searchYouTubeMusic(query, limit),
-      searchJamendo(query, Math.max(4, Math.ceil(limit / 3)), env)
-    ]);
-    const youtubeTracks = youtubeResult.status === "fulfilled" ? youtubeResult.value : [];
-    const jamendoTracks = jamendoResult.status === "fulfilled" ? jamendoResult.value : [];
-
-    return Response.json({
-      ok: true,
-      query,
-      mode: seed || mood ? "personalized" : "discovery",
-      providers: [
-        ...(youtubeTracks.length ? ["YouTube Music"] : []),
-        ...(jamendoTracks.length ? ["Jamendo"] : [])
-      ],
-      tracks: [...youtubeTracks, ...jamendoTracks].slice(0, limit),
-      errors: providerErrors(youtubeResult, jamendoResult)
-    });
+    const seed=(url.searchParams.get("seed")||"").trim();
+    const mood=(url.searchParams.get("mood")||"").trim();
+    const genres=(url.searchParams.get("genres")||"").trim();
+    const moods=(url.searchParams.get("moods")||"").trim();
+    const artists=(url.searchParams.get("artists")||"").trim();
+    const now=(url.searchParams.get("now")||"").trim();
+    const liked=(url.searchParams.get("liked")||"").trim();
+    const limit=Math.min(Math.max(Number(url.searchParams.get("limit")||16),6),40);
+    const base=[artists,genres,moods,mood,now,liked,seed].filter(Boolean).join(", ");
+    const queries=[artists+" "+genres,genres+" "+moods,artists+" "+now,base,mood+" "+genres+" "+artists]
+      .map(x=>x.replace(/\\s+/g," ").trim()).filter(Boolean);
+    const uniqueQueries=[...new Set(queries)].slice(0,5);
+    const ytResults=await Promise.allSettled(uniqueQueries.map(q=>searchYouTubeMusic(q,Math.min(10,limit))));
+    const jamResults=await Promise.allSettled(uniqueQueries.slice(0,3).map(q=>searchJamendo(q,4,env)));
+    const yt=ytResults.flatMap(r=>r.status==="fulfilled"?r.value:[]);
+    const jam=jamResults.flatMap(r=>r.status==="fulfilled"?r.value:[]);
+    const final=[];const seen=new Set();
+    for(let i=0;i<Math.max(yt.length,jam.length)&&final.length<limit;i++){
+      for(const list of [yt,jam]){const t=list[i];if(t&&!seen.has(t.id)){seen.add(t.id);final.push(t)}}
+    }
+    const errors=[...ytResults.filter(r=>r.status==="rejected").map(r=>"YouTube Music: "+(r.reason?.message||"ошибка")),...jamResults.filter(r=>r.status==="rejected").map(r=>"Jamendo: "+(r.reason?.message||"ошибка"))];
+    return Response.json({ok:true,mode:base?"personalized":"discovery",profile:{genres,moods,artists,now},providers:[...(yt.length?["YouTube Music"]:[]),...(jam.length?["Jamendo"]:[])],tracks:final.slice(0,limit),errors});
   }
-
   return Response.json({ ok: false, error: "Not found" }, { status: 404 });
 }
