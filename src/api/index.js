@@ -151,7 +151,12 @@ export async function handleApi(request, env) {
         details: errors,
         query: q,
         tracks: [],
-        diagnostics: {\n          vkConfigured: Boolean(String(env.VK_ACCESS_TOKEN || "").trim()),\n          jamendoConfigured: Boolean(String(env.JAMENDO_CLIENT_ID || "").trim()),\n          errors\n        }\n      }, { status: errors.length ? 502 : 200 });
+        diagnostics: {
+          vkConfigured: Boolean(String(env.VK_ACCESS_TOKEN || "").trim()),
+          jamendoConfigured: Boolean(String(env.JAMENDO_CLIENT_ID || "").trim()),
+          errors
+        }
+      }, { status: errors.length ? 502 : 200 });
     }
 
     return Response.json({
