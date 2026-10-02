@@ -199,6 +199,7 @@ function play(t,{fromEnded=false}={}){
  currentIndex=idx;
  current=t;
  drawHomeWave();
+ updateMediaSession();
  if(!(t.audio||t.src)){toast("У этого трека нет прямого воспроизведения");return}
  const src=t.audio||t.src;
  if(audio.src!==new URL(src,location.href).href){
@@ -214,19 +215,49 @@ function playNext(){
  if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";
  drawPlayer();
 }
+function mediaArtworkUrl(image){
+ if(!image)return "";
+ try{
+  const u=new URL(image,location.href);
+  if(u.origin===location.origin)return u.href;
+  const proxy=new URL("/api/artwork",location.origin);
+  proxy.searchParams.set("url",u.href);
+  return proxy.href;
+ }catch{return ""}
+}
+function setMediaAction(name,handler){
+ try{navigator.mediaSession.setActionHandler(name,handler)}catch{}
+}
 function updateMediaSession(){
  if(!("mediaSession" in navigator)||!current)return;
+ const artwork=mediaArtworkUrl(current.image);
  navigator.mediaSession.metadata=new MediaMetadata({
   title:current.title||"Ok Music",
   artist:current.artist||"",
   album:current.album||"Ok Music",
-  artwork:current.image?[{src:current.image,sizes:"300x300"}]:[]
+  artwork:artwork?[
+   {src:artwork,sizes:"96x96"},
+   {src:artwork,sizes:"192x192"},
+   {src:artwork,sizes:"512x512"}
+  ]:[]
  });
- navigator.mediaSession.setActionHandler("play",()=>audio.play().catch(()=>{}));
- navigator.mediaSession.setActionHandler("pause",()=>audio.pause());
+ setMediaAction("play",()=>audio.play().catch(()=>{}));
+ setMediaAction("pause",()=>audio.pause());
+ setMediaAction("previoustrack",playPrevious);
+ setMediaAction("nexttrack",playNext);
+ setMediaAction("seekbackward",details=>{
+  const step=Number(details?.seekOffset)||10;
+  audio.currentTime=Math.max(0,audio.currentTime-step);
+ });
+ setMediaAction("seekforward",details=>{
+  const step=Number(details?.seekOffset)||10;
+  audio.currentTime=Math.min(audio.duration||Infinity,audio.currentTime+step);
+ });
+ setMediaAction("seekto",details=>{
+  if(!Number.isFinite(audio.duration)||!Number.isFinite(details?.seekTime))return;
+  audio.currentTime=Math.max(0,Math.min(audio.duration,details.seekTime));
+ });
  navigator.mediaSession.playbackState=playing?"playing":"paused";
- navigator.mediaSession.setActionHandler("seekbackward",()=>{audio.currentTime=Math.max(0,audio.currentTime-10)});
- navigator.mediaSession.setActionHandler("seekforward",()=>{audio.currentTime=Math.min(audio.duration||Infinity,audio.currentTime+10)});
 }
 function drawPlayer(){if(!current){playerEl.className="player";return}
  playerEl.className="player on";
