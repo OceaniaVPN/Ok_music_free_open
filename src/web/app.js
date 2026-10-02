@@ -1,113 +1,89 @@
 export function renderApp(request, env) {
   const appName = env.APP_NAME || "Ok Music";
-  const html = `<!doctype html>
+  const html = String.raw`<!doctype html>
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#090a10">
 <title>${appName}</title>
 <style>
-:root{color-scheme:dark;font-family:Inter,system-ui,-apple-system,sans-serif}
-*{box-sizing:border-box}
-body{margin:0;background:#0c0d10;color:#f7f7f8}
-.app{max-width:760px;margin:0 auto;min-height:100vh;padding:22px 18px 30px}
-header{padding:12px 0 22px}h1{margin:0;font-size:34px;letter-spacing:-1px}header p{margin:6px 0;color:#9295a1}
-.view{min-height:54vh}
-.hero{padding:24px;border:1px solid #292b34;border-radius:24px;background:linear-gradient(145deg,#181a21,#111217);margin-bottom:16px}
-.cover{width:100%;aspect-ratio:1;border-radius:20px;background:radial-gradient(circle at 35% 25%,#565b72,#20222b 42%,#111217 72%);display:grid;place-items:center;font-size:64px;margin-bottom:18px;overflow:hidden}.cover img{width:100%;height:100%;object-fit:cover}
-.track-title{font-size:24px;font-weight:750}.artist{color:#a3a6b2;margin-top:5px}
-.controls{display:flex;align-items:center;justify-content:center;gap:12px;margin:20px 0}.controls button{width:48px;height:48px;padding:0;border-radius:50%}.controls .play{width:62px;height:62px;background:#f5f5f5;color:#111;font-size:22px}
-.progress{width:100%;height:6px}.time{display:flex;justify-content:space-between;color:#777b88;font-size:12px;margin-top:6px}
-.row,.search{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.search{margin:12px 0}.search input{flex:1;min-width:0}
-button,input{font:inherit}button{padding:12px 14px;border:1px solid #2b2d36;border-radius:14px;background:#1c1e25;color:inherit;cursor:pointer}button:hover{background:#252832}
-input{padding:13px;border:1px solid #2b2d36;border-radius:14px;background:#17181e;color:inherit}
-.result{display:flex;align-items:center;gap:12px;padding:13px 4px;border-bottom:1px solid #252731}.mini{width:56px;height:56px;flex:0 0 56px;border-radius:12px;background:linear-gradient(145deg,#303441,#191b22);display:grid;place-items:center;font-size:20px;overflow:hidden}.mini img{width:100%;height:100%;object-fit:cover}
-.result main{flex:1;min-width:0;font-weight:650}.result small{display:block;color:#858894;margin-top:3px;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.result .source{display:block;color:#666a77;margin-top:2px;font-size:11px;font-weight:400}.result .play-result{min-width:76px;padding:9px 12px;font-weight:700}
-.like-on{background:#f5f5f5;color:#111}.empty{color:#777b88;padding:20px 0}
-nav{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;position:sticky;bottom:8px;margin-top:18px;padding:8px;border:1px solid #252731;border-radius:18px;background:#121319ef;backdrop-filter:blur(14px)}nav button{border:0;background:transparent}
-footer{margin-top:20px;padding:16px 0;opacity:.55;font-size:11px;text-align:center}
-@media(max-width:430px){.app{padding:22px 18px 28px}.hero{padding:16px}.cover{aspect-ratio:1}.track-title{font-size:21px}nav button{padding:11px 8px}}
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+:root{color-scheme:dark;font-family:Manrope,system-ui,sans-serif;--bg:#080910;--panel:rgba(19,21,32,.72);--panel2:#151827;--text:#f8f8ff;--muted:#9499ad;--line:rgba(255,255,255,.09);--a:#8b5cf6;--b:#22d3ee;--pink:#ec4899}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:radial-gradient(circle at 15% 0%,#24134a 0,transparent 34%),radial-gradient(circle at 90% 18%,#063b50 0,transparent 30%),var(--bg);color:var(--text)}
+body{overflow-x:hidden}.app{width:min(1080px,100%);margin:auto;padding:24px 20px 120px}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:6px 0 28px}.brand{display:flex;align-items:center;gap:12px}.logo{width:48px;height:48px;border-radius:16px;background:linear-gradient(135deg,var(--a),var(--pink) 55%,var(--b));display:grid;place-items:center;box-shadow:0 10px 40px #8b5cf633;font-size:24px}.brand h1{margin:0;font-size:22px;letter-spacing:-.7px}.brand span{display:block;color:var(--muted);font-size:11px;margin-top:2px}.avatar{width:42px;height:42px;border:1px solid var(--line);border-radius:50%;background:var(--panel);color:white}
+.hero{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:30px;padding:34px;background:linear-gradient(135deg,rgba(139,92,246,.25),rgba(34,211,238,.08) 55%,rgba(236,72,153,.12));box-shadow:0 30px 90px #0008;margin-bottom:22px}.hero:after{content:"";position:absolute;width:260px;height:260px;border-radius:50%;background:#8b5cf655;filter:blur(70px);right:-100px;top:-100px}.hero h2{position:relative;z-index:1;font-size:clamp(30px,6vw,58px);line-height:1.02;max-width:650px;margin:0 0 12px;letter-spacing:-2px}.hero p{position:relative;z-index:1;color:#c1c5d5;margin:0 0 24px;max-width:600px}.searchbar{position:relative;z-index:2;display:flex;gap:10px;max-width:700px}.searchbar input{flex:1;min-width:0}.input{width:100%;border:1px solid var(--line);border-radius:17px;padding:15px 17px;background:rgba(8,9,16,.62);color:white;outline:0}.input:focus{border-color:#9b7aff;box-shadow:0 0 0 4px #8b5cf622}.primary{border:0!important;background:linear-gradient(135deg,var(--a),var(--pink));font-weight:800;box-shadow:0 10px 30px #8b5cf633}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.card{border:1px solid var(--line);background:var(--panel);backdrop-filter:blur(20px);border-radius:22px;padding:14px;transition:.2s transform,.2s border-color}.card:hover{transform:translateY(-3px);border-color:#ffffff25}.cover{aspect-ratio:1;border-radius:17px;background:linear-gradient(135deg,#272a3d,#11121c);overflow:hidden;position:relative;display:grid;place-items:center;font-size:38px}.cover img{width:100%;height:100%;object-fit:cover}.cover .play{position:absolute;right:10px;bottom:10px;width:44px;height:44px;border:0;border-radius:50%;background:white;color:#111;opacity:0;transform:translateY(5px);transition:.2s;font-size:16px}.card:hover .cover .play{opacity:1;transform:none}.title{font-weight:800;margin-top:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sub{font-size:12px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.section{display:flex;align-items:end;justify-content:space-between;margin:30px 2px 14px}.section h2{margin:0;font-size:21px;letter-spacing:-.6px}.section small{color:var(--muted)}
+.results{display:grid;gap:8px}.result{display:flex;align-items:center;gap:14px;padding:10px;border:1px solid transparent;border-radius:18px;transition:.15s}.result:hover{background:rgba(255,255,255,.04);border-color:var(--line)}.mini{width:62px;height:62px;flex:0 0 62px;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,#292d40,#11121a);display:grid;place-items:center;font-size:23px}.mini img{width:100%;height:100%;object-fit:cover}.meta{min-width:0;flex:1}.meta strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.meta span{display:block;color:var(--muted);font-size:12px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.actions{display:flex;gap:7px}.icon{width:40px;height:40px;padding:0;border-radius:13px}
+button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--line);background:rgba(255,255,255,.045);border-radius:14px;padding:11px 14px;transition:.15s}button:hover{background:rgba(255,255,255,.1);transform:translateY(-1px)}
+.empty{border:1px dashed var(--line);border-radius:20px;padding:35px;text-align:center;color:var(--muted)}
+.player{position:fixed;z-index:10;left:50%;bottom:14px;transform:translateX(-50%);width:min(760px,calc(100% - 22px));border:1px solid #ffffff18;background:rgba(14,15,24,.9);backdrop-filter:blur(28px);border-radius:24px;padding:12px 14px;box-shadow:0 25px 80px #000b;display:none}.player.on{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:13px}.pcover{width:50px;height:50px;border-radius:14px;overflow:hidden;background:#25283a;display:grid;place-items:center}.pcover img{width:100%;height:100%;object-fit:cover}.pmeta{min-width:0}.pmeta strong,.pmeta span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pmeta span{font-size:11px;color:var(--muted);margin-top:3px}.pc{display:flex;align-items:center;gap:7px}.pc .big{width:48px;height:48px;border-radius:50%;background:white;color:#111;border:0}.seek{grid-column:1/-1;width:100%;accent-color:#a78bfa}.time{font-size:10px;color:var(--muted)}
+.nav{position:fixed;z-index:9;bottom:14px;left:50%;transform:translateX(-50%);width:min(520px,calc(100% - 22px));display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:7px;border:1px solid #ffffff15;border-radius:22px;background:rgba(13,14,22,.78);backdrop-filter:blur(22px);box-shadow:0 20px 60px #0009}.nav button{border:0;background:transparent;padding:11px 7px;color:#8f93a7;font-size:12px}.nav button.active{background:linear-gradient(135deg,#8b5cf622,#ec489922);color:white}
+.playlist{display:flex;align-items:center;gap:14px;padding:13px;border:1px solid var(--line);border-radius:20px;background:var(--panel);margin-bottom:10px}.playlist .pic{width:58px;height:58px;border-radius:15px;background:linear-gradient(135deg,var(--a),var(--pink));display:grid;place-items:center;font-size:24px}.playlist main{flex:1;min-width:0}.playlist strong{display:block}.playlist span{font-size:12px;color:var(--muted)}.danger{color:#fb7185}
+.modal{position:fixed;inset:0;z-index:20;background:#0009;backdrop-filter:blur(10px);display:none;place-items:center;padding:18px}.modal.open{display:grid}.dialog{width:min(440px,100%);background:#131521;border:1px solid var(--line);border-radius:25px;padding:22px;box-shadow:0 30px 100px #000}.dialog h3{margin:0 0 8px}.dialog p{color:var(--muted);font-size:13px}.dialog .row{display:flex;gap:8px;margin-top:16px}
+.toast{position:fixed;z-index:30;top:20px;left:50%;transform:translate(-50%,-15px);opacity:0;pointer-events:none;padding:12px 17px;border:1px solid var(--line);background:#171927eF;border-radius:15px;transition:.2s}.toast.show{opacity:1;transform:translate(-50%,0)}
+@media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}.hero{padding:25px}.player{bottom:82px}.nav{bottom:12px}}@media(max-width:480px){.app{padding:18px 14px 150px}.top{margin-bottom:20px}.hero{border-radius:24px;padding:22px}.searchbar{flex-direction:column}.grid{gap:10px}.card{padding:10px}.cover .play{opacity:1;transform:none}.player.on{grid-template-columns:auto 1fr}.pc{grid-column:3}.player{padding:10px}.nav{width:calc(100% - 18px)}}
 </style>
 </head>
 <body>
-<main class="app">
-<header><h1>Ok Music</h1><p>Музыка под твоё настроение</p></header>
-<section id="view" class="view">
-  <div class="hero">
-    <div class="cover">♫</div>
-    <div class="track-title">Демо-трек</div>
-    <div class="artist">Ok Music</div>
-    <input class="progress" id="progress" type="range" min="0" max="100" value="0">
-    <div class="time"><span id="cur">0:00</span><span id="dur">0:00</span></div>
-    <div class="controls"><button id="prev">‹‹</button><button class="play" id="play">▶</button><button id="next">››</button></div>
-    <div class="row"><button id="like">♡ Нравится</button><button id="next2">Следующий</button></div>
-    <p style="color:#777b88;font-size:11px;margin:14px 0 0">Источник: Ok Music</p>
-  </div>
-</section>
-<nav><button data-view="mood">Моё настроение</button><button data-view="search">Поиск</button><button data-view="library">Понравившиеся</button></nav>
-<footer>Ok_music_llc<br>© 2026–2027. Все права защищены.<br>Источники: Jamendo · Hitmos.me · Zaycev.net · Zvuch.com · My.Mail.ru Music</footer>
-</main>
+<div class="app">
+  <header class="top"><div class="brand"><div class="logo">♫</div><div><h1>Ok Music</h1><span>Твоя музыка. Твоё настроение.</span></div></div><button class="avatar">♪</button></header>
+  <main id="view"></main>
+</div>
+<div id="player" class="player"></div>
+<nav class="nav"><button data-view="home" class="active">⌂<br>Главная</button><button data-view="search">⌕<br>Поиск</button><button data-view="library">▣<br>Моя музыка</button></nav>
+<div id="modal" class="modal"><div class="dialog"><h3>Новый плейлист</h3><p>Придумай название — треки можно будет добавлять из поиска.</p><input id="playlistName" class="input" placeholder="Например: Ночная поездка"><div class="row"><button id="closeModal">Отмена</button><button id="createPlaylist" class="primary">Создать</button></div></div></div>
+<div id="toast" class="toast"></div>
 <script>
-const view=document.querySelector("#view");
-const audio=new Audio();
-let playing=false,current=0,liked=[];
-const moodTracks=[
- {id:"demo-1",title:"Демо-трек",artist:"Ok Music",src:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"},
- {id:"demo-2",title:"Демо-трек 2",artist:"Ok Music",src:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"}
-];
-let tracks=[...moodTracks];
-
+const view=document.querySelector("#view"), playerEl=document.querySelector("#player"), modal=document.querySelector("#modal"), toastEl=document.querySelector("#toast");
+const KEY="okmusic:v2"; const state=JSON.parse(localStorage.getItem(KEY)||'{"liked":[],"playlists":[]}');
+let tracks=[], current=null, audio=new Audio(), playing=false;
+const demos=[
+{id:"demo-1",title:"Midnight Waves",artist:"Ok Music",image:"",audio:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",source:"Demo"},
+{id:"demo-2",title:"Neon Drive",artist:"Ok Music",image:"",audio:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",source:"Demo"},
+{id:"demo-3",title:"Afterglow",artist:"Ok Music",image:"",audio:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",source:"Demo"},
+{id:"demo-4",title:"Ocean Lights",artist:"Ok Music",image:"",audio:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",source:"Demo"}];
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
-function fmt(s){return Number.isFinite(s)?Math.floor(s/60)+":"+String(Math.floor(s%60)).padStart(2,"0"):"0:00"}
-function sync(){
- const p=document.querySelector("#progress"); if(!p)return;
- p.value=audio.duration?audio.currentTime/audio.duration*100:0;
- const cur=document.querySelector("#cur"),dur=document.querySelector("#dur"),play=document.querySelector("#play");
- if(cur)cur.textContent=fmt(audio.currentTime); if(dur)dur.textContent=fmt(audio.duration);
- if(play)play.textContent=playing?"Ⅱ":"▶";
+function save(){localStorage.setItem(KEY,JSON.stringify(state))}
+function toast(s){toastEl.textContent=s;toastEl.classList.add("show");clearTimeout(window._toast);window._toast=setTimeout(()=>toastEl.classList.remove("show"),1800)}
+function fmt(n){return Number.isFinite(n)&&n>0?Math.floor(n/60)+":"+String(Math.floor(n%60)).padStart(2,"0"):"0:00"}
+function card(t){return '<article class="card"><div class="cover">'+(t.image?'<img src="'+esc(t.image)+'" loading="lazy">':"♫")+'<button class="play" data-play="'+esc(t.id)+'">▶</button></div><div class="title">'+esc(t.title)+'</div><div class="sub">'+esc(t.artist)+'</div></article>'}
+function result(t){const liked=state.liked.some(x=>x.id===t.id);return '<div class="result"><div class="mini">'+(t.image?'<img src="'+esc(t.image)+'" loading="lazy">':"♫")+'</div><div class="meta"><strong>'+esc(t.title)+'</strong><span>'+esc(t.artist)+(t.album?" · "+esc(t.album):"")+'</span></div><div class="actions"><button class="icon" data-like="'+esc(t.id)+'">'+(liked?"♥":"♡")+'</button><button class="icon" data-play="'+esc(t.id)+'">▶</button></div></div>'}
+function bind(container=view){container.querySelectorAll("[data-play]").forEach(b=>b.onclick=()=>play(tracks.find(t=>t.id===b.dataset.play)||state.liked.find(t=>t.id===b.dataset.play)));container.querySelectorAll("[data-like]").forEach(b=>b.onclick=()=>like(tracks.find(t=>t.id===b.dataset.like)||state.liked.find(t=>t.id===b.dataset.like)))}
+function home(){
+ tracks=demos;
+ view.innerHTML='<section class="hero"><h2>Музыка, которая звучит <em>как ты.</em></h2><p>Ищи треки, собирай коллекции и включай любимое в один клик.</p><div class="searchbar"><input id="homeQ" class="input" placeholder="Что хочется послушать?"><button id="homeSearch" class="primary">Найти музыку</button></div></section><div class="section"><h2>Для тебя</h2><small>Подборка дня</small></div><div class="grid">'+demos.map(card).join("")+'</div>';
+ document.querySelector("#homeSearch").onclick=()=>doSearch(document.querySelector("#homeQ").value);document.querySelector("#homeQ").onkeydown=e=>{if(e.key==="Enter")doSearch(e.target.value)};bind()
 }
-function player(t){
- if(!t)return;
- const idx=tracks.findIndex(x=>x.id===t.id); if(idx>=0)current=idx;
- const likedNow=liked.some(x=>x.id===t.id);
- const cover=t.image?'<img src="'+esc(t.image)+'" alt="">':"♫";
- view.innerHTML='<div class="hero"><div class="cover">'+cover+'</div><div class="track-title">'+esc(t.title)+'</div><div class="artist">'+esc(t.artist)+'</div><input class="progress" id="progress" type="range" min="0" max="100" value="0"><div class="time"><span id="cur">0:00</span><span id="dur">0:00</span></div><div class="controls"><button id="prev">‹‹</button><button class="play" id="play">▶</button><button id="next">››</button></div><div class="row"><button id="like" class="'+(likedNow?"like-on":"")+'">'+(likedNow?"♥ В понравившихся":"♡ Нравится")+'</button><button id="next2">Следующий</button></div><p style="color:#777b88;font-size:11px;margin:14px 0 0">Источник: '+esc(t.source||"Ok Music")+'</p></div>';
- document.querySelector("#play").onclick=toggle; document.querySelector("#next").onclick=next; document.querySelector("#next2").onclick=next; document.querySelector("#prev").onclick=prev;
- document.querySelector("#like").onclick=()=>toggleLike(t);
- document.querySelector("#progress").oninput=e=>{if(audio.duration)audio.currentTime=audio.duration*e.target.value/100};
- audio.onloadedmetadata=sync; audio.ontimeupdate=sync; audio.onended=next;
- audio.onerror=()=>{playing=false;sync()};
- audio.src=t.audio||t.src||""; sync();
+function searchView(){
+ view.innerHTML='<div class="section"><h2>Поиск музыки</h2><small>Jamendo · свободные каталожные треки</small></div><div class="searchbar"><input id="q" class="input" placeholder="Исполнитель, название, жанр…"><button id="go" class="primary">Искать</button></div><div id="results" class="results" style="margin-top:18px"><div class="empty">Начни с названия трека или исполнителя.</div></div>';
+ document.querySelector("#go").onclick=()=>doSearch(document.querySelector("#q").value);document.querySelector("#q").onkeydown=e=>{if(e.key==="Enter")doSearch(e.target.value)}
 }
-function toggleLike(t){const i=liked.findIndex(x=>x.id===t.id);if(i>=0)liked.splice(i,1);else liked.unshift(t);player(t)}
-async function toggle(){if(playing){audio.pause();playing=false;sync();return}if(!audio.src)return;try{await audio.play();playing=true}catch(e){playing=false}sync()}
-function next(){if(!tracks.length)return;current=(current+1)%tracks.length;playing=false;player(tracks[current]);toggle()}
-function prev(){if(!tracks.length)return;current=(current-1+tracks.length)%tracks.length;playing=false;player(tracks[current]);toggle()}
-async function search(){
- const q=document.querySelector("#q").value.trim(),box=document.querySelector("#results"); if(!q){box.innerHTML='<p class="empty">Введи название трека или исполнителя.</p>';return}
- box.innerHTML='<p class="empty">Ищу в Jamendo…</p>';
- try{const r=await fetch("/api/search?q="+encodeURIComponent(q));const data=await r.json();if(!data.ok)throw Error();
- tracks=data.tracks||[];
- box.innerHTML=tracks.length?tracks.map(x=>'<div class="result"><div class="mini">'+(x.image?'<img src="'+esc(x.image)+'" alt="">':"♫")+'</div><main>'+esc(x.title)+'<small>'+esc(x.artist)+'</small><span class="source">Jamendo'+(data.languageFilter==="ru"?" · RU":"")+'</span></main><button class="play-result" type="button" data-play="'+esc(x.id)+'">▶ Плей</button></div>').join(""):'<p class="empty">В Jamendo ничего не найдено.</p>';
- box.querySelectorAll("[data-play]").forEach(b=>b.onclick=()=>{const t=tracks.find(x=>x.id===b.dataset.play);if(t){player(t);toggle()}});
- }catch(e){box.innerHTML='<p class="empty">Не удалось выполнить поиск. Попробуй ещё раз.</p>'}
+async function doSearch(q){
+ q=String(q||"").trim(); if(!q){toast("Введи запрос");return}
+ if(!document.querySelector("#results")){render("search");document.querySelector("#q").value=q}
+ const box=document.querySelector("#results");box.innerHTML='<div class="empty">Ищу музыку…<br><small>Подбираю совпадения и обложки</small></div>';
+ try{const r=await fetch("/api/search?q="+encodeURIComponent(q)+"&limit=30");const d=await r.json();if(!d.ok)throw Error(d.error||"Ошибка");tracks=d.tracks||[];box.innerHTML=tracks.length?tracks.map(result).join(""):'<div class="empty">Ничего не нашлось. Попробуй другой запрос.</div>';bind(box)}catch(e){box.innerHTML='<div class="empty">Поиск временно недоступен.<br><small>'+esc(e.message)+'</small></div>'}
 }
 function library(){
- view.innerHTML='<h2>Понравившиеся</h2><p style="color:#9295a1">Сохранено: '+liked.length+'</p><div id="likes"></div>';
- const box=document.querySelector("#likes");
- box.innerHTML=liked.length?liked.map(x=>'<div class="result"><div class="mini">'+(x.image?'<img src="'+esc(x.image)+'" alt="">':"♥")+'</div><main>'+esc(x.title)+'<small>'+esc(x.artist)+'</small><span class="source">'+esc(x.source||"Ok Music")+'</span></main><button data-play="'+esc(x.id)+'">▶</button><button data-remove="'+esc(x.id)+'">×</button></div>').join(""):'<p class="empty">Здесь пока пусто. Нажми ♡ у трека.</p>';
- box.querySelectorAll("[data-play]").forEach(b=>b.onclick=()=>{const t=liked.find(x=>x.id===b.dataset.play);if(t){player(t);toggle()}});
- box.querySelectorAll("[data-remove]").forEach(b=>b.onclick=()=>{liked=liked.filter(x=>x.id!==b.dataset.remove);library()});
+ view.innerHTML='<div class="section"><h2>Моя музыка</h2><button id="newPlaylist" class="primary">＋ Плейлист</button></div><div class="section"><h2>♥ Понравившиеся</h2><small>'+state.liked.length+' треков</small></div><div id="liked" class="results"></div><div class="section"><h2>Мои плейлисты</h2></div><div id="playlists"></div>';
+ const liked=document.querySelector("#liked");liked.innerHTML=state.liked.length?state.liked.map(result).join(""):'<div class="empty">Пока ничего нет.<br>Нажимай ♡ рядом с любимыми треками.</div>';bind(liked);
+ document.querySelector("#newPlaylist").onclick=()=>{modal.classList.add("open");document.querySelector("#playlistName").focus()};
+ const ps=document.querySelector("#playlists");ps.innerHTML=state.playlists.length?state.playlists.map(p=>'<div class="playlist"><div class="pic">♫</div><main><strong>'+esc(p.name)+'</strong><span>'+p.tracks.length+' треков</span></main><button data-pl="'+esc(p.id)+'">Открыть</button><button class="danger" data-del="'+esc(p.id)+'">×</button></div>').join(""):'<div class="empty">Создай первый плейлист — например, «В дорогу».</div>';
+ ps.querySelectorAll("[data-pl]").forEach(b=>b.onclick=()=>openPlaylist(b.dataset.pl));ps.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{state.playlists=state.playlists.filter(p=>p.id!==b.dataset.del);save();library();toast("Плейлист удалён")});
 }
-const views={
- mood:()=>{tracks=[...moodTracks];current=0;player(tracks[0])},
- search:()=>{view.innerHTML='<h2>Поиск</h2><div class="search"><input id="q" placeholder="Исполнитель или трек"><button id="search">Найти</button></div><div id="results"></div>';document.querySelector("#search").onclick=search;document.querySelector("#q").onkeydown=e=>{if(e.key==="Enter")search()}},
- library
-};
-function render(name){views[name]();document.querySelectorAll("nav button").forEach(b=>b.style.background=b.dataset.view===name?"#252832":"transparent")}
-document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>render(b.dataset.view));
-render("mood");
+function openPlaylist(id){const p=state.playlists.find(x=>x.id===id);if(!p)return;tracks=p.tracks;view.innerHTML='<div class="section"><h2>'+esc(p.name)+'</h2><small>'+p.tracks.length+' треков</small></div><div class="results">'+(p.tracks.length?p.tracks.map(result).join(""):'<div class="empty">Добавляй треки из поиска.</div>')+'</div>';bind()}
+function like(t){if(!t)return;const i=state.liked.findIndex(x=>x.id===t.id);if(i>=0){state.liked.splice(i,1);toast("Убрано из любимого")}else{state.liked.unshift(t);toast("♥ Добавлено в любимое")}save();render(document.querySelector(".nav button.active").dataset.view)}
+function play(t){if(!t||!(t.audio||t.src)){toast("У этого трека нет прямого воспроизведения");return}current=t;audio.src=t.audio||t.src;audio.play().then(()=>{playing=true;drawPlayer()}).catch(()=>toast("Браузер не разрешил воспроизведение"))}
+function drawPlayer(){if(!current){playerEl.className="player";return}playerEl.className="player on";playerEl.innerHTML='<div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>';
+ document.querySelector("#pause").onclick=()=>{if(playing){audio.pause();playing=false}else{audio.play();playing=true}drawPlayer()};document.querySelector("#seek").oninput=e=>{if(audio.duration)audio.currentTime=audio.duration*e.target.value/100}}
+audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration)}
+audio.onended=()=>{playing=false;drawPlayer()}
+document.querySelector("#closeModal").onclick=()=>modal.classList.remove("open");modal.onclick=e=>{if(e.target===modal)modal.classList.remove("open")};
+document.querySelector("#createPlaylist").onclick=()=>{const name=document.querySelector("#playlistName").value.trim();if(!name)return toast("Введи название");state.playlists.unshift({id:"pl-"+Date.now(),name,tracks:[]});save();document.querySelector("#playlistName").value="";modal.classList.remove("open");library();toast("Плейлист создан ✨")}
+function render(name){document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));({home,search:searchView,library}[name]||home)()}
+render("home");
 </script>
 </body></html>`;
-  return new Response(html,{headers:{"content-type":"text/html; charset=utf-8"}});
+  return new Response(html,{headers:{"content-type":"text/html; charset=utf-8; charset=utf-8"}});
 }
