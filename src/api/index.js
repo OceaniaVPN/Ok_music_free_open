@@ -14,81 +14,50 @@ function normalizeJamendo(t) {
   };
 }
 
-function normalizeVk(t) {
-  const audio = t.url || t.audio_url || t.stream_url || "";
-  const title = t.title || t.name || "";
-  const artist = t.artist || t.performer || t.artist_name || "";
-  if (!audio || !title || !artist) return null;
 
+function normalizeYouTube(t) {
+  const id = String(t?.id?.videoId || "").trim();
+  if (!id) return null;
+  const snippet = t.snippet || {};
+  const title = String(snippet.title || "Без названия");
+  const artist = String(snippet.channelTitle || "YouTube");
   return {
-    id: "vk-" + String(t.owner_id ?? t.oid ?? "0") + "-" + String(t.id ?? t.track_id ?? Math.random()),
-    title: String(title),
-    artist: String(artist),
-    album: String(t.album?.title || t.album_name || ""),
-    image: String(t.thumb?.photo_600 || t.thumb?.photo_300 || t.image || ""),
-    audio: String(audio),
-    duration: Number(t.duration || 0),
+    id: "youtube-" + id,
+    youtubeId: id,
+    title,
+    artist,
+    album: "",
+    image: String(snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || ""),
+    audio: "",
+    duration: 0,
     license: "",
-    source: "VK",
-    sourceUrl: String(t.url || "https://vk.ru/"),
-    genre: String(t.genre || "")
+    source: "YouTube Music",
+    sourceUrl: "https://www.youtube.com/watch?v=" + encodeURIComponent(id),
+    genre: ""
   };
 }
 
-function uniqueTracks(tracks, limit) {
-  const seen = new Set();
-  return tracks.filter(track => {
-    if (!track?.id || seen.has(track.id)) return false;
-    seen.add(track.id);
-    return true;
-  }).slice(0, limit);
-}
+async function searchYouTube(q, limit, env) {
+  const key = String(env.YOUTUBE_API_KEY || "").trim();
+  if (!key) throw new Error("YOUTUBE_API_KEY не задан");
 
-async function searchVk(q, limit, env) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
-  const token = String(env.VK_ACCESS_TOKEN || "").trim();
-  const userAgent = String(
-    env.VK_USER_AGENT ||
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
-  ).trim();
-
-  if (!token) throw new Error("VK_ACCESS_TOKEN не задан");
-
-  const api = new URL("https://api.vk.ru/method/audio.search");
-  api.searchParams.set("v", "5.199");
+  const api = new URL("https://www.googleapis.com/youtube/v3/search");
+  api.searchParams.set("key", key);
+  api.searchParams.set("part", "snippet");
+  api.searchParams.set("type", "video");
+  api.searchParams.set("videoCategoryId", "10");
+  api.searchParams.set("maxResults", String(Math.min(Math.max(limit, 1), 50)));
   api.searchParams.set("q", q);
-  api.searchParams.set("count", String(Math.min(Math.max(limit, 1), 100)));
-  api.searchParams.set("sort", "2");
 
-  let response;
-  try {
-    response = await fetch(api, {
-      headers: {
-        accept: "application/json",
-        authorization: `Bearer ${token}`,
-        "user-agent": userAgent
-      },
-      signal: controller.signal
-    });
-  } catch (error) {
-    throw new Error(error?.name === "AbortError" ? "VK timeout" : "VK network error");
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  if (!response.ok) throw new Error("VK HTTP " + response.status);
-
+  const response = await fetch(api, { headers: { accept: "application/json" } });
+  if (!response.ok) throw new Error("YouTube HTTP " + response.status);
   const data = await response.json();
-
   if (data?.error) {
-    const code = data.error.error_code ?? "unknown";
-    const message = data.error.error_msg || "VK API error";
-    throw new Error("VK " + code + ": " + message);
+    const message = data.error?.message || "YouTube API error";
+    throw new Error("YouTube: " + message);
   }
 
-  const items = Array.isArray(data?.response?.items) ? data.response.items : [];
-  return uniqueTracks(items.map(normalizeVk).filter(Boolean), limit);
+  return uniqueTracks((data.items || []).map(normalizeYouTube).filter(Boolean), limit);
 }
 
 async function searchJamendo(q, limit, env) {
@@ -120,11 +89,8 @@ export async function handleApi(request, env) {
       ok: true,
       service: env.APP_NAME || "Ok Music",
       version: "4.0",
-      providers: ["VK", "Jamendo"],
-      vk: {
-        configured: Boolean(String(env.VK_ACCESS_TOKEN || "").trim()),
-        userAgent: Boolean(String(env.VK_USER_AGENT || "").trim())
-      }
+      providers: ["YouTube Music", "Jamendo"],
+      youtube: { configured: Boolean(String(env.YOUTUBE_API_KEY || "").trim()) }
     });
   }
 
@@ -133,18 +99,15 @@ export async function handleApi(request, env) {
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 24), 1), 50);
     if (!q) return Response.json({ ok: true, query: "", tracks: [], providers: [] });
 
-    const [vkResult, jamendoResult] = await Promise.allSettled([
-      searchVk(q, limit, env),
-      searchJamendo(q, Math.max(6, Math.ceil(limit / 3)), env)
-    ]);
+    const [youtubeResult, jamendoResult] = await Promise.allSettled([\n      searchYouTube(q, limit, env),\n      searchJamendo(q, Math.max(6, Math.ceil(limit / 3)), env)\n    ]);
 
-    const vkTracks = vkResult.status === "fulfilled" ? vkResult.value : [];
+    const youtubeTracks = youtubeResult.status === "fulfilled" ? youtubeResult.value : [];
     const jamendoTracks = jamendoResult.status === "fulfilled" ? jamendoResult.value : [];
-    const tracks = [...vkTracks, ...jamendoTracks].slice(0, limit);
+    const tracks = [...youtubeTracks, ...jamendoTracks].slice(0, limit);
 
     if (!tracks.length) {
       const errors = [
-        vkResult.status === "rejected" ? "VK: " + (vkResult.reason?.message || "ошибка") : "",
+        youtubeResult.status === "rejected" ? "YouTube: " + (youtubeResult.reason?.message || "ошибка") : "",
         jamendoResult.status === "rejected" ? "Jamendo: " + (jamendoResult.reason?.message || "ошибка") : ""
       ].filter(Boolean);
 
@@ -155,7 +118,7 @@ export async function handleApi(request, env) {
         query: q,
         tracks: [],
         diagnostics: {
-          vkConfigured: Boolean(String(env.VK_ACCESS_TOKEN || "").trim()),
+          youtubeConfigured: Boolean(String(env.YOUTUBE_API_KEY || "").trim()),
           jamendoConfigured: Boolean(String(env.JAMENDO_CLIENT_ID || "").trim()),
           errors
         }
@@ -179,14 +142,11 @@ export async function handleApi(request, env) {
     const query = [seed, mood].filter(Boolean).join(" ").trim() || "популярная музыка";
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 12), 6), 30);
 
-    const [vkResult, jamendoResult] = await Promise.allSettled([
-      searchVk(query, limit, env),
-      searchJamendo(query, Math.max(4, Math.ceil(limit / 3)), env)
-    ]);
+    const [youtubeResult, jamendoResult] = await Promise.allSettled([\n      searchYouTube(query, limit, env),\n      searchJamendo(query, Math.max(4, Math.ceil(limit / 3)), env)\n    ]);
 
-    const vkTracks = vkResult.status === "fulfilled" ? vkResult.value : [];
+    const youtubeTracks = youtubeResult.status === "fulfilled" ? youtubeResult.value : [];
     const jamendoTracks = jamendoResult.status === "fulfilled" ? jamendoResult.value : [];
-    const tracks = [...vkTracks, ...jamendoTracks].slice(0, limit);
+    const tracks = [...youtubeTracks, ...jamendoTracks].slice(0, limit);
 
     return Response.json({
       ok: true,
@@ -197,8 +157,7 @@ export async function handleApi(request, env) {
         ...(jamendoTracks.length ? ["Jamendo"] : [])
       ],
       tracks,
-      errors: [
-        ...(vkResult.status === "rejected" ? ["VK: " + (vkResult.reason?.message || "ошибка")] : []),
+      errors: [\n        ...(youtubeResult.status === "rejected" ? ["YouTube: " + (youtubeResult.reason?.message || "ошибка")] : []),
         ...(jamendoResult.status === "rejected" ? ["Jamendo: " + (jamendoResult.reason?.message || "ошибка")] : [])
       ]
     });
