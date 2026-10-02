@@ -194,7 +194,7 @@ export async function handleApi(request, env) {
 
   if (url.pathname === "/api/zaycev/play") {
     const id=(url.searchParams.get("id")||"").trim();
-    if(!/^\\d+$/.test(id)) return Response.json({ok:false,error:"Invalid Zaycev track id"},{status:400});
+    if(!/^\d+$/.test(id)) return Response.json({ok:false,error:"Invalid Zaycev track id"},{status:400});
     try{return Response.redirect(await zaycevPlay(id,env),302)}catch(e){return Response.json({ok:false,error:e?.message||"Zaycev playback unavailable"},{status:502})}
   }
 
