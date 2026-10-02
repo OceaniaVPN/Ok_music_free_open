@@ -38,6 +38,51 @@ button,input{font:inherit;touch-action:manipulation}button{border:1px solid var(
 @media(max-width:1000px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}.moods{grid-template-columns:repeat(3,minmax(0,1fr))}.hero{padding:34px}}
 @media(max-width:700px){.app{padding:14px 13px calc(220px + env(safe-area-inset-bottom))}.top{margin:2px 0 17px}.brand h1{font-size:21px}.logo{width:47px;height:47px}.hero{padding:22px;border-radius:25px}.hero h2{font-size:clamp(30px,9vw,40px);letter-spacing:-1.7px}.hero p{font-size:12px}.searchbar{flex-direction:column}.searchbar button{width:100%}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.card{padding:9px;border-radius:20px}.cover{border-radius:15px}.cover .play{opacity:1;transform:none}.card-body{padding:9px 2px 2px}.title{font-size:12px}.sub{font-size:10px}.source-badge{font-size:7px;padding:4px 6px}.meta-pill{font-size:8px;padding:4px 6px}.section{margin:25px 1px 11px}.section h2{font-size:19px}.section small{font-size:9px}.wave-card{padding:9px;border-radius:24px}.wave-cover{aspect-ratio:1/1;border-radius:18px}.wave-info{grid-template-columns:1fr;gap:9px;padding:12px 3px 3px}.wave-info h2{font-size:22px}.wave-actions{justify-content:space-between}.taste-panel{padding:14px;border-radius:21px}.moods{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.mood-card{min-height:130px;padding:14px}.result{gap:9px;padding:8px}.mini{width:54px;height:54px;flex-basis:54px}.actions{gap:4px}.icon{width:36px;height:36px}.result .track-meta{display:none}.track-profile{padding:14px;border-radius:22px}.track-head{grid-template-columns:100px minmax(0,1fr);gap:12px;align-items:start}.track-cover{width:100px;height:100px;border-radius:17px}.track-profile h2{font-size:22px}.profile-grid{grid-template-columns:repeat(2,1fr);gap:8px}.player{bottom:calc(79px + env(safe-area-inset-bottom));width:calc(100% - 10px);padding:8px 9px;border-radius:19px;grid-template-columns:45px minmax(0,1fr) auto}.pcover{width:45px;height:45px}.pc{gap:4px}.pc .big{width:42px;height:42px}.fx-panel{padding-top:10px}.eq-grid{gap:3px}.eq-band input{height:92px;writing-mode:vertical-lr;direction:rtl}.nav{width:calc(100% - 12px);bottom:max(6px,env(safe-area-inset-bottom));padding:5px;border-radius:20px}.nav button{min-height:50px;font-size:19px;padding:7px 3px}.nav button span{font-size:8px}.input{font-size:16px}.empty{padding:28px 15px}.playlist{padding:10px;gap:9px}.playlist .pic{width:48px;height:48px}.playlist button{padding:9px 8px;font-size:10px}}
 @media(max-width:350px){.app{padding-left:9px;padding-right:9px}.grid{gap:8px}.card{padding:8px}.title{font-size:11px}.sub{font-size:9px}.meta-pill{font-size:7px}.source-badge{display:none}}
+
+/* ✦ BEAUTY PASS — luminous premium edition */
+body{background:
+ radial-gradient(900px 600px at -8% -12%,rgba(139,92,246,.34),transparent 58%),
+ radial-gradient(800px 520px at 108% 2%,rgba(34,211,238,.25),transparent 58%),
+ radial-gradient(700px 520px at 65% 112%,rgba(236,72,153,.18),transparent 58%),
+ linear-gradient(145deg,#020308 0%,#070714 42%,#03040b 100%);background-attachment:fixed}
+body:before{inset:-35%;opacity:.72;filter:blur(110px);background:conic-gradient(from 40deg at 50% 50%,rgba(124,58,237,.34),rgba(34,211,238,.22),rgba(236,72,153,.28),rgba(251,191,36,.11),rgba(124,58,237,.34));animation:aurora 16s ease-in-out infinite alternate}
+body:after{opacity:.3;background-image:radial-gradient(circle,rgba(255,255,255,.85) 0 1px,transparent 1.5px),radial-gradient(circle,rgba(124,58,237,.8) 0 1px,transparent 1.5px),radial-gradient(circle,rgba(34,211,238,.7) 0 1px,transparent 1.5px);background-size:190px 190px,270px 270px,340px 340px}
+.app{position:relative}
+.app:before{content:"";position:fixed;z-index:-1;pointer-events:none;width:480px;height:480px;left:-280px;top:38%;border-radius:50%;background:radial-gradient(circle,rgba(124,58,237,.18),transparent 68%);filter:blur(30px)}
+.hero{border-color:rgba(255,255,255,.14);background:
+ linear-gradient(135deg,rgba(18,17,42,.82),rgba(8,14,28,.72) 48%,rgba(28,8,29,.72)),
+ radial-gradient(circle at 18% 0%,rgba(167,139,250,.3),transparent 36%);box-shadow:0 35px 110px rgba(0,0,0,.48),0 0 90px rgba(124,58,237,.1),inset 0 1px rgba(255,255,255,.16)}
+.hero:before{width:480px;height:480px;right:-220px;top:-230px;background:radial-gradient(circle,rgba(34,211,238,.32),transparent 68%);animation:floatGlow 7s ease-in-out infinite alternate}
+.hero:after{width:420px;height:420px;left:30%;bottom:-330px;background:radial-gradient(circle,rgba(236,72,153,.28),transparent 68%);animation:floatGlow 9s ease-in-out infinite alternate-reverse}
+@keyframes floatGlow{to{transform:translate3d(-25px,20px,0) scale(1.12)}}
+.hero h2{text-shadow:0 10px 45px rgba(139,124,255,.2)}
+.hero h2 em{background:linear-gradient(100deg,#fff 5%,#c4b5fd 30%,#67e8f9 58%,#f9a8d4 82%,#fff);background-size:220% auto;animation:shineText 5s linear infinite}
+@keyframes shineText{to{background-position:220% center}}
+.searchbar .input{background:rgba(1,3,10,.5);backdrop-filter:blur(20px)}
+.grid{gap:18px}
+.card{border-color:rgba(255,255,255,.105);background:linear-gradient(145deg,rgba(19,20,37,.72),rgba(7,9,18,.76));box-shadow:0 18px 55px rgba(0,0,0,.28),inset 0 1px rgba(255,255,255,.09);transform-style:preserve-3d}
+.card:after{content:"";position:absolute;inset:-80%;pointer-events:none;background:linear-gradient(115deg,transparent 42%,rgba(255,255,255,.11) 50%,transparent 58%);transform:translateX(-40%) rotate(8deg);transition:transform .7s ease}
+.card:hover:after{transform:translateX(40%) rotate(8deg)}
+.card:hover{transform:translateY(-8px) scale(1.012);border-color:rgba(196,181,253,.3);box-shadow:0 28px 80px rgba(0,0,0,.42),0 0 45px rgba(124,58,237,.12),inset 0 1px rgba(255,255,255,.13)}
+.cover{box-shadow:inset 0 1px rgba(255,255,255,.12),0 14px 35px rgba(0,0,0,.2)}
+.cover:before{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(125deg,rgba(255,255,255,.14),transparent 25%,transparent 70%,rgba(139,92,246,.12));pointer-events:none}
+.cover .play{background:linear-gradient(135deg,#fff,#ddd8ff);box-shadow:0 10px 35px rgba(139,92,246,.32)}
+.source-badge{background:linear-gradient(135deg,rgba(139,92,246,.15),rgba(34,211,238,.1));border-color:rgba(167,139,250,.2)}
+.meta-pill{background:linear-gradient(135deg,rgba(255,255,255,.055),rgba(139,92,246,.045));border-color:rgba(255,255,255,.08)}
+.wave-card,.track-profile,.taste-panel{border-color:rgba(255,255,255,.12);background:linear-gradient(145deg,rgba(18,20,38,.78),rgba(6,9,18,.72));box-shadow:0 30px 100px rgba(0,0,0,.42),inset 0 1px rgba(255,255,255,.1)}
+.wave-cover{box-shadow:0 20px 55px rgba(0,0,0,.3)}
+.wave-cover:after{content:"";position:absolute;inset:0;z-index:2;background:linear-gradient(105deg,rgba(255,255,255,.12),transparent 24%,transparent 72%,rgba(139,92,246,.16));pointer-events:none}
+.wave-badge{box-shadow:0 10px 30px rgba(0,0,0,.25)}
+.home-play,.primary{background:linear-gradient(135deg,#c4b5fd,#a78bfa 38%,#f0abfc 68%,#67e8f9);box-shadow:0 14px 42px rgba(139,92,246,.32),inset 0 1px rgba(255,255,255,.55)}
+.nav{border-color:rgba(255,255,255,.14);background:linear-gradient(145deg,rgba(14,16,29,.84),rgba(5,7,14,.78));box-shadow:0 22px 70px rgba(0,0,0,.5),0 0 40px rgba(124,58,237,.08),inset 0 1px rgba(255,255,255,.1)}
+.nav button.active{background:linear-gradient(135deg,rgba(139,92,246,.22),rgba(34,211,238,.1),rgba(236,72,153,.12));box-shadow:0 0 28px rgba(139,92,246,.12),inset 0 1px rgba(255,255,255,.08)}
+.player{border-color:rgba(255,255,255,.15);background:linear-gradient(145deg,rgba(17,19,34,.9),rgba(5,7,14,.86));box-shadow:0 28px 90px rgba(0,0,0,.55),0 0 45px rgba(124,58,237,.1),inset 0 1px rgba(255,255,255,.1)}
+.player .big{background:linear-gradient(135deg,#fff,#ddd8ff)}
+.result{border-color:rgba(255,255,255,.035)}
+.result:hover{border-color:rgba(167,139,250,.18);box-shadow:0 10px 35px rgba(0,0,0,.2)}
+.dialog{background:linear-gradient(145deg,rgba(20,22,40,.96),rgba(7,9,17,.97));border-color:rgba(255,255,255,.13);box-shadow:0 40px 130px rgba(0,0,0,.65),0 0 70px rgba(124,58,237,.1),inset 0 1px rgba(255,255,255,.1)}
+button:hover{box-shadow:0 8px 25px rgba(0,0,0,.18)}
+@media(max-width:700px){.hero{box-shadow:0 24px 70px rgba(0,0,0,.42),inset 0 1px rgba(255,255,255,.13)}.card:hover{transform:translateY(-4px) scale(1.006)}}
 </style></head>
 <body>
 <div class="app">
