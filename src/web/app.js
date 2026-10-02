@@ -104,11 +104,27 @@ function library(){
 }
 function openPlaylist(id){const p=state.playlists.find(x=>x.id===id);if(!p)return;tracks=p.tracks;view.innerHTML='<div class="section"><h2>'+esc(p.name)+'</h2><small>'+p.tracks.length+' треков</small></div><div class="results">'+(p.tracks.length?p.tracks.map(result).join(""):'<div class="empty">Добавляй треки из поиска.</div>')+'</div>';bind()}
 function like(t){if(!t)return;const i=state.liked.findIndex(x=>x.id===t.id);if(i>=0){state.liked.splice(i,1);toast("Убрано из любимого")}else{state.liked.unshift(t);toast("♥ Добавлено в любимое")}save();render(document.querySelector(".nav button.active").dataset.view)}
+function isTelegramWebApp(){
+ return Boolean(window.Telegram?.WebApp?.initData);
+}
+function openYouTube(t){
+ const url=t?.sourceUrl||("https://www.youtube.com/watch?v="+encodeURIComponent(t?.youtubeId||""));
+ if(window.Telegram?.WebApp?.openLink){
+   window.Telegram.WebApp.openLink(url,{try_instant_view:false});
+ }else{
+   window.open(url,"_blank","noopener,noreferrer");
+ }
+}
 function play(t){
  if(!t)return;
  current=t;
  if(t.youtubeId){
    audio.pause();
+   playing=false;
+   if(isTelegramWebApp()){
+     drawPlayer();
+     return;
+   }
    playing=true;
    drawPlayer();
    return;
@@ -134,6 +150,11 @@ function updateMediaSession(){
 function drawPlayer(){if(!current){playerEl.className="player";return}
  playerEl.className="player on";
  if(current.youtubeId){
+   if(isTelegramWebApp()){
+     playerEl.innerHTML='<div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+' · YouTube Music</span><small id="ytStatus" style="display:block;color:var(--muted);font-size:10px;margin-top:4px">YouTube в Telegram не встраивается здесь без риска экрана входа.</small></div><div class="pc"><button id="openYT" class="big" title="Открыть YouTube">▶</button></div>';
+     document.querySelector("#openYT").onclick=()=>openYouTube(current);
+     return;
+   }
    const ytOrigin=location.origin;
    const ytUrl="https://www.youtube.com/embed/"+encodeURIComponent(current.youtubeId)+"?autoplay=1&playsinline=1&enablejsapi=1&origin="+encodeURIComponent(ytOrigin)+"&widget_referrer="+encodeURIComponent(ytOrigin)+"/";
    playerEl.innerHTML='<div class="yt-frame"><iframe title="YouTube Music" src="'+ytUrl+'" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div><div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+' · YouTube Music</span><small id="ytStatus" style="display:block;color:var(--muted);font-size:10px;margin-top:4px">Ожидаю ответ YouTube…</small></div><div class="pc"><button id="closeYT" class="big">■</button></div>';
