@@ -150,7 +150,7 @@ export async function handleApi(request, env) {
         error: errors.length ? "Музыкальные каталоги недоступны" : "Ничего не найдено",
         details: errors,
         query: q,
-        tracks: []
+        tracks: [],
         diagnostics: {\n          vkConfigured: Boolean(String(env.VK_ACCESS_TOKEN || "").trim()),\n          jamendoConfigured: Boolean(String(env.JAMENDO_CLIENT_ID || "").trim()),\n          errors\n        }\n      }, { status: errors.length ? 502 : 200 });
     }
 
