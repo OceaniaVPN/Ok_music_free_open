@@ -5,7 +5,7 @@ export function renderApp(request, env) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#090a10"><script src="https://telegram.org/js/telegram-web-app.js?63"></script>
+<meta name="theme-color" content="#090a10"><meta name="referrer" content="strict-origin-when-cross-origin"><script src="https://telegram.org/js/telegram-web-app.js?63"></script>
 <title>${appName}</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
@@ -136,8 +136,8 @@ function drawPlayer(){if(!current){playerEl.className="player";return}
  if(current.youtubeId){
    const ytOrigin=location.origin;
    const ytReferrer=location.href.split("#")[0];
-   const ytUrl="https://www.youtube.com/embed/"+encodeURIComponent(current.youtubeId)+"?autoplay=1&playsinline=1&enablejsapi=1&origin="+encodeURIComponent(ytOrigin)+"&widget_referrer="+encodeURIComponent(ytReferrer);
-   playerEl.innerHTML='<div class="yt-frame"><iframe title="YouTube Music" src="'+ytUrl+'" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div><div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+' · YouTube Music</span><small id="ytStatus" style="display:block;color:var(--muted);font-size:10px;margin-top:4px">Ожидаю ответ YouTube…</small></div><div class="pc"><button id="closeYT" class="big">■</button></div>';
+   const ytUrl="https://www.youtube-nocookie.com/embed/"+encodeURIComponent(current.youtubeId)+"?autoplay=1&playsinline=1&enablejsapi=1&origin="+encodeURIComponent(ytOrigin)+"&widget_referrer="+encodeURIComponent(ytReferrer)+"&rel=0";
+   playerEl.innerHTML='<div class="yt-frame"><iframe title="YouTube Music" src="'+ytUrl+'" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div><div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+' · YouTube Music</span><small id="ytStatus" style="display:block;color:var(--muted);font-size:10px;margin-top:4px">Ожидаю ответ YouTube…</small></div><div class="pc"><button id="closeYT" class="big">■</button></div>';
    document.querySelector("#closeYT").onclick=()=>{current=null;playing=false;playerEl.className="player";};
    return;
  }
