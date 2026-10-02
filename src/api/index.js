@@ -27,19 +27,21 @@ function parseZaycevSearch(html,limit){
     const links=[...chunk.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)];
     const trackLink=links.find(x=>/\/pages\/\d+\/\d+\.shtml(?:[?#]|$)/i.test(x[1]));
     if(!trackLink)continue;
-    const idm=trackLink[1].match(/\/(\d+)\.shtml(?:[?#]|$)/); if(!idm)continue;
-    const id=idm[1]; if(seen.has(id))continue;
+    const idm=trackLink[1].match(/\/(\d+)\.shtml(?:[?#]|$)/);if(!idm)continue;
+    const id=idm[1];if(seen.has(id))continue;
     const texts=links.map(x=>stripHtml(x[2])).filter(Boolean);
     const title=stripHtml(trackLink[2])||"Без названия";
     const artist=texts.find(x=>x!==title&&x.length<160)||"Неизвестный исполнитель";
+    const imgMatch=chunk.match(/<(?:img|source)\b[^>]*(?:src|data-src|data-original)=["']([^"']+)["']/i);
+    const image=imgMatch?imgMatch[1]:"";
     const dm=stripHtml(chunk).match(/\b(\d{1,2}:\d{2})\b/);
-    seen.add(id);out.push({id,title,artist,duration:dm?parseDuration(dm[1]):0});
+    seen.add(id);out.push({id,title,artist,image,duration:dm?parseDuration(dm[1]):0,sourceUrl:new URL(trackLink[1],ZAYCEV_BASE).href});
     if(out.length>=limit)break;
   }
   if(!out.length){
     for(const m of String(html||"").matchAll(/href=["']([^"']*\/pages\/\d+\/\d+\.shtml[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi)){
       const idm=m[1].match(/\/(\d+)\.shtml/);if(!idm||seen.has(idm[1]))continue;
-      seen.add(idm[1]);out.push({id:idm[1],title:stripHtml(m[2])||"Без названия",artist:"Неизвестный исполнитель",duration:0});
+      seen.add(idm[1]);out.push({id:idm[1],title:stripHtml(m[2])||"Без названия",artist:"Неизвестный исполнитель",image:"",duration:0,sourceUrl:new URL(m[1],ZAYCEV_BASE).href});
       if(out.length>=limit)break;
     }
   }
@@ -50,7 +52,7 @@ async function fetchZaycevSearch(q,limit){
   const r=await fetch(u,{headers:{"accept":"text/html,application/xhtml+xml","accept-language":"ru-RU,ru;q=0.9,en;q=0.7","referer":ZAYCEV_BASE+"/","user-agent":ZAYCEV_HEADERS["user-agent"]}});
   const html=await r.text();if(!r.ok)throw Error("Zaycev search HTTP "+r.status);
   const found=parseZaycevSearch(html,limit);if(!found.length)throw Error("Zaycev search returned no parsable tracks");
-  return found.map(t=>({id:"zaycev-"+t.id,zaycevId:Number(t.id),title:t.title,artist:t.artist,album:"",image:"",audio:"/api/zaycev/play?id="+encodeURIComponent(t.id),duration:t.duration||0,license:"",source:"Zaycev.net",sourceUrl:ZAYCEV_BASE+"/pages/"+Math.floor(Number(t.id)/100)+"/"+t.id+".shtml",genre:""}));
+  return found.map(t=>({id:"zaycev-"+t.id,zaycevId:Number(t.id),title:t.title,artist:t.artist,album:"",image:t.image||"",audio:"/api/zaycev/play?id="+encodeURIComponent(t.id),duration:t.duration||0,license:"",source:"Zaycev.net",sourceUrl:t.sourceUrl,genre:""}));
 }
 async function zaycevFileMeta(ids){
   const r=await fetch(ZAYCEV_TRACK_API+"/filezmeta",{method:"POST",headers:ZAYCEV_HEADERS,body:JSON.stringify({trackIds:ids.map(String),subscription:false})});
@@ -131,9 +133,22 @@ export async function handleApi(request,env){
     return Response.json({ok:true,query:q,providers:[...(zTracks.length?["Zaycev.net"]:[]),...(jTracks.length?["Jamendo"]:[])],tracks});
   }
   if(url.pathname==="/api/zaycev/play"){
-    const id=(url.searchParams.get("id")||"").trim();if(!/^\d+$/.test(id))return Response.json({ok:false,error:"Invalid Zaycev track id"},{status:400});
-    try{return Response.redirect(await zaycevPlay(id),302)}catch(e){return Response.json({ok:false,error:e?.message||"Zaycev playback unavailable"},{status:502})}
+    const id=(url.searchParams.get("id")||"").trim();
+    if(!/^\d+$/.test(id))return Response.json({ok:false,error:"Invalid Zaycev track id"},{status:400});
+    try{
+      const target=await zaycevPlay(id);
+      const range=request.headers.get("range")||"";
+      const upstream=await fetch(target,{headers:{...(range?{range}:{}),"user-agent":ZAYCEV_HEADERS["user-agent"],"referer":ZAYCEV_BASE+"/"}});
+      if(!upstream.ok&&upstream.status!==206)throw Error("Zaycev audio HTTP "+upstream.status);
+      const headers=new Headers(upstream.headers);
+      headers.set("cache-control","no-store");
+      headers.set("access-control-allow-origin","*");
+      headers.set("accept-ranges",headers.get("accept-ranges")||"bytes");
+      headers.set("content-type",headers.get("content-type")||"audio/mpeg");
+      return new Response(upstream.body,{status:upstream.status,headers});
+    }catch(e){return Response.json({ok:false,error:e?.message||"Zaycev playback unavailable"},{status:502})}
   }
+
   if(url.pathname==="/api/recommendations"){
     const seed=(url.searchParams.get("seed")||"").trim(),mood=(url.searchParams.get("mood")||"").trim(),genres=(url.searchParams.get("genres")||"").trim(),moods=(url.searchParams.get("moods")||"").trim(),artists=(url.searchParams.get("artists")||"").trim(),now=(url.searchParams.get("now")||"").trim(),liked=(url.searchParams.get("liked")||"").trim(),refresh=(url.searchParams.get("refresh")||"").trim(),limit=Math.min(Math.max(Number(url.searchParams.get("limit")||16),6),40);
     const base=[artists,genres,moods,mood,now,liked,seed].filter(Boolean).join(", ");
