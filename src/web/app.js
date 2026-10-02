@@ -85,7 +85,7 @@ function mood(){
  bind();view.querySelectorAll('[data-mood]').forEach(b=>b.onclick=()=>{toast('Подбираю: '+moodItems[Number(b.dataset.mood)][1]);tracks=[...demos];view.querySelector('.section h2').textContent=moodItems[Number(b.dataset.mood)][1];});
 }
 function searchView(){
- view.innerHTML='<div class="section"><h2>Поиск музыки</h2><small>Jamendo · свободные каталожные треки</small></div><div class="searchbar"><input id="q" class="input" placeholder="Исполнитель, название, жанр…"><button id="go" class="primary">Искать</button></div><div id="results" class="results" style="margin-top:18px"><div class="empty">Начни с названия трека или исполнителя.</div></div>';
+ view.innerHTML='<div class="section"><h2>Поиск музыки</h2><small>YouTube Music · Jamendo</small></div><div class="searchbar"><input id="q" class="input" placeholder="Исполнитель, название, жанр…"><button id="go" class="primary">Искать</button></div><div id="results" class="results" style="margin-top:18px"><div class="empty">Начни с названия трека или исполнителя.</div></div>';
  document.querySelector("#go").onclick=()=>doSearch(document.querySelector("#q").value);document.querySelector("#q").onkeydown=e=>{if(e.key==="Enter")doSearch(e.target.value)}
 }
 async function doSearch(q){
@@ -103,9 +103,29 @@ function library(){
 }
 function openPlaylist(id){const p=state.playlists.find(x=>x.id===id);if(!p)return;tracks=p.tracks;view.innerHTML='<div class="section"><h2>'+esc(p.name)+'</h2><small>'+p.tracks.length+' треков</small></div><div class="results">'+(p.tracks.length?p.tracks.map(result).join(""):'<div class="empty">Добавляй треки из поиска.</div>')+'</div>';bind()}
 function like(t){if(!t)return;const i=state.liked.findIndex(x=>x.id===t.id);if(i>=0){state.liked.splice(i,1);toast("Убрано из любимого")}else{state.liked.unshift(t);toast("♥ Добавлено в любимое")}save();render(document.querySelector(".nav button.active").dataset.view)}
-function play(t){if(!t||!(t.audio||t.src)){toast("У этого трека нет прямого воспроизведения");return}current=t;audio.src=t.audio||t.src;audio.play().then(()=>{playing=true;drawPlayer()}).catch(()=>toast("Браузер не разрешил воспроизведение"))}
-function drawPlayer(){if(!current){playerEl.className="player";return}playerEl.className="player on";playerEl.innerHTML='<div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>';
- document.querySelector("#pause").onclick=()=>{if(playing){audio.pause();playing=false}else{audio.play();playing=true}drawPlayer()};document.querySelector("#seek").oninput=e=>{if(audio.duration)audio.currentTime=audio.duration*e.target.value/100}}
+function play(t){
+ if(!t)return;
+ current=t;
+ if(t.youtubeId){
+   audio.pause();
+   playing=true;
+   drawPlayer();
+   return;
+ }
+ if(!(t.audio||t.src)){toast("У этого трека нет прямого воспроизведения");return}
+ audio.src=t.audio||t.src;
+ audio.play().then(()=>{playing=true;drawPlayer()}).catch(()=>toast("Браузер не разрешил воспроизведение"))
+}
+function drawPlayer(){if(!current){playerEl.className="player";return}
+ playerEl.className="player on";
+ if(current.youtubeId){
+   playerEl.innerHTML='<div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+' · YouTube Music</span></div><div class="pc"><button id="closeYT" class="big">■</button></div><iframe title="YouTube Music" style="position:absolute;width:1px;height:1px;opacity:.01;pointer-events:none" src="https://www.youtube.com/embed/'+encodeURIComponent(current.youtubeId)+'?autoplay=1&playsinline=1" allow="autoplay; encrypted-media"></iframe>';
+   document.querySelector("#closeYT").onclick=()=>{current=null;playing=false;playerEl.className="player";};
+   return;
+ }
+ playerEl.innerHTML='<div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>';
+ document.querySelector("#pause").onclick=()=>{if(playing){audio.pause();playing=false}else{audio.play();playing=true}drawPlayer()};document.querySelector("#seek").oninput=e=>{if(audio.duration)audio.currentTime=audio.duration*e.target.value/100}
+}
 audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration)}
 audio.onended=()=>{playing=false;drawPlayer()}
 document.querySelector("#closeModal").onclick=()=>modal.classList.remove("open");modal.onclick=e=>{if(e.target===modal)modal.classList.remove("open")};
