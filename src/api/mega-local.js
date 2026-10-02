@@ -25,8 +25,8 @@ async function loadMegaCatalog(){
     return {
       id:"mega-key-"+file.nodeId,title,artist,album:"",image:"",
       audio:megaAudioUrl(file.nodeId,file.name),duration:0,license:"",
-      source:"🔐 Ключник",sourceUrl:MEGA_FOLDER_URL,genre:"",
-      fileName:String(file.name||""),
+      source:"🔐 Ключник",sourceUrl:MEGA_FOLDER_URL,genre:"",year:0,trackNumber:"",discNumber:"",composer:"",bitrate:0,format:"",
+      fileName:String(file.name||""),fileSize:Number(file.size||0),
       mega:{folder:MEGA_FOLDER_URL,fileId:file.nodeId,name:String(file.name||""),size:Number(file.size||0)}
     };
   }).sort((a,b)=>a.title.localeCompare(b.title,"ru"));
