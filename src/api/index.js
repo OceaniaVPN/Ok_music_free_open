@@ -1,6 +1,6 @@
 const YT_MUSIC_API_KEY = "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30";
 const YT_MUSIC_CLIENT_VERSION = "1.20260707.12.00";
-const YT_MUSIC_SEARCH_PARAMS = "Eg-KAQwIARAAGAAgACgAMABqChAEEAMQCRAFEAo=";
+const YT_MUSIC_SEARCH_PARAMS = "Eg-KAQwIARAAGAAgACgAMABqChAEEAMQCRAFEAo%3D";
 
 function uniqueTracks(tracks, limit) {
   const seen = new Set();
@@ -115,7 +115,10 @@ async function searchYouTubeMusic(q, limit) {
     headers: {
       "content-type": "application/json",
       "origin": "https://music.youtube.com",
-      "accept": "application/json"
+      "accept": "application/json",
+      "x-youtube-client-name": "67",
+      "x-youtube-client-version": YT_MUSIC_CLIENT_VERSION,
+      "referer": "https://music.youtube.com/"
     },
     body: JSON.stringify({
       context: {
