@@ -8,8 +8,10 @@
     "deploy": "wrangler deploy",
     "build": "node scripts/build-local-music.mjs"
   },
-  "dependencies": {},
+  "dependencies": {
+    "music-metadata": "^11.16.1"
+  },
   "devDependencies": {
     "wrangler": "^4.40.0"
   }
-}\n
+}
