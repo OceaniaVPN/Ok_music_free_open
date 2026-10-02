@@ -97,39 +97,6 @@ function normalizeJamendo(t) {
   };
 }
 
-function collectNodes(value, key, out = []) {
-  if (!value || typeof value !== "object") return out;
-  if (Array.isArray(value)) {
-    for (const item of value) collectNodes(item, key, out);
-    return out;
-  }
-  if (value[key] && typeof value[key] === "object") out.push(value[key]);
-  for (const child of Object.values(value)) collectNodes(child, key, out);
-  return out;
-}
-
-function firstText(value) {
-  if (!value) return "";
-  if (typeof value === "string") return value;
-  if (Array.isArray(value)) return value.map(firstText).filter(Boolean).join("");
-  if (typeof value === "object") {
-    if (typeof value.text === "string") return value.text;
-    if (value.simpleText) return value.simpleText;
-    if (Array.isArray(value.runs)) return value.runs.map(firstText).join("");
-  }
-  return "";
-}
-
-function parseDuration(value) {
-  const text = firstText(value);
-  if (!text) return 0;
-  const parts = text.split(":").map(Number);
-  if (parts.some(Number.isNaN)) return 0;
-  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
-  if (parts.length === 2) return parts[0] * 60 + parts[1];
-  return parts[0] || 0;
-}
-
 async function searchJamendo(q, limit, env) {
   const clientId = env.JAMENDO_CLIENT_ID;
   if (!clientId) return [];
