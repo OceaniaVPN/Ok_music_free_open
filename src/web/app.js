@@ -17,7 +17,7 @@ body{overflow-x:hidden}.app{width:min(1080px,100%);margin:auto;padding:20px 20px
 .results{display:grid;gap:8px}.result{display:flex;align-items:center;gap:14px;padding:10px;border:1px solid transparent;border-radius:18px;transition:.15s}.result:hover{background:rgba(255,255,255,.04);border-color:var(--line)}.mini{width:62px;height:62px;flex:0 0 62px;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,#292d40,#11121a);display:grid;place-items:center;font-size:23px}.mini img{width:100%;height:100%;object-fit:cover}.meta{min-width:0;flex:1}.meta strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.meta span{display:block;color:var(--muted);font-size:12px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.actions{display:flex;gap:7px}.icon{width:40px;height:40px;padding:0;border-radius:13px}
 button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--line);background:rgba(255,255,255,.045);border-radius:14px;padding:11px 14px;transition:.15s}button:hover{background:rgba(255,255,255,.1);transform:translateY(-1px)}
 .empty{border:1px dashed var(--line);border-radius:20px;padding:35px;text-align:center;color:var(--muted)}
-.player{position:fixed;z-index:40;left:50%;bottom:14px;transform:translateX(-50%);width:min(760px,calc(100% - 22px));border:1px solid #ffffff18;background:rgba(14,15,24,.9);backdrop-filter:blur(28px);border-radius:24px;padding:12px 14px;box-shadow:0 25px 80px #000b;display:none}.player.on{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:13px}.pcover{width:50px;height:50px;border-radius:14px;overflow:hidden;background:#25283a;display:grid;place-items:center}.pcover img{width:100%;height:100%;object-fit:cover}.pmeta{min-width:0}.pmeta strong,.pmeta span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pmeta span{font-size:11px;color:var(--muted);margin-top:3px}.pc{display:flex;align-items:center;gap:7px}.pc .big{width:48px;height:48px;border-radius:50%;background:white;color:#111;border:0}.seek{grid-column:1/-1;width:100%;accent-color:#a78bfa}.time{font-size:10px;color:var(--muted)}
+.player{position:fixed;z-index:60;left:50%;bottom:14px;transform:translateX(-50%);width:min(820px,calc(100% - 22px));border:1px solid #ffffff18;background:rgba(14,15,24,.94);backdrop-filter:blur(28px);border-radius:24px;padding:12px 14px;box-shadow:0 25px 80px #000b;display:none}.player.on{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:13px}.fx-panel{grid-column:1/-1;border-top:1px solid var(--line);padding:12px 4px 2px}.eq-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.eq-band{min-width:0;text-align:center}.eq-band input{width:100%;accent-color:#a78bfa}.eq-band small{display:block;color:var(--muted);font-size:9px;margin-top:3px}.pcover{width:50px;height:50px;border-radius:14px;overflow:hidden;background:#25283a;display:grid;place-items:center}.pcover img{width:100%;height:100%;object-fit:cover}.pmeta{min-width:0}.pmeta strong,.pmeta span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pmeta span{font-size:11px;color:var(--muted);margin-top:3px}.pc{display:flex;align-items:center;gap:7px}.pc .big{width:48px;height:48px;border-radius:50%;background:white;color:#111;border:0}.seek{grid-column:1/-1;width:100%;accent-color:#a78bfa}.time{font-size:10px;color:var(--muted)}
 .nav{position:fixed;z-index:50;bottom:max(12px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(560px,calc(100% - 20px));display:grid;grid-template-columns:repeat(4,1fr);gap:5px;padding:7px;pointer-events:auto;border:1px solid #ffffff15;border-radius:22px;background:rgba(13,14,22,.78);backdrop-filter:blur(22px);box-shadow:0 20px 60px #0009}.nav button{border:0;background:transparent;padding:9px 5px;color:#8f93a7;font-size:20px;line-height:1;min-height:48px;touch-action:manipulation}.nav button span{display:block;font-size:10px;font-weight:700;margin-top:5px}.nav button.active{background:linear-gradient(135deg,#8b5cf622,#ec489922);color:white}
 .playlist{display:flex;align-items:center;gap:14px;padding:13px;border:1px solid var(--line);border-radius:20px;background:var(--panel);margin-bottom:10px}.playlist .pic{width:58px;height:58px;border-radius:15px;background:linear-gradient(135deg,var(--a),var(--pink));display:grid;place-items:center;font-size:24px}.playlist main{flex:1;min-width:0}.playlist strong{display:block}.playlist span{font-size:12px;color:var(--muted)}.danger{color:#fb7185}
 .modal{position:fixed;inset:0;z-index:20;background:#0009;backdrop-filter:blur(10px);display:none;place-items:center;padding:18px}.modal.open{display:grid}.dialog{width:min(440px,100%);background:#131521;border:1px solid var(--line);border-radius:25px;padding:22px;box-shadow:0 30px 100px #000}.dialog h3{margin:0 0 8px}.dialog p{color:var(--muted);font-size:13px}.dialog .row{display:flex;gap:8px;margin-top:16px}
@@ -25,7 +25,7 @@ button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--line);ba
 @media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}.hero{padding:25px}.player{bottom:82px}.nav{bottom:12px}}@media(max-width:480px){.app{padding:18px 14px 150px}.top{margin-bottom:20px}.hero{border-radius:24px;padding:22px}.searchbar{flex-direction:column}.grid{gap:10px}.card{padding:10px}.cover .play{opacity:1;transform:none}.player.on{grid-template-columns:auto 1fr}.pc{grid-column:3}.player{padding:10px}.nav{width:calc(100% - 18px)}}
 </style>
 <style id="mobile-fix">
-.moods{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.mood-card{min-height:150px;text-align:left;padding:18px;display:flex;flex-direction:column;justify-content:flex-end;border-radius:22px;background:linear-gradient(145deg,rgba(139,92,246,.2),rgba(255,255,255,.035));border:1px solid var(--line);touch-action:manipulation}.mood-card b{font-size:35px;margin-bottom:auto}.mood-card strong{font-size:16px}.mood-card span{color:var(--muted);font-size:11px;margin-top:5px}@media(max-width:600px){.app{padding:14px 12px 205px}.top{margin:4px 0 18px}.hero{padding:19px}.hero h2{font-size:31px;letter-spacing:-1.2px}.hero p{font-size:13px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.card{min-width:0;border-radius:18px}.cover{border-radius:14px}.title{font-size:13px}.sub{font-size:10px}.section{margin:23px 2px 11px}.section h2{font-size:19px}.moods{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.mood-card{min-height:135px;padding:14px}.result{gap:9px;padding:8px}.mini{width:54px;height:54px;flex-basis:54px}.actions{gap:4px}.icon{width:36px;height:36px;padding:0}.player{bottom:79px;width:calc(100% - 16px);padding:9px 10px;border-radius:19px}.player.on{grid-template-columns:auto 1fr auto;gap:9px}.pcover{width:45px;height:45px}.pmeta strong{font-size:12px}.pmeta span{font-size:10px}.pc .big{width:42px;height:42px}.nav{width:calc(100% - 12px);bottom:max(6px,env(safe-area-inset-bottom));border-radius:20px;padding:5px}.nav button{min-height:50px;padding:7px 3px}.nav button span{font-size:9px}.searchbar button{width:100%}.input{font-size:16px}.empty{padding:27px 15px}.playlist{padding:10px;gap:9px}.playlist .pic{width:48px;height:48px}.playlist button{padding:9px 8px;font-size:11px}}@media(max-width:350px){.grid{grid-template-columns:1fr}.moods{grid-template-columns:1fr}.mood-card{min-height:105px}.nav button span{font-size:8px}}
+.moods{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.mood-card{min-height:150px;text-align:left;padding:18px;display:flex;flex-direction:column;justify-content:flex-end;border-radius:22px;background:linear-gradient(145deg,rgba(139,92,246,.2),rgba(255,255,255,.035));border:1px solid var(--line);touch-action:manipulation}.mood-card b{font-size:35px;margin-bottom:auto}.mood-card strong{font-size:16px}.mood-card span{color:var(--muted);font-size:11px;margin-top:5px}@media(max-width:600px){.app{padding:14px 12px 215px}.top{margin:4px 0 18px}.hero{padding:19px}.hero h2{font-size:31px;letter-spacing:-1.2px}.hero p{font-size:13px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.card{min-width:0;border-radius:18px}.cover{border-radius:14px}.title{font-size:13px}.sub{font-size:10px}.section{margin:23px 2px 11px}.section h2{font-size:19px}.moods{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.mood-card{min-height:135px;padding:14px}.result{gap:9px;padding:8px}.mini{width:54px;height:54px;flex-basis:54px}.actions{gap:4px}.icon{width:36px;height:36px;padding:0}.player{bottom:79px;width:calc(100% - 10px);padding:8px 9px;border-radius:18px}.player.on{grid-template-columns:45px minmax(0,1fr) auto;gap:8px}.pcover{width:45px;height:45px}.pc{gap:4px}.pc .big{width:40px;height:40px}.fx-panel{padding-top:10px}.eq-grid{gap:3px}.eq-band input{height:92px;writing-mode:vertical-lr;direction:rtl}.eq-band small{font-size:8px}.nav{z-index:70}.pmeta strong{font-size:12px}.pmeta span{font-size:10px}.pc .big{width:42px;height:42px}.nav{width:calc(100% - 12px);bottom:max(6px,env(safe-area-inset-bottom));border-radius:20px;padding:5px}.nav button{min-height:50px;padding:7px 3px}.nav button span{font-size:9px}.searchbar button{width:100%}.input{font-size:16px}.empty{padding:27px 15px}.playlist{padding:10px;gap:9px}.playlist .pic{width:48px;height:48px}.playlist button{padding:9px 8px;font-size:11px}}@media(max-width:350px){.grid{grid-template-columns:1fr}.moods{grid-template-columns:1fr}.mood-card{min-height:105px}.nav button span{font-size:8px}}
 .taste-panel{border:1px solid var(--line);border-radius:24px;padding:18px;background:var(--panel);margin:0 0 20px}.taste-panel h3{margin:0 0 6px}.taste-panel p{margin:0;color:var(--muted);font-size:12px}.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.chip{padding:9px 12px;border-radius:999px;font-size:12px}.chip.on{background:linear-gradient(135deg,var(--a),var(--pink));border-color:transparent}.taste-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.taste-field label{display:block;font-size:11px;color:var(--muted);margin-bottom:7px}.taste-actions{display:flex;gap:8px;margin-top:14px}@media(max-width:600px){.taste-grid{grid-template-columns:1fr}.taste-panel{padding:14px}}</style></head>
 <body>
 <div class="app">
@@ -49,8 +49,10 @@ state.taste.genres=Array.isArray(state.taste.genres)?state.taste.genres:[];
 state.taste.moods=Array.isArray(state.taste.moods)?state.taste.moods:[];
 state.taste.artists=typeof state.taste.artists==="string"?state.taste.artists:"";
 state.taste.now=typeof state.taste.now==="string"?state.taste.now:"";
-let tracks=[], current=null, audio=new Audio(), playing=false;
+let tracks=[], current=null, currentIndex=-1, audio=new Audio(), nextAudio=new Audio(), playing=false, autoNext=true, nextPreloadToken=0;
 audio.preload="auto";
+nextAudio.preload="auto";
+nextAudio.setAttribute("aria-hidden","true");
 const demos=[
 {id:"demo-1",title:"Midnight Waves",artist:"Ok Music",image:"",audio:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",source:"Demo"},
 {id:"demo-2",title:"Neon Drive",artist:"Ok Music",image:"",audio:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",source:"Demo"},
@@ -117,12 +119,35 @@ function library(){
 }
 function openPlaylist(id){const p=state.playlists.find(x=>x.id===id);if(!p)return;tracks=p.tracks;view.innerHTML='<div class="section"><h2>'+esc(p.name)+'</h2><small>'+p.tracks.length+' треков</small></div><div class="results">'+(p.tracks.length?p.tracks.map(result).join(""):'<div class="empty">Добавляй треки из поиска.</div>')+'</div>';bind()}
 function like(t){if(!t)return;const i=state.liked.findIndex(x=>x.id===t.id);if(i>=0){state.liked.splice(i,1);toast("Убрано из любимого")}else{state.liked.unshift(t);toast("♥ Добавлено в любимое")}save();render(document.querySelector(".nav button.active").dataset.view)}
-function play(t){
+function findTrackIndex(t){return tracks.findIndex(x=>x?.id===t?.id)}
+function preloadNext(){
+ const i=findTrackIndex(current), next=i>=0?tracks[i+1]:null, token=++nextPreloadToken;
+ if(!next?.audio&&!next?.src){nextAudio.removeAttribute("src");return}
+ const src=next.audio||next.src;
+ if(nextAudio.src===new URL(src,location.href).href)return;
+ nextAudio.src=src;
+ nextAudio.load();
+ void token;
+}
+function play(t,{fromEnded=false}={}){
  if(!t)return;
+ const idx=findTrackIndex(t);
+ currentIndex=idx;
  current=t;
  if(!(t.audio||t.src)){toast("У этого трека нет прямого воспроизведения");return}
- audio.src=t.audio||t.src;
- audio.play().then(()=>{playing=true;updateMediaSession();drawPlayer()}).catch(()=>toast("Браузер не разрешил воспроизведение"))
+ const src=t.audio||t.src;
+ if(audio.src!==new URL(src,location.href).href){
+   audio.src=src;
+   audio.load();
+ }
+ audio.play().then(()=>{playing=true;updateMediaSession();drawPlayer();preloadNext()}).catch(()=>toast("Браузер не разрешил воспроизведение"));
+}
+function playNext(){
+ const next=tracks[currentIndex+1];
+ if(next){play(next,{fromEnded:true});return}
+ playing=false;
+ if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";
+ drawPlayer();
 }
 function updateMediaSession(){
  if(!("mediaSession" in navigator)||!current)return;
@@ -146,7 +171,9 @@ function drawPlayer(){if(!current){playerEl.className="player";return}
 }
 
 audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
-audio.onplay=()=>{playing=true;if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer()};audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer()};audio.onended=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()};audio.onerror=()=>{toast("Не удалось загрузить аудио");playing=false;drawPlayer()}
+audio.onplay=()=>{playing=true;if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer()};audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer()};audio.onended=()=>{playing=false;if(autoNext)playNext();else{if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()}};audio.onerror=()=>{toast("Не удалось загрузить аудио");playing=false;drawPlayer()};
+nextAudio.onerror=()=>{nextAudio.removeAttribute("src")};
+audio.addEventListener("canplay",preloadNext);
 document.querySelector("#closeModal").onclick=()=>modal.classList.remove("open");modal.onclick=e=>{if(e.target===modal)modal.classList.remove("open")};
 document.querySelector("#createPlaylist").onclick=()=>{const name=document.querySelector("#playlistName").value.trim();if(!name)return toast("Введи название");state.playlists.unshift({id:"pl-"+Date.now(),name,tracks:[]});save();document.querySelector("#playlistName").value="";modal.classList.remove("open");library();toast("Плейлист создан ✨")}
 function render(name){document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));({home,mood,search:searchView,library}[name]||home)()}
