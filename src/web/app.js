@@ -135,7 +135,8 @@ function drawPlayer(){if(!current){playerEl.className="player";return}
  playerEl.className="player on";
  if(current.youtubeId){
    const ytOrigin=location.origin;
-   const ytUrl="https://www.youtube.com/embed/"+encodeURIComponent(current.youtubeId)+"?autoplay=1&playsinline=1&enablejsapi=1&origin="+encodeURIComponent(ytOrigin)+"&widget_referrer="+encodeURIComponent(ytOrigin)+"/";
+   const ytReferrer=location.href.split("#")[0];
+   const ytUrl="https://www.youtube.com/embed/"+encodeURIComponent(current.youtubeId)+"?autoplay=1&playsinline=1&enablejsapi=1&origin="+encodeURIComponent(ytOrigin)+"&widget_referrer="+encodeURIComponent(ytReferrer);
    playerEl.innerHTML='<div class="yt-frame"><iframe title="YouTube Music" src="'+ytUrl+'" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div><div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+' · YouTube Music</span><small id="ytStatus" style="display:block;color:var(--muted);font-size:10px;margin-top:4px">Ожидаю ответ YouTube…</small></div><div class="pc"><button id="closeYT" class="big">■</button></div>';
    document.querySelector("#closeYT").onclick=()=>{current=null;playing=false;playerEl.className="player";};
    return;
