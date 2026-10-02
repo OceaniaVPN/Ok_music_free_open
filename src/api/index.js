@@ -34,9 +34,9 @@ function parseZaycevSearch(html,limit){
     const artist=texts.find(x=>x!==title&&x.length<160)||"Неизвестный исполнитель";
     const imgTag=chunk.match(/<(?:img|source)\b[^>]*>/i);
     const attrs=imgTag?imgTag[0]:"";
-    const imageMatch=attrs.match(/(?:src|data-src|data-original|data-lazy-src|poster)=["']([^"']+)["']/i);
-    const srcsetMatch=attrs.match(/(?:srcset|data-srcset)=["']([^"']+)["']/i);
-    const image=imageMatch?imageMatch[1]:(srcsetMatch?srcsetMatch[1].split(",")[0].trim().split(/\s+/)[0]:"");
+    const imageMatch=attrs.match(/(?:data-src|data-original|data-lazy-src|poster|src)=["']([^"']+)["']/i);
+    const srcsetMatch=attrs.match(/(?:data-srcset|srcset)=["']([^"']+)["']/i);
+    const image=imageMatch?imageMatch[1]:(srcsetMatch?srcsetMatch[1].split(",").pop().trim().split(/\s+/)[0]:"");
     const dm=stripHtml(chunk).match(/\b(\d{1,2}:\d{2})\b/);
     seen.add(id);out.push({id,title,artist,image,duration:dm?parseDuration(dm[1]):0,sourceUrl:new URL(trackLink[1],ZAYCEV_BASE).href});
     if(out.length>=limit)break;
