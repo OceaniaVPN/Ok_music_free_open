@@ -55,8 +55,7 @@ async function searchVk(q, limit, env) {
 
   if (!token) throw new Error("VK_ACCESS_TOKEN не задан");
 
-  const api = new URL("https://api.vk.com/method/audio.search");
-  api.searchParams.set("access_token", token);
+  const api = new URL("https://api.vk.ru/method/audio.search");
   api.searchParams.set("v", "5.199");
   api.searchParams.set("q", q);
   api.searchParams.set("count", String(Math.min(Math.max(limit, 1), 100)));
@@ -65,7 +64,11 @@ async function searchVk(q, limit, env) {
   let response;
   try {
     response = await fetch(api, {
-      headers: { accept: "application/json", "user-agent": userAgent },
+      headers: {
+        accept: "application/json",
+        authorization: `Bearer ${token}`,
+        "user-agent": userAgent
+      },
       signal: controller.signal
     });
   } catch (error) {
