@@ -51,6 +51,27 @@ const MEGA_AUDIO_SCRIPT=`<script>
     return pending;
   }
 
+  function fixKeynikLabels(root=document){
+    const nodes=root.querySelectorAll?.("*")||[];
+    for(const node of nodes){
+      if(node.childElementCount===0&&typeof node.textContent==="string"&&node.textContent.includes("🔑 Ключник")){
+        node.textContent=node.textContent.replaceAll("🔑 Ключник","🔐 Ключник");
+      }
+    }
+  }
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",()=>fixKeynikLabels());
+  }else{
+    fixKeynikLabels();
+  }
+  new MutationObserver(mutations=>{
+    for(const mutation of mutations){
+      for(const node of mutation.addedNodes){
+        if(node.nodeType===1)fixKeynikLabels(node);
+      }
+    }
+  }).observe(document.documentElement,{childList:true,subtree:true});
+
   HTMLMediaElement.prototype.load=function(){
     const src=this.getAttribute("src")||"";
     if(src.startsWith("mega://"))return;
