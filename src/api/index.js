@@ -100,7 +100,8 @@ export async function handleApi(request, env) {
     if (!q) return Response.json({ ok: true, query: "", tracks: [], providers: [] });
 
     const [youtubeResult, jamendoResult] = await Promise.allSettled([
-      searchYouTube(q, limit, env),\n      searchJamendo(q, Math.max(6, Math.ceil(limit / 3)), env)
+      searchYouTube(q, limit, env),
+      searchJamendo(q, Math.max(6, Math.ceil(limit / 3)), env)
     ]);
 
     const youtubeTracks = youtubeResult.status === "fulfilled" ? youtubeResult.value : [];
@@ -145,7 +146,8 @@ export async function handleApi(request, env) {
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 12), 6), 30);
 
     const [youtubeResult, jamendoResult] = await Promise.allSettled([
-      searchYouTube(query, limit, env),\n      searchJamendo(query, Math.max(4, Math.ceil(limit / 3)), env)
+      searchYouTube(query, limit, env),
+      searchJamendo(query, Math.max(4, Math.ceil(limit / 3)), env)
     ]);
 
     const youtubeTracks = youtubeResult.status === "fulfilled" ? youtubeResult.value : [];
