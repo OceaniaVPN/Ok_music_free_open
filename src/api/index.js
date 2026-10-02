@@ -152,7 +152,7 @@ export async function handleApi(request,env){
   if(url.pathname==="/api/recommendations"){
     const seed=(url.searchParams.get("seed")||"").trim(),mood=(url.searchParams.get("mood")||"").trim(),genres=(url.searchParams.get("genres")||"").trim(),moods=(url.searchParams.get("moods")||"").trim(),artists=(url.searchParams.get("artists")||"").trim(),now=(url.searchParams.get("now")||"").trim(),liked=(url.searchParams.get("liked")||"").trim(),refresh=(url.searchParams.get("refresh")||"").trim(),limit=Math.min(Math.max(Number(url.searchParams.get("limit")||16),6),40);
     const base=[artists,genres,moods,mood,now,liked,seed].filter(Boolean).join(", ");
-    const queries=[artists+" "+genres,genres+" "+moods,artists+" "+now,base,mood+" "+genres+" "+artists].map(x=>x.replace(/\s+/g," ").trim()).filter(Boolean);
+    const artistQueries=artists.split(/[,;]+/).map(x=>x.trim()).filter(Boolean).slice(0,8); const queries=[...artistQueries,...artistQueries.map(a=>a+" "+genres),artists+" "+genres,genres+" "+moods,artists+" "+now,base,mood+" "+genres+" "+artists].map(x=>x.replace(/\s+/g," ").trim()).filter(Boolean);
     const uniqueQueries=[...new Set(queries)].slice(0,5);
     const [zr,jr]=await Promise.all([Promise.allSettled(uniqueQueries.map(q=>fetchZaycevSearch(q,Math.min(10,limit)))),Promise.allSettled(uniqueQueries.slice(0,3).map(q=>searchJamendo(q,4,env)))]);
     const zaycev=zr.flatMap(r=>r.status==="fulfilled"?r.value:[]),jam=jr.flatMap(r=>r.status==="fulfilled"?r.value:[]),final=[],seen=new Set();
