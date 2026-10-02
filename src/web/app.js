@@ -50,14 +50,35 @@ function save(){localStorage.setItem(KEY,JSON.stringify(state))}
 function toast(s){toastEl.textContent=s;toastEl.classList.add("show");clearTimeout(window._toast);window._toast=setTimeout(()=>toastEl.classList.remove("show"),1800)}
 function fmt(n){return Number.isFinite(n)&&n>0?Math.floor(n/60)+":"+String(Math.floor(n%60)).padStart(2,"0"):"0:00"}
 function card(t){return '<article class="card"><div class="cover">'+(t.image?'<img src="'+esc(t.image)+'" loading="lazy">':"♫")+'<button class="play" data-play="'+esc(t.id)+'">▶</button></div><div class="title">'+esc(t.title)+'</div><div class="sub">'+esc(t.artist)+'</div></article>'}
-function result(t){const liked=state.liked.some(x=>x.id===t.id);return '<div class="result"><div class="mini">'+(t.image?'<img src="'+esc(t.image)+'" loading="lazy">':"♫")+'</div><div class="meta"><strong>'+esc(t.title)+'</strong><span>'+esc(t.artist)+(t.album?" · "+esc(t.album):"")+'</span></div><div class="actions"><button class="icon" data-like="'+esc(t.id)+'">'+(liked?"♥":"♡")+'</button><button class="icon" data-add="'+esc(t.id)+'">＋</button><button class="icon" data-play="'+esc(t.id)+'">▶</button></div></div>'}
+function result(t){const liked=state.liked.some(x=>x.id===t.id);return '<div class="result"><div class="mini">'+(t.image?'<img src="'+esc(t.image)+'" loading="lazy">':"♫")+'</div><div class="meta"><strong>'+esc(t.title)+'</strong><span>'+esc(t.artist)+(t.source?" · "+esc(t.source):"")+(t.album?" · "+esc(t.album):"")+'</span></div><div class="actions"><button class="icon" data-like="'+esc(t.id)+'">'+(liked?"♥":"♡")+'</button><button class="icon" data-add="'+esc(t.id)+'">＋</button><button class="icon" data-play="'+esc(t.id)+'">▶</button></div></div>'}
 function bind(container=view){container.querySelectorAll("[data-play]").forEach(b=>b.onclick=()=>play(tracks.find(t=>t.id===b.dataset.play)||state.liked.find(t=>t.id===b.dataset.play)));container.querySelectorAll("[data-like]").forEach(b=>b.onclick=()=>like(tracks.find(t=>t.id===b.dataset.like)||state.liked.find(t=>t.id===b.dataset.like)));container.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>addToPlaylist(tracks.find(t=>t.id===b.dataset.add)||state.liked.find(t=>t.id===b.dataset.add)))}
 function addToPlaylist(t){if(!t)return;if(!state.playlists.length){toast("Сначала создай плейлист");modal.classList.add("open");document.querySelector("#playlistName").focus();return}const names=state.playlists.map((p,i)=>(i+1)+". "+p.name+" ("+p.tracks.length+")").join("\n");const answer=window.prompt("Добавить в какой плейлист?\\n\\n"+names+"\\n\\nВведи номер:","1");const n=Number(answer);if(!Number.isInteger(n)||!state.playlists[n-1])return;const p=state.playlists[n-1];if(p.tracks.some(x=>x.id===t.id)){toast("Трек уже есть в плейлисте");return}p.tracks.push(t);save();toast("Добавлено в «"+p.name+"» ✨")}
-function home(){
+async function home(){
  tracks=demos;
- view.innerHTML='<section class="hero"><h2>Музыка, которая звучит <em>как ты.</em></h2><p>Ищи треки, собирай коллекции и включай любимое в один клик.</p><div class="searchbar"><input id="homeQ" class="input" placeholder="Что хочется послушать?"><button id="homeSearch" class="primary">Найти музыку</button></div></section><div class="section"><h2>Для тебя</h2><small>Подборка дня</small></div><div class="grid">'+demos.map(card).join("")+'</div>';
- document.querySelector("#homeSearch").onclick=()=>doSearch(document.querySelector("#homeQ").value);document.querySelector("#homeQ").onkeydown=e=>{if(e.key==="Enter")doSearch(e.target.value)};bind()
+ view.innerHTML='<section class="hero"><h2>Музыка, которая звучит <em>как ты.</em></h2><p>Умная подборка из музыкальных каталогов подстраивается под твои любимые треки.</p><div class="searchbar"><input id="homeQ" class="input" placeholder="Исполнитель, трек или настроение"><button id="homeSearch" class="primary">Найти музыку</button></div></section><div class="section"><h2>✨ Твой микс</h2><small id="mixStatus">Подбираю музыку…</small></div><div id="mix" class="grid"><div class="empty" style="grid-column:1/-1">Создаю персональную подборку…</div></div>';
+ document.querySelector("#homeSearch").onclick=()=>doSearch(document.querySelector("#homeQ").value);document.querySelector("#homeQ").onkeydown=e=>{if(e.key==="Enter")doSearch(e.target.value)};
+ bind();
+ await loadMix();
 }
+async function loadMix(){
+ const seed=[...state.liked.slice(0,5).map(t=>t.artist),...state.liked.slice(0,3).map(t=>t.genre||"")].filter(Boolean).join(" ");
+ const box=document.querySelector("#mix"), status=document.querySelector("#mixStatus");
+ try{
+   const r=await fetch("/api/recommendations?limit=12&seed="+encodeURIComponent(seed));
+   const d=await r.json();
+   if(!d.ok || !d.tracks?.length) throw Error("Нет доступных рекомендаций");
+   tracks=d.tracks;
+   box.innerHTML=d.tracks.map(card).join("");
+   status.textContent=(d.mode==="personalized"?"Под твои предпочтения":"Новая подборка")+" · "+(d.providers||[]).join(" + ");
+   bind(box);
+ }catch(e){
+   tracks=demos;
+   box.innerHTML=demos.map(card).join("");
+   status.textContent="Демо-подборка · каталоги пока недоступны";
+   bind(box);
+ }
+}
+
 function mood(){
  const moodItems=[["🌙","Ночной вайб","Спокойное и атмосферное"],["⚡","Энергия","Больше ритма и движения"],["☁️","Chill","Расслабиться и выдохнуть"],["💜","Любовь","Мягкие и тёплые треки"],["🚗","В дорогу","Музыка для долгой поездки"],["🔥","Вечеринка","Ритм, который не отпускает"]];
  view.innerHTML='<div class="section"><h2>Какое настроение?</h2><small>Выбери атмосферу</small></div><div class="moods">'+moodItems.map((x,i)=>'<button class="mood-card" data-mood="'+i+'"><b>'+x[0]+'</b><strong>'+x[1]+'</strong><span>'+x[2]+'</span></button>').join('')+'</div><div class="section"><h2>Популярное</h2><small>Для хорошего настроения</small></div><div class="grid">'+demos.map(card).join('')+'</div>';
