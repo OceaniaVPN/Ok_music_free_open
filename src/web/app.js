@@ -132,7 +132,8 @@ document.querySelector("#closeModal").onclick=()=>modal.classList.remove("open")
 document.querySelector("#createPlaylist").onclick=()=>{const name=document.querySelector("#playlistName").value.trim();if(!name)return toast("Введи название");state.playlists.unshift({id:"pl-"+Date.now(),name,tracks:[]});save();document.querySelector("#playlistName").value="";modal.classList.remove("open");library();toast("Плейлист создан ✨")}
 function render(name){document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));({home,mood,search:searchView,library}[name]||home)()}
 document.querySelector("#nav").addEventListener("click",e=>{const b=e.target.closest("button[data-view]");if(b)render(b.dataset.view)});
-if(window.Telegram?.WebApp){window.Telegram.WebApp.ready();window.Telegram.WebApp.expand();window.Telegram.WebApp.setHeaderColor("#090a10");window.Telegram.WebApp.setBackgroundColor("#080910")}\nrender("home");
+if(window.Telegram?.WebApp){window.Telegram.WebApp.ready();window.Telegram.WebApp.expand();window.Telegram.WebApp.setHeaderColor("#090a10");window.Telegram.WebApp.setBackgroundColor("#080910")}
+render("home");
 </script>
 </body></html>`;
   return new Response(html,{headers:{"content-type":"text/html; charset=utf-8; charset=utf-8"}});
