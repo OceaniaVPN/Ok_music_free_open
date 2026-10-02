@@ -90,97 +90,7 @@ async function searchJamendo(q, limit, env) {
   return (data.results || []).map(normalizeJamendo).filter(t => t.audio);
 }
 
-export async function handleApi(request, env) {
-  const url = new URL(request.url);
-
-  if (url.pathname === "/api/health") {
-    return Response.json({
-      ok: true,
-      service: env.APP_NAME || "Ok Music",
-      version: "4.0",
-      providers: ["YouTube Music", "Jamendo"],
-      youtube: { configured: Boolean(String(env.YOUTUBE_API_KEY || "").trim()) }
-    });
-  }
-
-  if (url.pathname === "/api/search") {
-    const q = (url.searchParams.get("q") || "").trim();
-    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 24), 1), 50);
-    if (!q) return Response.json({ ok: true, query: "", tracks: [], providers: [] });
-
-    const [youtubeResult, jamendoResult] = await Promise.allSettled([
-      searchYouTube(q, limit, env),
-      searchJamendo(q, Math.max(6, Math.ceil(limit / 3)), env)
-    ]);
-
-    const youtubeTracks = youtubeResult.status === "fulfilled" ? youtubeResult.value : [];
-    const jamendoTracks = jamendoResult.status === "fulfilled" ? jamendoResult.value : [];
-    const tracks = [...youtubeTracks, ...jamendoTracks].slice(0, limit);
-
-    if (!tracks.length) {
-      const errors = [
-        youtubeResult.status === "rejected" ? "YouTube: " + (youtubeResult.reason?.message || "ошибка") : "",
-        jamendoResult.status === "rejected" ? "Jamendo: " + (jamendoResult.reason?.message || "ошибка") : ""
-      ].filter(Boolean);
-
-      return Response.json({
-        ok: false,
-        error: errors.length ? "Музыкальные каталоги недоступны" : "Ничего не найдено",
-        details: errors,
-        query: q,
-        tracks: [],
-        diagnostics: {
-          youtubeConfigured: Boolean(String(env.YOUTUBE_API_KEY || "").trim()),
-          jamendoConfigured: Boolean(String(env.JAMENDO_CLIENT_ID || "").trim()),
-          errors
-        }
-      }, { status: errors.length ? 502 : 200 });
-    }
-
-    return Response.json({
-      ok: true,
-      query: q,
-      providers: [
-        ...(youtubeTracks.length ? ["YouTube Music"] : []),
-        ...(jamendoTracks.length ? ["Jamendo"] : [])
-      ],
-      tracks
-    });
-  }
-
-  if (url.pathname === "/api/recommendations") {
-    const seed = (url.searchParams.get("seed") || "").trim();
-    const mood = (url.searchParams.get("mood") || "").trim();
-    const query = [seed, mood].filter(Boolean).join(" ").trim() || "популярная музыка";
-    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 12), 6), 30);
-
-    const [youtubeResult, jamendoResult] = await Promise.allSettled([
-      searchYouTube(query, limit, env),
-      searchJamendo(query, Math.max(4, Math.ceil(limit / 3)), env)
-    ]);
-
-    const youtubeTracks = youtubeResult.status === "fulfilled" ? youtubeResult.value : [];
-    const jamendoTracks = jamendoResult.status === "fulfilled" ? jamendoResult.value : [];
-    const tracks = [...youtubeTracks, ...jamendoTracks].slice(0, limit);
-
-    return Response.json({
-      ok: true,
-      query,
-      mode: seed || mood ? "personalized" : "discovery",
-      providers: [
-        ...(youtubeTracks.length ? ["YouTube Music"] : []),
-        ...(jamendoTracks.length ? ["Jamendo"] : [])
-      ],
-      tracks,
-      errors: [
-        ...(youtubeResult.status === "rejected" ? ["YouTube: " + (youtubeResult.reason?.message || "ошибка")] : []),
-        ...(jamendoResult.status === "rejected" ? ["Jamendo: " + (jamendoResult.reason?.message || "ошибка")] : [])
-      ]
-    });
-  }
-
-  return Response.json({ ok: false, error: "Not found" }, { status: 404 });
-}function providerErrors(youtubeResult, jamendoResult) {
+function providerErrors(youtubeResult, jamendoResult) {
   return [
     youtubeResult.status === "rejected" ? "YouTube Music: " + (youtubeResult.reason?.message || "ошибка") : "",
     jamendoResult.status === "rejected" ? "Jamendo: " + (jamendoResult.reason?.message || "ошибка") : ""
@@ -221,7 +131,11 @@ export async function handleApi(request, env) {
         details: errors,
         query: q,
         tracks: [],
-        diagnostics: { youtubeMusicConfigured: true, jamendoConfigured: Boolean(String(env.JAMENDO_CLIENT_ID || "").trim()), errors }
+        diagnostics: {
+          youtubeMusicConfigured: true,
+          jamendoConfigured: Boolean(String(env.JAMENDO_CLIENT_ID || "").trim()),
+          errors
+        }
       }, { status: errors.length ? 502 : 200 });
     }
 
@@ -241,12 +155,14 @@ export async function handleApi(request, env) {
     const mood = (url.searchParams.get("mood") || "").trim();
     const query = [seed, mood].filter(Boolean).join(" ").trim() || "популярная музыка";
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 12), 6), 30);
+
     const [youtubeResult, jamendoResult] = await Promise.allSettled([
       searchYouTubeMusic(query, limit),
       searchJamendo(query, Math.max(4, Math.ceil(limit / 3)), env)
     ]);
     const youtubeTracks = youtubeResult.status === "fulfilled" ? youtubeResult.value : [];
     const jamendoTracks = jamendoResult.status === "fulfilled" ? jamendoResult.value : [];
+
     return Response.json({
       ok: true,
       query,
