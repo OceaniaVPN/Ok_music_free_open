@@ -49,7 +49,7 @@ state.taste.genres=Array.isArray(state.taste.genres)?state.taste.genres:[];
 state.taste.moods=Array.isArray(state.taste.moods)?state.taste.moods:[];
 state.taste.artists=typeof state.taste.artists==="string"?state.taste.artists:"";
 state.taste.now=typeof state.taste.now==="string"?state.taste.now:"";
-let tracks=[], current=null, currentIndex=-1, audio=new Audio(), nextAudio=new Audio(), playing=false, autoNext=true, nextPreloadToken=0;
+let tracks=[], localTracks=[], current=null, currentIndex=-1, audio=new Audio(), nextAudio=new Audio(), playing=false, autoNext=true, nextPreloadToken=0;
 audio.preload="auto";
 audio.crossOrigin="anonymous";
 nextAudio.preload="auto";
@@ -142,7 +142,7 @@ function playPrevious(){
 function addToPlaylist(t){if(!t)return;if(!state.playlists.length){toast("Сначала создай плейлист");modal.classList.add("open");document.querySelector("#playlistName").focus();return}const names=state.playlists.map((p,i)=>(i+1)+". "+p.name+" ("+p.tracks.length+")").join("\n");const answer=window.prompt("Добавить в какой плейлист?\\n\\n"+names+"\\n\\nВведи номер:","1");const n=Number(answer);if(!Number.isInteger(n)||!state.playlists[n-1])return;const p=state.playlists[n-1];if(p.tracks.some(x=>x.id===t.id)){toast("Трек уже есть в плейлисте");return}p.tracks.push(t);save();toast("Добавлено в «"+p.name+"» ✨")}
 const TASTE_GENRES=["Русский рэп","Поп","Рок","Электроника","Хип-хоп","Фонк","R&B","Lo-fi","Инди","Метал","Классика","Джаз","K-pop"]; const TASTE_MOODS=["Спокойно","Энергично","Грустно","Романтично","Ночью","Для дороги","Вечеринка","Фон для работы"]; function openTaste(){const m=document.querySelector("#tasteModal"),g=document.querySelector("#genreChips"),mo=document.querySelector("#moodChips");g.innerHTML=TASTE_GENRES.map(x=>'<button class="chip '+(state.taste.genres.includes(x)?"on":"")+'" data-g="'+esc(x)+'">'+esc(x)+'</button>').join("");mo.innerHTML=TASTE_MOODS.map(x=>'<button class="chip '+(state.taste.moods.includes(x)?"on":"")+'" data-m="'+esc(x)+'">'+esc(x)+'</button>').join("");g.querySelectorAll("[data-g]").forEach(b=>b.onclick=()=>{const x=b.dataset.g;state.taste.genres=state.taste.genres.includes(x)?state.taste.genres.filter(v=>v!==x):[...state.taste.genres,x];b.classList.toggle("on")});mo.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{const x=b.dataset.m;state.taste.moods=state.taste.moods.includes(x)?state.taste.moods.filter(v=>v!==x):[...state.taste.moods,x];b.classList.toggle("on")});document.querySelector("#tasteArtists").value=state.taste.artists||"";document.querySelector("#tasteNow").value=state.taste.now||"";m.classList.add("open")} document.querySelector("#tasteBtn").onclick=openTaste; document.querySelector("#tasteCancel").onclick=()=>document.querySelector("#tasteModal").classList.remove("open"); document.querySelector("#tasteSave").onclick=()=>{state.taste.artists=document.querySelector("#tasteArtists").value.trim();state.taste.now=document.querySelector("#tasteNow").value.trim();save();document.querySelector("#tasteModal").classList.remove("open");toast("Вкус сохранён ✨");render("home")}; async function home(){
  tracks=demos;
- view.innerHTML='<section class="hero"><h2>Музыка, которая звучит <em>как ты.</em></h2><p>Умная подборка из музыкальных каталогов подстраивается под твои любимые треки.</p><div class="searchbar"><input id="homeQ" class="input" placeholder="Исполнитель, трек или настроение"><button id="homeSearch" class="primary">Найти музыку</button></div></section><div id="homeWave" class="wave-card"></div><div class="taste-panel"><h3>🎧 Твой музыкальный профиль</h3><p>Настрой предпочтения, и алгоритм будет учитывать их в каждом новом миксе.</p><button id="editTaste" style="margin-top:12px">Настроить вкус</button></div><div class="section"><div><h2>✨ Твой микс</h2><small id="mixStatus">Подбираю музыку…</small></div><div class="section-actions"><button id="refreshMix" title="Пересобрать подборку">↻</button><button id="mixPlay" class="home-play" title="Слушать микс">▶</button></div></div><div id="mix" class="grid"><div class="empty" style="grid-column:1/-1">Создаю персональную подборку…</div></div>';
+ view.innerHTML='<section class="hero"><h2>Музыка, которая звучит <em>как ты.</em></h2><p>Умная подборка из музыкальных каталогов подстраивается под твои любимые треки.</p><div class="searchbar"><input id="homeQ" class="input" placeholder="Исполнитель, трек или настроение"><button id="homeSearch" class="primary">Найти музыку</button></div></section><div id="homeWave" class="wave-card"></div><div class="taste-panel"><h3>🎧 Твой музыкальный профиль</h3><p>Настрой предпочтения, и алгоритм будет учитывать их в каждом новом миксе.</p><button id="editTaste" style="margin-top:12px">Настроить вкус</button></div><div class="section"><div><h2>✨ Твой микс</h2><small id="mixStatus">Подбираю музыку…</small></div><div class="section-actions"><button id="refreshMix" title="Пересобрать подборку">↻</button><button id="mixPlay" class="home-play" title="Слушать микс">▶</button></div></div><div id="mix" class="grid"><div class="empty" style="grid-column:1/-1">Создаю персональную подборку…</div></div><div class="section"><div><h2>🔑 Ключник</h2><small>Музыка из папки репозитория</small></div></div><div id="localMusic" class="grid"><div class="empty" style="grid-column:1/-1">Загружаю локальную музыку…</div></div>';
  document.querySelector("#homeSearch").onclick=()=>doSearch(document.querySelector("#homeQ").value);document.querySelector("#homeQ").onkeydown=e=>{if(e.key==="Enter")doSearch(e.target.value)};
  document.querySelector("#editTaste").onclick=openTaste;
  document.querySelector("#refreshMix").onclick=()=>loadMix(true);
@@ -151,6 +151,25 @@ drawHomeWave();
 bind();
  await loadMix();
 }
+async function loadLocalMusic(){
+ const box=document.querySelector("#localMusic");
+ if(!box)return;
+ try{
+  const r=await fetch("/api/local-music");
+  const d=await r.json();
+  if(!d.ok)throw Error("Локальная музыка недоступна");
+  localTracks=Array.isArray(d.tracks)?d.tracks:[];
+  if(localTracks.length){
+   tracks=[...tracks,...localTracks.filter(t=>!tracks.some(x=>x.id===t.id))];
+   box.innerHTML=localTracks.map(card).join("");
+   bind(box);
+  }else box.innerHTML='<div class="empty" style="grid-column:1/-1">Папка «music» пока пустая. Добавь туда MP3/M4A/OGG и сделай новый деплой.</div>';
+ }catch(e){
+  localTracks=[];
+  box.innerHTML='<div class="empty" style="grid-column:1/-1">Не удалось загрузить 🔑 Ключник.</div>';
+ }
+}
+
 async function loadMix(force=false){
  const refresh=force?String(Date.now()):"";
  const seed=[...state.liked.slice(0,8).map(t=>t.artist),...state.liked.slice(0,5).map(t=>t.genre||""),...(state.taste.genres||[]),...(state.taste.moods||[]),state.taste.artists,state.taste.now].filter(Boolean).join(", ");
@@ -166,6 +185,7 @@ async function loadMix(force=false){
    box.innerHTML=d.tracks.map(card).join("");
    status.textContent=(d.mode==="personalized"?"Под твои предпочтения":"Новая подборка")+" · "+(d.providers||[]).join(" + ");
    bind(box);
+   await loadLocalMusic();
  }catch(e){
    tracks=demos;
    box.innerHTML=demos.map(card).join("");
@@ -187,7 +207,7 @@ async function doSearch(q){
  q=String(q||"").trim(); if(!q){toast("Введи запрос");return}
  if(!document.querySelector("#results")){render("search");document.querySelector("#q").value=q}
  const box=document.querySelector("#results");box.innerHTML='<div class="empty">Ищу музыку…<br><small>Подбираю совпадения и обложки</small></div>';
- try{const r=await fetch("/api/search?q="+encodeURIComponent(q)+"&limit=30");const d=await r.json();if(!d.ok)throw Error(d.error||"Ошибка");tracks=d.tracks||[];box.innerHTML=tracks.length?tracks.map(result).join(""):'<div class="empty">Ничего не нашлось. Попробуй другой запрос.</div>';bind(box)}catch(e){box.innerHTML='<div class="empty">Поиск временно недоступен.<br><small>'+esc(e.message)+'</small></div>'}
+ try{const [remote,local]=await Promise.all([fetch("/api/search?q="+encodeURIComponent(q)+"&limit=30").then(x=>x.json()),Promise.resolve(localTracks.length?localTracks:(await fetch("/api/local-music").then(x=>x.json())).tracks||[])]);if(!remote.ok)throw Error(remote.error||"Ошибка");localTracks=local;const ql=q.toLowerCase();const localMatches=local.filter(t=>(t.title+" "+t.artist+" "+(t.album||"")).toLowerCase().includes(ql));tracks=[...(remote.tracks||[]),...localMatches.filter(t=>!(remote.tracks||[]).some(x=>x.id===t.id))];box.innerHTML=tracks.length?tracks.map(result).join(""):'<div class="empty">Ничего не нашлось. Попробуй другой запрос.</div>';bind(box)}catch(e){box.innerHTML='<div class="empty">Поиск временно недоступен.<br><small>'+esc(e.message)+'</small></div>'}
 }
 function library(){
  view.innerHTML='<div class="section"><h2>Моя музыка</h2><button id="newPlaylist" class="primary">＋ Плейлист</button></div><div class="section"><h2>♥ Понравившиеся</h2><small>'+state.liked.length+' треков</small></div><div id="liked" class="results"></div><div class="section"><h2>Мои плейлисты</h2></div><div id="playlists"></div>';
