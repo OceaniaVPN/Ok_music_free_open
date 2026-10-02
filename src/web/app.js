@@ -134,13 +134,29 @@ function drawPlayer(){if(!current){playerEl.className="player";return}
  if(current.youtubeId){
    const ytOrigin=location.origin;
    const ytUrl="https://www.youtube-nocookie.com/embed/"+encodeURIComponent(current.youtubeId)+"?autoplay=1&playsinline=1&enablejsapi=1&origin="+encodeURIComponent(ytOrigin)+"&widget_referrer="+encodeURIComponent(ytOrigin)+"/";
-   playerEl.innerHTML='<div class="yt-frame"><iframe title="YouTube Music" src="'+ytUrl+'" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="origin"></iframe></div><div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+' · YouTube Music</span></div><div class="pc"><button id="closeYT" class="big">■</button></div>';
+   playerEl.innerHTML='<div class="yt-frame"><iframe title="YouTube Music" src="'+ytUrl+'" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe></div><div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+' · YouTube Music</span><small id="ytStatus" style="display:block;color:var(--muted);font-size:10px;margin-top:4px">Ожидаю ответ YouTube…</small></div><div class="pc"><button id="closeYT" class="big">■</button></div>';
    document.querySelector("#closeYT").onclick=()=>{current=null;playing=false;playerEl.className="player";};
    return;
  }
  playerEl.innerHTML='<div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>';
  document.querySelector("#pause").onclick=()=>{if(playing){audio.pause();playing=false}else{audio.play();playing=true}drawPlayer()};document.querySelector("#seek").oninput=e=>{if(audio.duration)audio.currentTime=audio.duration*e.target.value/100}
 }
+
+window.addEventListener("message",e=>{
+ if(!current?.youtubeId||!e.origin.includes("youtube"))return;
+ let data=e.data;
+ try{if(typeof data==="string")data=JSON.parse(data)}catch{return}
+ if(data?.event==="onError"){
+  const code=Number(data.info);
+  const text=code===153?"YouTube не получил HTTP Referer / идентификацию клиента":code===101||code===150?"Видео запрещено для встраивания":code===100?"Видео удалено или приватное":"Ошибка YouTube "+code;
+  toast(text);
+  const s=document.querySelector("#ytStatus");if(s)s.textContent=text;
+ }
+ if(data?.event==="onAutoplayBlocked"){
+  toast("YouTube заблокировал автоматический запуск — нажми ▶ в плеере");
+  const s=document.querySelector("#ytStatus");if(s)s.textContent="Автозапуск заблокирован WebView";
+ }
+});
 audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration)}
 audio.onplay=()=>{playing=true;updateMediaSession()};audio.onpause=()=>{playing=false;drawPlayer()};audio.onended=()=>{playing=false;drawPlayer()}
 document.querySelector("#closeModal").onclick=()=>modal.classList.remove("open");modal.onclick=e=>{if(e.target===modal)modal.classList.remove("open")};
