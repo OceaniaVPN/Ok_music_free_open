@@ -51,6 +51,7 @@ state.taste.artists=typeof state.taste.artists==="string"?state.taste.artists:""
 state.taste.now=typeof state.taste.now==="string"?state.taste.now:"";
 let tracks=[], current=null, currentIndex=-1, audio=new Audio(), nextAudio=new Audio(), playing=false, autoNext=true, nextPreloadToken=0;
 audio.preload="auto";
+audio.crossOrigin="anonymous";
 nextAudio.preload="auto";
 nextAudio.setAttribute("aria-hidden","true");
 const AUDIO_KEY="okmusic:audio";
