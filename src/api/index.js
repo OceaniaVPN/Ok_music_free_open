@@ -45,6 +45,8 @@ function uniqueTracks(tracks, limit) {
 }
 
 async function searchVk(q, limit, env) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
   const token = String(env.VK_ACCESS_TOKEN || "").trim();
   const userAgent = String(
     env.VK_USER_AGENT ||
@@ -60,9 +62,17 @@ async function searchVk(q, limit, env) {
   api.searchParams.set("count", String(Math.min(Math.max(limit, 1), 100)));
   api.searchParams.set("sort", "2");
 
-  const response = await fetch(api, {
-    headers: { accept: "application/json", "user-agent": userAgent }
-  });
+  let response;
+  try {
+    response = await fetch(api, {
+      headers: { accept: "application/json", "user-agent": userAgent },
+      signal: controller.signal
+    });
+  } catch (error) {
+    throw new Error(error?.name === "AbortError" ? "VK timeout" : "VK network error");
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) throw new Error("VK HTTP " + response.status);
 
@@ -141,7 +151,7 @@ export async function handleApi(request, env) {
         details: errors,
         query: q,
         tracks: []
-      }, { status: errors.length ? 502 : 200 });
+        diagnostics: {\n          vkConfigured: Boolean(String(env.VK_ACCESS_TOKEN || "").trim()),\n          jamendoConfigured: Boolean(String(env.JAMENDO_CLIENT_ID || "").trim()),\n          errors\n        }\n      }, { status: errors.length ? 502 : 200 });
     }
 
     return Response.json({
