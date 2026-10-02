@@ -99,7 +99,9 @@ export async function handleApi(request, env) {
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 24), 1), 50);
     if (!q) return Response.json({ ok: true, query: "", tracks: [], providers: [] });
 
-    const [youtubeResult, jamendoResult] = await Promise.allSettled([\n      searchYouTube(q, limit, env),\n      searchJamendo(q, Math.max(6, Math.ceil(limit / 3)), env)\n    ]);
+    const [youtubeResult, jamendoResult] = await Promise.allSettled([
+      searchYouTube(q, limit, env),\n      searchJamendo(q, Math.max(6, Math.ceil(limit / 3)), env)
+    ]);
 
     const youtubeTracks = youtubeResult.status === "fulfilled" ? youtubeResult.value : [];
     const jamendoTracks = jamendoResult.status === "fulfilled" ? jamendoResult.value : [];
@@ -129,7 +131,7 @@ export async function handleApi(request, env) {
       ok: true,
       query: q,
       providers: [
-        ...(vkTracks.length ? ["VK"] : []),
+        ...(youtubeTracks.length ? ["YouTube Music"] : []),
         ...(jamendoTracks.length ? ["Jamendo"] : [])
       ],
       tracks
@@ -142,7 +144,9 @@ export async function handleApi(request, env) {
     const query = [seed, mood].filter(Boolean).join(" ").trim() || "популярная музыка";
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 12), 6), 30);
 
-    const [youtubeResult, jamendoResult] = await Promise.allSettled([\n      searchYouTube(query, limit, env),\n      searchJamendo(query, Math.max(4, Math.ceil(limit / 3)), env)\n    ]);
+    const [youtubeResult, jamendoResult] = await Promise.allSettled([
+      searchYouTube(query, limit, env),\n      searchJamendo(query, Math.max(4, Math.ceil(limit / 3)), env)
+    ]);
 
     const youtubeTracks = youtubeResult.status === "fulfilled" ? youtubeResult.value : [];
     const jamendoTracks = jamendoResult.status === "fulfilled" ? jamendoResult.value : [];
@@ -157,7 +161,8 @@ export async function handleApi(request, env) {
         ...(jamendoTracks.length ? ["Jamendo"] : [])
       ],
       tracks,
-      errors: [\n        ...(youtubeResult.status === "rejected" ? ["YouTube: " + (youtubeResult.reason?.message || "ошибка")] : []),
+      errors: [
+        ...(youtubeResult.status === "rejected" ? ["YouTube: " + (youtubeResult.reason?.message || "ошибка")] : []),
         ...(jamendoResult.status === "rejected" ? ["Jamendo: " + (jamendoResult.reason?.message || "ошибка")] : [])
       ]
     });
