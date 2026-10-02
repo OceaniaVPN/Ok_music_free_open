@@ -14,15 +14,16 @@ export async function handleApi(request, env) {
       return Response.json({ ok: false, error: "Jamendo client_id is not configured" }, { status: 500 });
     }
 
+    const hasCyrillic = /[А-Яа-яЁё]/.test(q);
     const api = new URL("https://api.jamendo.com/v3.0/tracks/");
     api.searchParams.set("client_id", clientId);
     api.searchParams.set("format", "json");
-    api.searchParams.set("limit", "12");
+    api.searchParams.set("limit", "20");
     api.searchParams.set("search", q);
     api.searchParams.set("type", "single albumtrack");
     api.searchParams.set("imagesize", "200");
     api.searchParams.set("audioformat", "mp32");
-    api.searchParams.set("include", "licenses");
+    if (hasCyrillic) api.searchParams.set("lang", "ru");
 
     const response = await fetch(api);
     if (!response.ok) {
@@ -42,7 +43,7 @@ export async function handleApi(request, env) {
       sourceUrl: t.shareurl || ("https://www.jamendo.com/track/" + t.id)
     })).filter(t => t.audio);
 
-    return Response.json({ ok: true, query: q, source: "Jamendo", tracks });
+    return Response.json({ ok: true, query: q, source: "Jamendo", languageFilter: hasCyrillic ? "ru" : null, tracks });
   }
 
   if (url.pathname === "/api/recommendations") {
