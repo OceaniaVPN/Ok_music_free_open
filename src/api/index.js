@@ -156,7 +156,30 @@ export async function handleApi(request, env) {
   }
 
   if (url.pathname === "/api/recommendations") {
-    return Response.json({ ok: true, tracks: [], providers: ["VK", "Jamendo"] });
+    const seed = (url.searchParams.get("seed") || "").trim();
+    const mood = (url.searchParams.get("mood") || "").trim();
+    const query = [seed, mood].filter(Boolean).join(" ").trim() || "популярная музыка";
+    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 12), 6), 30);
+
+    const [vkResult, jamendoResult] = await Promise.allSettled([
+      searchVk(query, limit),
+      searchJamendo(query, Math.max(4, Math.ceil(limit / 3)), env)
+    ]);
+
+    const vkTracks = vkResult.status === "fulfilled" ? vkResult.value : [];
+    const jamendoTracks = jamendoResult.status === "fulfilled" ? jamendoResult.value : [];
+    const tracks = [...vkTracks, ...jamendoTracks].slice(0, limit);
+
+    return Response.json({
+      ok: true,
+      query,
+      mode: seed || mood ? "personalized" : "discovery",
+      providers: [
+        ...(vkTracks.length ? ["VK"] : []),
+        ...(jamendoTracks.length ? ["Jamendo"] : [])
+      ],
+      tracks
+    });
   }
 
   return Response.json({ ok: false, error: "Not found" }, { status: 404 });
