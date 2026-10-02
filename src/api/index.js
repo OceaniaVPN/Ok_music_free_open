@@ -1,13 +1,77 @@
-function md5(s){function a(x,y){return(x+y)|0}function r(x,n){return(x<<n)|(x>>>(32-n))}function c(q,x,y,z,w,n,t){return a(r(a(a(x,q),a(z,t)),n),y)}function f(x,y,z,w,q,n,t){return c((y&z)|(~y&w),x,y,q,n,t)}function g(x,y,z,w,q,n,t){return c((y&w)|(z&~w),x,y,q,n,t)}function h(x,y,z,w,q,n,t){return c(y^z^w,x,y,q,n,t)}function i(x,y,z,w,q,n,t){return c(z^(y|~w),x,y,q,n,t)}function words(s){s=unescape(encodeURIComponent(s));const n=((s.length+8>>6)+1),x=new Array(n*16).fill(0);for(let j=0;j<s.length;j++)x[j>>2]|=s.charCodeAt(j)<<((j%4)*8);x[s.length>>2]|=128<<((s.length%4)*8);x[n*16-2]=s.length*8;return x}const x=words(s);let A=1732584193,B=-271733879,C=-1732584194,D=271733878;for(let k=0;k<x.length;k+=16){const aa=A,bb=B,cc=C,dd=D;A=f(A,B,C,D,x[k],7,-680876936);D=f(D,A,B,C,x[k+1],12,-389564586);C=f(C,D,A,B,x[k+2],17,606105819);B=f(B,C,D,A,x[k+3],22,-1044525330);A=f(A,B,C,D,x[k+4],7,-176418897);D=f(D,A,B,C,x[k+5],12,1200080426);C=f(C,D,A,B,x[k+6],17,-1473231341);B=f(B,C,D,A,x[k+7],22,-45705983);A=f(A,B,C,D,x[k+8],7,1770035416);D=f(D,A,B,C,x[k+9],12,-1958414417);C=f(C,D,A,B,x[k+10],17,-42063);B=f(B,C,D,A,x[k+11],22,-1990404162);A=f(A,B,C,D,x[k+12],7,1804603682);D=f(D,A,B,C,x[k+13],12,-40341101);C=f(C,D,A,B,x[k+14],17,-1502002290);B=f(B,C,D,A,x[k+15],22,1236535329);A=g(A,B,C,D,x[k+1],5,-165796510);D=g(D,A,B,C,x[k+6],9,-1069501632);C=g(C,D,A,B,x[k+11],14,643717713);B=g(B,C,D,A,x[k],20,-373897302);A=g(A,B,C,D,x[k+5],5,-701558691);D=g(D,A,B,C,x[k+10],9,38016083);C=g(C,D,A,B,x[k+15],14,-660478335);B=g(B,C,D,A,x[k+4],20,-405537848);A=g(A,B,C,D,x[k+9],5,568446438);D=g(D,A,B,C,x[k+14],9,-1019803690);C=g(C,D,A,B,x[k+3],14,-187363961);B=g(B,C,D,A,x[k+8],20,1163531501);A=g(A,B,C,D,x[k+13],5,-1444681467);D=g(D,A,B,C,x[k+2],9,-51403784);C=g(C,D,A,B,x[k+7],14,1735328473);B=g(B,C,D,A,x[k+12],20,-1926607734);A=h(A,B,C,D,x[k+5],4,-378558);D=h(D,A,B,C,x[k+8],11,-2022574463);C=h(C,D,A,B,x[k+11],16,1839030562);B=h(B,C,D,A,x[k+14],23,-35309556);A=h(A,B,C,D,x[k+1],4,-1530992060);D=h(D,A,B,C,x[k+4],11,1272893353);C=h(C,D,A,B,x[k+7],16,-155497632);B=h(B,C,D,A,x[k+10],23,-1094730640);A=h(A,B,C,D,x[k+13],4,681279174);D=h(D,A,B,C,x[k],11,-358537222);C=h(C,D,A,B,x[k+3],16,-722521979);B=h(B,C,D,A,x[k+6],23,76029189);A=h(A,B,C,D,x[k+9],4,-640364487);D=h(D,A,B,C,x[k+12],11,-421815835);C=h(C,D,A,B,x[k+15],16,530742520);B=h(B,C,D,A,x[k+2],23,-995338651);A=i(A,B,C,D,x[k],6,-198630844);D=i(D,A,B,C,x[k+7],10,1126891415);C=i(C,D,A,B,x[k+14],15,-1416354905);B=i(B,C,D,A,x[k+5],21,-57434055);A=i(A,B,C,D,x[k+12],6,1700485571);D=i(D,A,B,C,x[k+3],10,-1894986606);C=i(C,D,A,B,x[k+10],15,-1051523);B=i(B,C,D,A,x[k+1],21,-2054922799);A=i(A,B,C,D,x[k+8],6,1873313359);D=i(D,A,B,C,x[k+15],10,-30611744);C=i(C,D,A,B,x[k+6],15,-1560198380);B=i(B,C,D,A,x[k+13],21,1309151649);A=i(A,B,C,D,x[k+4],6,-145523070);D=i(D,A,B,C,x[k+11],10,-1120210379);C=i(C,D,A,B,x[k+2],15,718787259);B=i(B,C,D,A,x[k+9],21,-343485551);A=a(A,aa);B=a(B,bb);C=a(C,cc);D=a(D,dd)}function z(n){let s="";for(let j=0;j<4;j++)s+=("0"+(n>>>j*8&255).toString(16)).slice(-2);return s}return z(A)+z(B)+z(C)+z(D)}
-const ZAYCEV_BASE="https://api.zaycev.net/external";const ZAYCEV_KEYS=["kmskoNdkYHDnl3ol3","63kQw2LlpV3jv","d7DVdaELf"];let zaycevToken="",zaycevTokenAt=0;
-async function zaycevJson(path,params={}){const u=new URL(ZAYCEV_BASE+path);for(const[k,v]of Object.entries(params))u.searchParams.set(k,String(v));const r=await fetch(u,{headers:{accept:"application/json","user-agent":"Ok Music/1.0"}});const text=await r.text();if(!r.ok)throw Error("Zaycev HTTP "+r.status);try{return JSON.parse(text)}catch{throw Error("Zaycev returned invalid JSON")}}
-async function zaycevAuth(env){if(zaycevToken&&Date.now()-zaycevTokenAt<20*60*60*1000)return zaycevToken;const hello=await zaycevJson("/hello");if(!hello?.token)throw Error("Zaycev hello token missing");const keys=[env.ZAYCEV_STATIC_KEY,...ZAYCEV_KEYS].filter(Boolean);let last;for(const key of [...new Set(keys)])try{const auth=await zaycevJson("/auth",{code:hello.token,hash:md5(hello.token+key)});if(auth?.token){zaycevToken=auth.token;zaycevTokenAt=Date.now();return zaycevToken}}catch(e){last=e}throw last||Error("Zaycev authentication failed")}
-function normalizeZaycev(t){if(!t?.id||t.block||t.phantom)return null;return{id:"zaycev-"+t.id,zaycevId:Number(t.id),title:t.track||"Без названия",artist:t.artistName||"Неизвестный исполнитель",album:"",image:t.artistImageUrlSquare250||t.artistImageUrlSquare100||"",audio:"/api/zaycev/play?id="+encodeURIComponent(t.id),duration:typeof t.duration==="number"?t.duration:0,license:"",source:"Zaycev.net",sourceUrl:"https://zaycev.net/track/"+t.id,genre:""}}
-async function searchZaycev(q,limit,env){const token=await zaycevAuth(env),u=new URL(ZAYCEV_BASE+"/search");u.searchParams.set("query",q);u.searchParams.set("page","1");u.searchParams.set("access_token",token);const r=await fetch(u,{headers:{accept:"application/json","user-agent":"Ok Music/1.0"}});if(!r.ok)throw Error("Zaycev search HTTP "+r.status);const d=await r.json();return(d.tracks||[]).map(normalizeZaycev).filter(Boolean).slice(0,limit)}
-async function zaycevPlay(id,env){const token=await zaycevAuth(env),d=await zaycevJson("/track/"+encodeURIComponent(id)+"/play",{access_token:token,encoded_identifier:""}),target=d?.url||d?.playUrl;if(!target)throw Error("Zaycev play URL missing");return target}
-const YT_MUSIC_CLIENT_VERSION = "1.20260707.12.00";
-const YT_MUSIC_SEARCH_PARAMS = "Eg-KAQwIARAAGAAgACgAMABqChAEEAMQCRAFEAo%3D";
+const ZAYCEV_BASE="https://zaycev.net";
+const ZAYCEV_SEARCH="https://zaycev.net/search";
+const ZAYCEV_TRACK_API="https://zaycev.net/api/external/track";
+const ZAYCEV_HEADERS={
+  "accept":"application/json, text/plain, */*",
+  "accept-language":"ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3",
+  "content-type":"application/json;charset=utf-8",
+  "origin":ZAYCEV_BASE,
+  "referer":ZAYCEV_BASE+"/",
+  "user-agent":"Mozilla/5.0 (X11; Linux x86_64; rv:129.0) Gecko/20100101 Firefox/129.0"
+};
 
+function stripHtml(value){
+  return String(value||"").replace(/<script[\s\S]*?<\/script>/gi," ").replace(/<style[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/&nbsp;/gi," ").replace(/&amp;/gi,"&").replace(/&quot;/gi,'"').replace(/&#39;/gi,"'").replace(/&lt;/gi,"<").replace(/&gt;/gi,">").replace(/\s+/g," ").trim();
+}
+function parseDuration(value){
+  const text=String(value||"").trim(), parts=text.split(":").map(Number);
+  if(parts.some(Number.isNaN))return 0;
+  if(parts.length===3)return parts[0]*3600+parts[1]*60+parts[2];
+  if(parts.length===2)return parts[0]*60+parts[1];
+  return parts[0]||0;
+}
+function parseZaycevSearch(html,limit){
+  const out=[],seen=new Set();
+  const chunks=String(html||"").match(/<li\b[^>]*>[\s\S]*?<\/li>/gi)||[String(html||"")];
+  for(const chunk of chunks){
+    const links=[...chunk.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)];
+    const trackLink=links.find(x=>/\/pages\/\d+\/\d+\.shtml(?:[?#]|$)/i.test(x[1]));
+    if(!trackLink)continue;
+    const idm=trackLink[1].match(/\/(\d+)\.shtml(?:[?#]|$)/); if(!idm)continue;
+    const id=idm[1]; if(seen.has(id))continue;
+    const texts=links.map(x=>stripHtml(x[2])).filter(Boolean);
+    const title=stripHtml(trackLink[2])||"Без названия";
+    const artist=texts.find(x=>x!==title&&x.length<160)||"Неизвестный исполнитель";
+    const dm=stripHtml(chunk).match(/\b(\d{1,2}:\d{2})\b/);
+    seen.add(id);out.push({id,title,artist,duration:dm?parseDuration(dm[1]):0});
+    if(out.length>=limit)break;
+  }
+  if(!out.length){
+    for(const m of String(html||"").matchAll(/href=["']([^"']*\/pages\/\d+\/\d+\.shtml[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi)){
+      const idm=m[1].match(/\/(\d+)\.shtml/);if(!idm||seen.has(idm[1]))continue;
+      seen.add(idm[1]);out.push({id:idm[1],title:stripHtml(m[2])||"Без названия",artist:"Неизвестный исполнитель",duration:0});
+      if(out.length>=limit)break;
+    }
+  }
+  return out;
+}
+async function fetchZaycevSearch(q,limit){
+  const u=new URL(ZAYCEV_SEARCH);u.searchParams.set("query_search",q);u.searchParams.set("type","track");
+  const r=await fetch(u,{headers:{"accept":"text/html,application/xhtml+xml","accept-language":"ru-RU,ru;q=0.9,en;q=0.7","referer":ZAYCEV_BASE+"/","user-agent":ZAYCEV_HEADERS["user-agent"]}});
+  const html=await r.text();if(!r.ok)throw Error("Zaycev search HTTP "+r.status);
+  const found=parseZaycevSearch(html,limit);if(!found.length)throw Error("Zaycev search returned no parsable tracks");
+  return found.map(t=>({id:"zaycev-"+t.id,zaycevId:Number(t.id),title:t.title,artist:t.artist,album:"",image:"",audio:"/api/zaycev/play?id="+encodeURIComponent(t.id),duration:t.duration||0,license:"",source:"Zaycev.net",sourceUrl:ZAYCEV_BASE+"/pages/"+Math.floor(Number(t.id)/100)+"/"+t.id+".shtml",genre:""}));
+}
+async function zaycevFileMeta(ids){
+  const r=await fetch(ZAYCEV_TRACK_API+"/filezmeta",{method:"POST",headers:ZAYCEV_HEADERS,body:JSON.stringify({trackIds:ids.map(String),subscription:false})});
+  const text=await r.text();if(!r.ok)throw Error("Zaycev filezmeta HTTP "+r.status);
+  let d;try{d=JSON.parse(text)}catch{throw Error("Zaycev filezmeta returned invalid JSON")}
+  return Array.isArray(d?.tracks)?d.tracks:[];
+}
+async function zaycevPlay(id){
+  const meta=(await zaycevFileMeta([id]))[0];if(!meta)throw Error("Zaycev track metadata not found");
+  if(meta.download){
+    const r=await fetch(ZAYCEV_TRACK_API+"/download/"+encodeURIComponent(meta.download),{headers:{accept:"text/plain,application/json,*/*","user-agent":ZAYCEV_HEADERS["user-agent"],referer:ZAYCEV_BASE+"/"}});
+    const target=(await r.text()).trim();if(r.ok&&/^https?:\/\//i.test(target))return target;
+  }
+  if(meta.streaming){
+    const r=await fetch(ZAYCEV_TRACK_API+"/play/"+encodeURIComponent(meta.streaming),{headers:ZAYCEV_HEADERS});
+    const text=await r.text();if(!r.ok)throw Error("Zaycev stream HTTP "+r.status);
+    let d;try{d=JSON.parse(text)}catch{throw Error("Zaycev stream returned invalid JSON")}
+    if(d?.url)return d.url;
+  }
+  throw Error("Zaycev playback URL missing");
+}
 function uniqueTracks(tracks, limit) {
   const seen = new Set();
   return tracks.filter(track => {
@@ -139,93 +203,33 @@ function providerErrors(youtubeResult, jamendoResult) {
   ].filter(Boolean);
 }
 
-export async function handleApi(request, env) {
-  const url = new URL(request.url);
-
-  if (url.pathname === "/api/health") {
-    return Response.json({
-      ok: true,
-      service: env.APP_NAME || "Ok Music",
-      version: "6.0",
-      providers: ["YouTube Music", "Jamendo"],
-      youtubeMusic: { configured: true, apiKeyRequired: false, mode: "direct-inner-tube" }
-    });
+export async function handleApi(request,env){
+  const url=new URL(request.url);
+  if(url.pathname==="/api/health")return Response.json({ok:true,service:env.APP_NAME||"Ok Music",version:"7.0",providers:["Zaycev.net","Jamendo"],zaycev:{configured:true,mode:"current-web-api"},jamendo:{configured:Boolean(String(env.JAMENDO_CLIENT_ID||"").trim())}});
+  if(url.pathname==="/api/search"){
+    const q=(url.searchParams.get("q")||"").trim(),limit=Math.min(Math.max(Number(url.searchParams.get("limit")||24),1),50);
+    if(!q)return Response.json({ok:true,query:"",tracks:[],providers:[]});
+    const [z,j]=await Promise.allSettled([fetchZaycevSearch(q,limit),searchJamendo(q,Math.max(6,Math.ceil(limit/3)),env)]);
+    const zTracks=z.status==="fulfilled"?z.value:[],jTracks=j.status==="fulfilled"?j.value:[],tracks=uniqueTracks([...zTracks,...jTracks],limit);
+    const errors=[...(z.status==="rejected"?["Zaycev.net: "+(z.reason?.message||"ошибка")]:[]),...(j.status==="rejected"?["Jamendo: "+(j.reason?.message||"ошибка")]:[])];
+    if(!tracks.length)return Response.json({ok:false,error:errors.length?"Музыкальные каталоги недоступны":"Ничего не найдено",details:errors,query:q,tracks:[],diagnostics:{zaycevConfigured:true,jamendoConfigured:Boolean(String(env.JAMENDO_CLIENT_ID||"").trim()),errors}},{status:errors.length?502:200});
+    return Response.json({ok:true,query:q,providers:[...(zTracks.length?["Zaycev.net"]:[]),...(jTracks.length?["Jamendo"]:[])],tracks});
   }
-
-  if (url.pathname === "/api/search") {
-    const q = (url.searchParams.get("q") || "").trim();
-    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 24), 1), 50);
-    if (!q) return Response.json({ ok: true, query: "", tracks: [], providers: [] });
-
-    const [youtubeResult, jamendoResult] = await Promise.allSettled([
-      searchZaycev(q, limit, env),
-      searchJamendo(q, Math.max(6, Math.ceil(limit / 3)), env)
-    ]);
-    const zaycevTracks = youtubeResult.status === "fulfilled" ? youtubeResult.value : [];
-    const jamendoTracks = jamendoResult.status === "fulfilled" ? jamendoResult.value : [];
-    const tracks = uniqueTracks([...zaycevTracks, ...jamendoTracks], limit);
-    const errors = providerErrors(youtubeResult, jamendoResult);
-
-    if (!tracks.length) {
-      return Response.json({
-        ok: false,
-        error: errors.length ? "Музыкальные каталоги недоступны" : "Ничего не найдено",
-        details: errors,
-        query: q,
-        tracks: [],
-        diagnostics: {
-          zaycevConfigured: true,
-          jamendoConfigured: Boolean(String(env.JAMENDO_CLIENT_ID || "").trim()),
-          errors
-        }
-      }, { status: errors.length ? 502 : 200 });
-    }
-
-    return Response.json({
-      ok: true,
-      query: q,
-      providers: [
-        ...(zaycevTracks.length ? ["Zaycev.net"] : []),
-        ...(jamendoTracks.length ? ["Jamendo"] : [])
-      ],
-      tracks
-    });
+  if(url.pathname==="/api/zaycev/play"){
+    const id=(url.searchParams.get("id")||"").trim();if(!/^\d+$/.test(id))return Response.json({ok:false,error:"Invalid Zaycev track id"},{status:400});
+    try{return Response.redirect(await zaycevPlay(id),302)}catch(e){return Response.json({ok:false,error:e?.message||"Zaycev playback unavailable"},{status:502})}
   }
-
-  if (url.pathname === "/api/zaycev/play") {
-    const id=(url.searchParams.get("id")||"").trim();
-    if(!/^\d+$/.test(id)) return Response.json({ok:false,error:"Invalid Zaycev track id"},{status:400});
-    try{return Response.redirect(await zaycevPlay(id,env),302)}catch(e){return Response.json({ok:false,error:e?.message||"Zaycev playback unavailable"},{status:502})}
-  }
-
-  if (url.pathname === "/api/recommendations") {
-    const seed=(url.searchParams.get("seed")||"").trim();
-    const mood=(url.searchParams.get("mood")||"").trim();
-    const genres=(url.searchParams.get("genres")||"").trim();
-    const moods=(url.searchParams.get("moods")||"").trim();
-    const artists=(url.searchParams.get("artists")||"").trim();
-    const now=(url.searchParams.get("now")||"").trim();
-    const liked=(url.searchParams.get("liked")||"").trim();
-    const refresh=(url.searchParams.get("refresh")||"").trim();
-    const limit=Math.min(Math.max(Number(url.searchParams.get("limit")||16),6),40);
+  if(url.pathname==="/api/recommendations"){
+    const seed=(url.searchParams.get("seed")||"").trim(),mood=(url.searchParams.get("mood")||"").trim(),genres=(url.searchParams.get("genres")||"").trim(),moods=(url.searchParams.get("moods")||"").trim(),artists=(url.searchParams.get("artists")||"").trim(),now=(url.searchParams.get("now")||"").trim(),liked=(url.searchParams.get("liked")||"").trim(),refresh=(url.searchParams.get("refresh")||"").trim(),limit=Math.min(Math.max(Number(url.searchParams.get("limit")||16),6),40);
     const base=[artists,genres,moods,mood,now,liked,seed].filter(Boolean).join(", ");
-    const queries=[artists+" "+genres,genres+" "+moods,artists+" "+now,base,mood+" "+genres+" "+artists]
-      .map(x=>x.replace(/\\s+/g," ").trim()).filter(Boolean);
+    const queries=[artists+" "+genres,genres+" "+moods,artists+" "+now,base,mood+" "+genres+" "+artists].map(x=>x.replace(/\s+/g," ").trim()).filter(Boolean);
     const uniqueQueries=[...new Set(queries)].slice(0,5);
-    const zResults=await Promise.allSettled(uniqueQueries.map(q=>searchZaycev(q,Math.min(10,limit),env)));
-    const jamResults=await Promise.allSettled(uniqueQueries.slice(0,3).map(q=>searchJamendo(q,4,env)));
-    const zaycev=zResults.flatMap(r=>r.status==="fulfilled"?r.value:[]);
-    const jam=jamResults.flatMap(r=>r.status==="fulfilled"?r.value:[]);
-    const final=[];const seen=new Set();
-    for(let i=0;i<Math.max(zaycev.length,jam.length)&&final.length<limit;i++){
-      for(const list of [zaycev,jam]){const t=list[i];if(t&&!seen.has(t.id)){seen.add(t.id);final.push(t)}}
-    }
-    const errors=[...zResults.filter(r=>r.status==="rejected").map(r=>"Zaycev.net: "+(r.reason?.message||"ошибка")),...jamResults.filter(r=>r.status==="rejected").map(r=>"Jamendo: "+(r.reason?.message||"ошибка"))];
-    if(refresh&&final.length>1){
-      let h=0;for(const ch of refresh)h=(h*31+ch.charCodeAt(0))>>>0;
-      const shift=h%final.length;final.push(...final.splice(0,shift));
-    }
-    return Response.json({ok:true,mode:base?"personalized":"discovery",profile:{genres,moods,artists,now},providers:[...(yt.length?["YouTube Music"]:[]),...(jam.length?["Jamendo"]:[])],tracks:final.slice(0,limit),errors});
+    const [zr,jr]=await Promise.all([Promise.allSettled(uniqueQueries.map(q=>fetchZaycevSearch(q,Math.min(10,limit)))),Promise.allSettled(uniqueQueries.slice(0,3).map(q=>searchJamendo(q,4,env)))]);
+    const zaycev=zr.flatMap(r=>r.status==="fulfilled"?r.value:[]),jam=jr.flatMap(r=>r.status==="fulfilled"?r.value:[]),final=[],seen=new Set();
+    for(let i=0;i<Math.max(zaycev.length,jam.length)&&final.length<limit;i++)for(const list of [zaycev,jam]){const t=list[i];if(t&&!seen.has(t.id)){seen.add(t.id);final.push(t)}}
+    const errors=[...zr.filter(r=>r.status==="rejected").map(r=>"Zaycev.net: "+(r.reason?.message||"ошибка")),...jr.filter(r=>r.status==="rejected").map(r=>"Jamendo: "+(r.reason?.message||"ошибка"))];
+    if(refresh&&final.length>1){let h=0;for(const ch of refresh)h=(h*31+ch.charCodeAt(0))>>>0;const shift=h%final.length;final.push(...final.splice(0,shift))}
+    return Response.json({ok:true,mode:base?"personalized":"discovery",profile:{genres,moods,artists,now},providers:[...(zaycev.length?["Zaycev.net"]:[]),...(jam.length?["Jamendo"]:[])],tracks:final.slice(0,limit),errors});
   }
-  return Response.json({ ok: false, error: "Not found" }, { status: 404 });
+  return Response.json({ok:false,error:"Not found"},{status:404});
 }
