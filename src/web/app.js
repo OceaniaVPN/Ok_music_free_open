@@ -164,36 +164,19 @@ bind();
  await loadMix();
 }
 async function loadLocalMusic(){
- const box=document.querySelector("#localMusic");
- if(!box)return;
+ const box=document.querySelector("#localMusic");if(!box)return;
  try{
-  const r=await fetch("/api/local-music",{cache:"no-store"});
-  const d=await r.json();
-  if(!d.ok)throw Error("Ключник недоступен");
+  const r=await fetch("/api/local-music",{cache:"no-store"});const d=await r.json();if(!d.ok)throw Error("Ключник недоступен");
   localTracks=Array.isArray(d.tracks)?d.tracks:[];
-  if(!localTracks.length){
-   box.innerHTML='<div class="empty" style="grid-column:1/-1">Ключник пока пуст.</div>';
-   return;
-  }
-  tracks=[...tracks,...localTracks.filter(t=>!tracks.some(x=>x.id===t.id))];
-  box.innerHTML=localTracks.map(card).join("");
-  bind(box);
-  if(window.__megaEnrichLocalTracks){
-    await window.__megaEnrichLocalTracks(localTracks);
-    const ids=new Set(localTracks.map(t=>t.id));
-    tracks=tracks.map(t=>ids.has(t.id)?(localTracks.find(x=>x.id===t.id)||t):t);
-    box.innerHTML=localTracks.map(card).join("");
-    bind(box);
-    if(current&&ids.has(current.id)){
-      current=localTracks.find(x=>x.id===current.id)||current;
-      drawPlayer();
-      updateMediaSession();
-    }
-  }
+  if(!localTracks.length){box.innerHTML='<div class="empty" style="grid-column:1/-1">Ключник пока пуст.</div>';return}
+  const renderLocal=()=>{box.innerHTML=localTracks.map(card).join("");bind(box)};
+  tracks=[...tracks,...localTracks.filter(t=>!tracks.some(x=>x.id===t.id))];renderLocal();
+  if(window.__megaEnrichLocalTracks)await window.__megaEnrichLocalTracks(localTracks,{onTrack:t=>{
+   const ti=tracks.findIndex(x=>x.id===t.id);if(ti>=0)tracks[ti]=t;
+   renderLocal();if(current?.id===t.id){current=t;drawPlayer();updateMediaSession()}
+  }});
  }catch(e){
-  console.error("🔐 Ключник:",e);
-  localTracks=[];
-  box.innerHTML='<div class="empty" style="grid-column:1/-1">Не удалось загрузить 🔐 Ключник.</div>';
+  console.error("🔐 Ключник:",e);localTracks=[];box.innerHTML='<div class="empty" style="grid-column:1/-1">Не удалось загрузить 🔐 Ключник.</div>';
  }
 }
 
@@ -341,7 +324,7 @@ document.querySelector("#closeModal").onclick=()=>modal.classList.remove("open")
 document.querySelector("#createPlaylist").onclick=()=>{const name=document.querySelector("#playlistName").value.trim();if(!name)return toast("Введи название");state.playlists.unshift({id:"pl-"+Date.now(),name,tracks:[]});save();document.querySelector("#playlistName").value="";modal.classList.remove("open");library();toast("Плейлист создан ✨")}
 function render(name){document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));({home,mood,search:searchView,library}[name]||home)()}
 document.querySelector("#nav").addEventListener("click",e=>{const b=e.target.closest("button[data-view]");if(b)render(b.dataset.view)});
-if(window.Telegram?.WebApp){window.Telegram.WebApp.ready();window.Telegram.WebApp.expand();window.Telegram.WebApp.setHeaderColor("#090a10");window.Telegram.WebApp.setBackgroundColor("#080910")}
+if(window.Telegram?.WebApp){window.Telegram.WebApp.ready();window.Telegram.WebApp.expand();window.Telegram.WebApp.setHeaderColor("#080a13");window.Telegram.WebApp.setBackgroundColor("#04040a")}
 render("home");
 </script>
 </body></html>`;
