@@ -38,7 +38,17 @@ button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--line);ba
 <div id="toast" class="toast"></div><div id="tasteModal" class="modal"><div class="dialog"><h3>🎧 Мой музыкальный вкус</h3><p>Выбери любимые направления и настроение — Ok Music будет учитывать их в каждом миксе.</p><div class="taste-grid"><div class="taste-field"><label>Любимые жанры</label><div id="genreChips" class="chips"></div></div><div class="taste-field"><label>Настроение</label><div id="moodChips" class="chips"></div></div></div><div style="margin-top:14px"><label style="display:block;font-size:11px;color:var(--muted);margin-bottom:7px">Любимые исполнители</label><input id="tasteArtists" class="input" placeholder="Например: Miyagi, The Weeknd, Кино"></div><div style="margin-top:14px"><label style="display:block;font-size:11px;color:var(--muted);margin-bottom:7px">Что хочется сейчас</label><input id="tasteNow" class="input" placeholder="Например: спокойный русский рэп для дороги"></div><div class="taste-actions"><button id="tasteCancel">Отмена</button><button id="tasteSave" class="primary" style="flex:1">Сохранить вкус ✨</button></div></div></div>
 <script>
 const view=document.querySelector("#view"), playerEl=document.querySelector("#player"), modal=document.querySelector("#modal"), toastEl=document.querySelector("#toast");
-const KEY="okmusic:v2"; const state=JSON.parse(localStorage.getItem(KEY)||'{"liked":[],"playlists":[]}');
+const KEY="okmusic:v2";
+let state;
+try{state=JSON.parse(localStorage.getItem(KEY)||"{}")}catch{state={}}
+state=state&&typeof state==="object"?state:{};
+state.liked=Array.isArray(state.liked)?state.liked:[];
+state.playlists=Array.isArray(state.playlists)?state.playlists:[];
+state.taste=state.taste&&typeof state.taste==="object"?state.taste:{};
+state.taste.genres=Array.isArray(state.taste.genres)?state.taste.genres:[];
+state.taste.moods=Array.isArray(state.taste.moods)?state.taste.moods:[];
+state.taste.artists=typeof state.taste.artists==="string"?state.taste.artists:"";
+state.taste.now=typeof state.taste.now==="string"?state.taste.now:"";
 let tracks=[], current=null, audio=new Audio(), playing=false;
 audio.preload="auto";
 const demos=[
