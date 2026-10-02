@@ -1,3 +1,16 @@
+import YTMusic from "ytmusic-api";
+
+let ytmusicPromise;
+
+function uniqueTracks(tracks, limit) {
+  const seen = new Set();
+  return tracks.filter(track => {
+    if (!track?.id || seen.has(track.id)) return false;
+    seen.add(track.id);
+    return true;
+  }).slice(0, limit);
+}
+
 function normalizeJamendo(t) {
   return {
     id: "jamendo-" + t.id,
@@ -14,50 +27,46 @@ function normalizeJamendo(t) {
   };
 }
 
-
-function normalizeYouTube(t) {
-  const id = String(t?.id?.videoId || "").trim();
+function normalizeYTMusic(t) {
+  const id = String(t?.videoId || "").trim();
   if (!id) return null;
-  const snippet = t.snippet || {};
-  const title = String(snippet.title || "Без названия");
-  const artist = String(snippet.channelTitle || "YouTube");
+  const thumbnails = Array.isArray(t.thumbnails) ? t.thumbnails : [];
   return {
-    id: "youtube-" + id,
+    id: "ytmusic-" + id,
     youtubeId: id,
-    title,
-    artist,
-    album: "",
-    image: String(snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || ""),
+    title: String(t.name || "Без названия"),
+    artist: String(t.artist?.name || "Неизвестный исполнитель"),
+    album: String(t.album?.name || ""),
+    image: String(thumbnails.at(-1)?.url || ""),
     audio: "",
-    duration: 0,
+    duration: Number(t.duration || 0),
     license: "",
     source: "YouTube Music",
-    sourceUrl: "https://www.youtube.com/watch?v=" + encodeURIComponent(id),
+    sourceUrl: "https://music.youtube.com/watch?v=" + encodeURIComponent(id),
     genre: ""
   };
 }
 
-async function searchYouTube(q, limit, env) {
-  const key = String(env.YOUTUBE_API_KEY || "").trim();
-  if (!key) throw new Error("YOUTUBE_API_KEY не задан");
-
-  const api = new URL("https://www.googleapis.com/youtube/v3/search");
-  api.searchParams.set("key", key);
-  api.searchParams.set("part", "snippet");
-  api.searchParams.set("type", "video");
-  api.searchParams.set("videoCategoryId", "10");
-  api.searchParams.set("maxResults", String(Math.min(Math.max(limit, 1), 50)));
-  api.searchParams.set("q", q);
-
-  const response = await fetch(api, { headers: { accept: "application/json" } });
-  if (!response.ok) throw new Error("YouTube HTTP " + response.status);
-  const data = await response.json();
-  if (data?.error) {
-    const message = data.error?.message || "YouTube API error";
-    throw new Error("YouTube: " + message);
+async function getYTMusic() {
+  if (!ytmusicPromise) {
+    ytmusicPromise = (async () => {
+      const client = new YTMusic();
+      await client.initialize({ GL: "RU", HL: "ru" });
+      return client;
+    })();
   }
+  try {
+    return await ytmusicPromise;
+  } catch (error) {
+    ytmusicPromise = null;
+    throw error;
+  }
+}
 
-  return uniqueTracks((data.items || []).map(normalizeYouTube).filter(Boolean), limit);
+async function searchYouTubeMusic(q, limit) {
+  const client = await getYTMusic();
+  const songs = await client.searchSongs(q);
+  return uniqueTracks(songs.map(normalizeYTMusic).filter(Boolean), limit);
 }
 
 async function searchJamendo(q, limit, env) {
@@ -167,6 +176,87 @@ export async function handleApi(request, env) {
         ...(youtubeResult.status === "rejected" ? ["YouTube: " + (youtubeResult.reason?.message || "ошибка")] : []),
         ...(jamendoResult.status === "rejected" ? ["Jamendo: " + (jamendoResult.reason?.message || "ошибка")] : [])
       ]
+    });
+  }
+
+  return Response.json({ ok: false, error: "Not found" }, { status: 404 });
+}function providerErrors(youtubeResult, jamendoResult) {
+  return [
+    youtubeResult.status === "rejected" ? "YouTube Music: " + (youtubeResult.reason?.message || "ошибка") : "",
+    jamendoResult.status === "rejected" ? "Jamendo: " + (jamendoResult.reason?.message || "ошибка") : ""
+  ].filter(Boolean);
+}
+
+export async function handleApi(request, env) {
+  const url = new URL(request.url);
+
+  if (url.pathname === "/api/health") {
+    return Response.json({
+      ok: true,
+      service: env.APP_NAME || "Ok Music",
+      version: "5.0",
+      providers: ["YouTube Music", "Jamendo"],
+      youtubeMusic: { configured: true, apiKeyRequired: false }
+    });
+  }
+
+  if (url.pathname === "/api/search") {
+    const q = (url.searchParams.get("q") || "").trim();
+    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 24), 1), 50);
+    if (!q) return Response.json({ ok: true, query: "", tracks: [], providers: [] });
+
+    const [youtubeResult, jamendoResult] = await Promise.allSettled([
+      searchYouTubeMusic(q, limit),
+      searchJamendo(q, Math.max(6, Math.ceil(limit / 3)), env)
+    ]);
+    const youtubeTracks = youtubeResult.status === "fulfilled" ? youtubeResult.value : [];
+    const jamendoTracks = jamendoResult.status === "fulfilled" ? jamendoResult.value : [];
+    const tracks = [...youtubeTracks, ...jamendoTracks].slice(0, limit);
+    const errors = providerErrors(youtubeResult, jamendoResult);
+
+    if (!tracks.length) {
+      return Response.json({
+        ok: false,
+        error: errors.length ? "Музыкальные каталоги недоступны" : "Ничего не найдено",
+        details: errors,
+        query: q,
+        tracks: [],
+        diagnostics: { youtubeMusicConfigured: true, jamendoConfigured: Boolean(String(env.JAMENDO_CLIENT_ID || "").trim()), errors }
+      }, { status: errors.length ? 502 : 200 });
+    }
+
+    return Response.json({
+      ok: true,
+      query: q,
+      providers: [
+        ...(youtubeTracks.length ? ["YouTube Music"] : []),
+        ...(jamendoTracks.length ? ["Jamendo"] : [])
+      ],
+      tracks
+    });
+  }
+
+  if (url.pathname === "/api/recommendations") {
+    const seed = (url.searchParams.get("seed") || "").trim();
+    const mood = (url.searchParams.get("mood") || "").trim();
+    const query = [seed, mood].filter(Boolean).join(" ").trim() || "популярная музыка";
+    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 12), 6), 30);
+    const [youtubeResult, jamendoResult] = await Promise.allSettled([
+      searchYouTubeMusic(query, limit),
+      searchJamendo(query, Math.max(4, Math.ceil(limit / 3)), env)
+    ]);
+    const youtubeTracks = youtubeResult.status === "fulfilled" ? youtubeResult.value : [];
+    const jamendoTracks = jamendoResult.status === "fulfilled" ? jamendoResult.value : [];
+    return Response.json({
+      ok: true,
+      query,
+      mode: seed || mood ? "personalized" : "discovery",
+      providers: [
+        ...(youtubeTracks.length ? ["YouTube Music"] : []),
+        ...(jamendoTracks.length ? ["Jamendo"] : [])
+      ],
+      tracks: [...youtubeTracks, ...jamendoTracks].slice(0, limit),
+      errors: providerErrors(youtubeResult, jamendoResult)
     });
   }
 
