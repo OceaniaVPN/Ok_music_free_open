@@ -157,7 +157,7 @@ export async function handleApi(request, env) {
       query,
       mode: seed || mood ? "personalized" : "discovery",
       providers: [
-        ...(vkTracks.length ? ["VK"] : []),
+        ...(youtubeTracks.length ? ["YouTube Music"] : []),
         ...(jamendoTracks.length ? ["Jamendo"] : [])
       ],
       tracks,
