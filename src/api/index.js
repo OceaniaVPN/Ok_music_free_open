@@ -132,6 +132,30 @@ export async function handleApi(request,env){
     if(!tracks.length)return Response.json({ok:false,error:errors.length?"Музыкальные каталоги недоступны":"Ничего не найдено",details:errors,query:q,tracks:[],diagnostics:{zaycevConfigured:true,jamendoConfigured:Boolean(String(env.JAMENDO_CLIENT_ID||"").trim()),errors}},{status:errors.length?502:200});
     return Response.json({ok:true,query:q,providers:[...(zTracks.length?["Zaycev.net"]:[]),...(jTracks.length?["Jamendo"]:[])],tracks});
   }
+  if(url.pathname==="/api/artwork"){
+    const raw=(url.searchParams.get("url")||"").trim();
+    let target;
+    try{target=new URL(raw)}catch{return Response.json({ok:false,error:"Invalid artwork URL"},{status:400})}
+    const host=target.hostname.toLowerCase();
+    const allowed=host==="zaycev.net"||host.endsWith(".zaycev.net")||host==="jamendo.com"||host.endsWith(".jamendo.com");
+    if(!allowed||!/^https?:$/.test(target.protocol))return Response.json({ok:false,error:"Artwork host is not allowed"},{status:403});
+    try{
+      const upstream=await fetch(target,{headers:{
+        accept:"image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        referer:host.endsWith("zaycev.net")?ZAYCEV_BASE+"/":"https://www.jamendo.com/",
+        "user-agent":ZAYCEV_HEADERS["user-agent"]
+      }});
+      if(!upstream.ok)throw Error("Artwork HTTP "+upstream.status);
+      const headers=new Headers();
+      headers.set("content-type",upstream.headers.get("content-type")||"image/jpeg");
+      headers.set("cache-control","public,max-age=86400");
+      headers.set("access-control-allow-origin","*");
+      return new Response(upstream.body,{status:200,headers});
+    }catch(e){
+      return Response.json({ok:false,error:e?.message||"Artwork unavailable"},{status:502});
+    }
+  }
+
   if(url.pathname==="/api/zaycev/play"){
     const id=(url.searchParams.get("id")||"").trim();
     if(!/^\d+$/.test(id))return Response.json({ok:false,error:"Invalid Zaycev track id"},{status:400});
