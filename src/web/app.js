@@ -116,10 +116,25 @@ function play(t){
  audio.src=t.audio||t.src;
  audio.play().then(()=>{playing=true;updateMediaSession();drawPlayer()}).catch(()=>toast("Браузер не разрешил воспроизведение"))
 }
+function updateMediaSession(){
+ if(!("mediaSession" in navigator)||!current||current.youtubeId)return;
+ navigator.mediaSession.metadata=new MediaMetadata({
+  title:current.title||"Ok Music",
+  artist:current.artist||"",
+  album:current.album||"Ok Music",
+  artwork:current.image?[{src:current.image,sizes:"300x300"}]:[]
+ });
+ navigator.mediaSession.setActionHandler("play",()=>audio.play());
+ navigator.mediaSession.setActionHandler("pause",()=>audio.pause());
+ navigator.mediaSession.setActionHandler("seekbackward",()=>{audio.currentTime=Math.max(0,audio.currentTime-10)});
+ navigator.mediaSession.setActionHandler("seekforward",()=>{audio.currentTime=Math.min(audio.duration||Infinity,audio.currentTime+10)});
+}
 function drawPlayer(){if(!current){playerEl.className="player";return}
  playerEl.className="player on";
  if(current.youtubeId){
-   playerEl.innerHTML='<div class="yt-frame"><iframe title="YouTube Music" src="https://www.youtube.com/embed/'+encodeURIComponent(current.youtubeId)+'?autoplay=1&playsinline=1" allow="autoplay; encrypted-media"></iframe></div><div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+' · YouTube Music</span></div><div class="pc"><button id="closeYT" class="big">■</button></div>';
+   const ytOrigin=location.origin;
+   const ytUrl="https://www.youtube.com/embed/"+encodeURIComponent(current.youtubeId)+"?autoplay=1&playsinline=1&enablejsapi=1&origin="+encodeURIComponent(ytOrigin)+"&widget_referrer="+encodeURIComponent(location.href);
+   playerEl.innerHTML='<div class="yt-frame"><iframe title="YouTube Music" src="'+ytUrl+'" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe></div><div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+' · YouTube Music</span></div><div class="pc"><button id="closeYT" class="big">■</button></div>';
    document.querySelector("#closeYT").onclick=()=>{current=null;playing=false;playerEl.className="player";};
    return;
  }
