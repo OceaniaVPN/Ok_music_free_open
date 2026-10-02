@@ -26,7 +26,48 @@ button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--line);ba
 </style>
 <style id="mobile-fix">
 .moods{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.mood-card{min-height:150px;text-align:left;padding:18px;display:flex;flex-direction:column;justify-content:flex-end;border-radius:22px;background:linear-gradient(145deg,rgba(139,92,246,.2),rgba(255,255,255,.035));border:1px solid var(--line);touch-action:manipulation}.mood-card b{font-size:35px;margin-bottom:auto}.mood-card strong{font-size:16px}.mood-card span{color:var(--muted);font-size:11px;margin-top:5px}@media(max-width:600px){.app{padding:14px 12px 215px}.top{margin:4px 0 18px}.hero{padding:19px}.hero h2{font-size:31px;letter-spacing:-1.2px}.hero p{font-size:13px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.card{min-width:0;border-radius:18px}.cover{border-radius:14px}.title{font-size:13px}.sub{font-size:10px}.section{margin:23px 2px 11px}.section h2{font-size:19px}.moods{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.mood-card{min-height:135px;padding:14px}.result{gap:9px;padding:8px}.mini{width:54px;height:54px;flex-basis:54px}.actions{gap:4px}.icon{width:36px;height:36px;padding:0}.player{bottom:max(78px,calc(env(safe-area-inset-bottom) + 70px));width:calc(100% - 10px);padding:8px 9px;border-radius:18px}.player.on{grid-template-columns:45px minmax(0,1fr) auto;gap:8px}.pcover{width:45px;height:45px}.pc{gap:4px}.pc .big{width:40px;height:40px}.fx-panel{padding-top:10px}.eq-grid{gap:3px}.eq-band input{height:92px;writing-mode:vertical-lr;direction:rtl}.eq-band small{font-size:8px}.nav{z-index:70}.pmeta strong{font-size:12px}.pmeta span{font-size:10px}.pc .big{width:42px;height:42px}.nav{width:calc(100% - 12px);bottom:max(6px,env(safe-area-inset-bottom));border-radius:20px;padding:5px}.nav button{min-height:50px;padding:7px 3px}.nav button span{font-size:9px}.searchbar button{width:100%}.input{font-size:16px}.empty{padding:27px 15px}.playlist{padding:10px;gap:9px}.playlist .pic{width:48px;height:48px}.playlist button{padding:9px 8px;font-size:11px}}@media(max-width:350px){.grid{grid-template-columns:1fr}.moods{grid-template-columns:1fr}.mood-card{min-height:105px}.nav button span{font-size:8px}}
-.taste-panel{border:1px solid var(--line);border-radius:24px;padding:18px;background:var(--panel);margin:0 0 20px}.taste-panel h3{margin:0 0 6px}.taste-panel p{margin:0;color:var(--muted);font-size:12px}.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.chip{padding:9px 12px;border-radius:999px;font-size:12px}.chip.on{background:linear-gradient(135deg,var(--a),var(--pink));border-color:transparent}.taste-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.taste-field label{display:block;font-size:11px;color:var(--muted);margin-bottom:7px}.taste-actions{display:flex;gap:8px;margin-top:14px}@media(max-width:600px){.taste-grid{grid-template-columns:1fr}.taste-panel{padding:14px}}</style></head>
+.taste-panel{border:1px solid var(--line);border-radius:24px;padding:18px;background:var(--panel);margin:0 0 20px}.taste-panel h3{margin:0 0 6px}.taste-panel p{margin:0;color:var(--muted);font-size:12px}.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.chip{padding:9px 12px;border-radius:999px;font-size:12px}.chip.on{background:linear-gradient(135deg,var(--a),var(--pink));border-color:transparent}.taste-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.taste-field label{display:block;font-size:11px;color:var(--muted);margin-bottom:7px}.taste-actions{display:flex;gap:8px;margin-top:14px}@media(max-width:600px){.taste-grid{grid-template-columns:1fr}.taste-panel{padding:14px}}
+/* Unified responsive layout: one consistent mobile experience */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
+body{width:100%;min-width:0;overscroll-behavior-x:none;-webkit-tap-highlight-color:transparent;}
+.app{width:100%;max-width:1080px;margin:0 auto;padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right));}
+.grid{grid-template-columns:repeat(4,minmax(0,1fr));}
+.card,.result,.playlist,.mood-card,button,input{touch-action:manipulation;}
+img{max-width:100%;}
+@media(max-width:900px){
+  .app{padding-top:16px;}
+  .grid{grid-template-columns:repeat(3,minmax(0,1fr));}
+  .hero{padding:26px;}
+}
+@media(max-width:600px){
+  .app{padding-top:12px;padding-bottom:calc(215px + env(safe-area-inset-bottom));}
+  .top{margin:2px 0 16px;}
+  .hero{padding:20px;border-radius:22px;}
+  .hero h2{font-size:clamp(28px,8vw,34px);}
+  .searchbar{flex-direction:column;}
+  .searchbar button{width:100%;}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+  .card{min-width:0;padding:10px;border-radius:18px;}
+  .cover{border-radius:14px;}
+  .cover .play{opacity:1;transform:none;}
+  .title{font-size:13px;}
+  .sub{font-size:10px;}
+  .section{margin:22px 2px 10px;}
+  .section h2{font-size:19px;}
+  .nav{width:calc(100% - 12px);bottom:max(6px,env(safe-area-inset-bottom));}
+  .player{bottom:calc(78px + env(safe-area-inset-bottom));}
+  .input{font-size:16px;}
+  .track-head{align-items:flex-start;}
+}
+/* Keep the same two-column phone layout even on very narrow screens. */
+@media(max-width:350px){
+  .app{padding-left:10px;padding-right:10px;}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+  .card{padding:8px;}
+  .title{font-size:12px;}
+  .sub{font-size:9px;}
+}
+</style></head>
 <body>
 <div class="app">
   <header class="top"><div class="brand"><div class="logo">♫</div><div><h1>Ok Music</h1><span>Твоя музыка. Твоё настроение.</span></div></div><button class="avatar" id="tasteBtn" title="Мой музыкальный вкус">♪</button></header>
