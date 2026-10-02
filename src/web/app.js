@@ -60,6 +60,7 @@ let audioFx={eq:[0,0,0,0,0]};
 try{audioFx={...audioFx,...JSON.parse(localStorage.getItem(AUDIO_KEY)||"{}")}}catch{}
 function saveAudioFx(){localStorage.setItem(AUDIO_KEY,JSON.stringify(audioFx))}
 let audioCtx=null,audioSource=null,eqNodes=[],fxReady=false,showEq=false;
+let eqLimiter=null;
 function initAudioFx(){
  if(fxReady)return true;
  try{
@@ -70,19 +71,31 @@ function initAudioFx(){
    const n=audioCtx.createBiquadFilter();
    n.type=i===0?"lowshelf":i===4?"highshelf":"peaking";
    n.frequency.value=f;
-   n.Q.value=i===0||i===4?0.7:1.1;
+   n.Q.value=i===0||i===4?0.7:1.0;
    n.gain.value=Number(audioFx.eq[i]||0);
    return n;
   });
+  eqLimiter=audioCtx.createDynamicsCompressor();
+  eqLimiter.threshold.value=-6;
+  eqLimiter.knee.value=12;
+  eqLimiter.ratio.value=4;
+  eqLimiter.attack.value=0.003;
+  eqLimiter.release.value=0.12;
   eqNodes.reduce((a,b)=>a.connect(b),audioSource);
-  eqNodes[4].connect(audioCtx.destination);
+  eqNodes[eqNodes.length-1].connect(eqLimiter);
+  eqLimiter.connect(audioCtx.destination);
   fxReady=true;
   return true;
  }catch(e){return false}
 }
 function setEq(i,v){
- audioFx.eq[i]=Number(v);
- if(eqNodes[i])eqNodes[i].gain.value=Number(v);
+ const value=Math.max(-12,Math.min(12,Number(v)||0));
+ audioFx.eq[i]=value;
+ if(eqNodes[i]&&audioCtx){
+  const now=audioCtx.currentTime;
+  eqNodes[i].gain.cancelScheduledValues(now);
+  eqNodes[i].gain.setTargetAtTime(value,now,0.025);
+ }
  saveAudioFx();
 }
 function toggleEq(){
@@ -143,7 +156,9 @@ async function loadMix(force=false){
  const seed=[...state.liked.slice(0,8).map(t=>t.artist),...state.liked.slice(0,5).map(t=>t.genre||""),...(state.taste.genres||[]),...(state.taste.moods||[]),state.taste.artists,state.taste.now].filter(Boolean).join(", ");
  const box=document.querySelector("#mix"), status=document.querySelector("#mixStatus");
  try{
-   const r=await fetch("/api/recommendations?limit=16&seed="+encodeURIComponent(seed)+"&genres="+encodeURIComponent(state.taste.genres.join(", "))+"&moods="+encodeURIComponent(state.taste.moods.join(", "))+"&artists="+encodeURIComponent(state.taste.artists)+"&now="+encodeURIComponent(state.taste.now)+"&liked="+encodeURIComponent(state.liked.slice(0,10).map(t=>t.artist+" "+t.title).join(", "))+"&refresh="+encodeURIComponent(refresh));
+   const shown=force?tracks.slice(0,24).map(t=>t.id).filter(Boolean).join(","):"";
+ const likedArtists=[...new Set(state.liked.slice(0,20).map(t=>t.artist).filter(Boolean))].join(", ");
+ const r=await fetch("/api/recommendations?limit=16&seed="+encodeURIComponent(seed)+"&genres="+encodeURIComponent(state.taste.genres.join(", "))+"&moods="+encodeURIComponent(state.taste.moods.join(", "))+"&artists="+encodeURIComponent(state.taste.artists)+"&likedArtists="+encodeURIComponent(likedArtists)+"&now="+encodeURIComponent(state.taste.now)+"&liked="+encodeURIComponent(state.liked.slice(0,10).map(t=>t.artist+" "+t.title).join(", "))+"&exclude="+encodeURIComponent(shown)+"&refresh="+encodeURIComponent(refresh));
    const d=await r.json();
    if(!d.ok || !d.tracks?.length) throw Error("Нет доступных рекомендаций");
    tracks=d.tracks;
@@ -236,9 +251,9 @@ function updateMediaSession(){
   artist:current.artist||"",
   album:current.album||"Ok Music",
   artwork:artwork?[
-   {src:artwork,sizes:"96x96"},
-   {src:artwork,sizes:"192x192"},
-   {src:artwork,sizes:"512x512"}
+   {src:artwork,sizes:"96x96",type:"image/jpeg"},
+   {src:artwork,sizes:"192x192",type:"image/jpeg"},
+   {src:artwork,sizes:"512x512",type:"image/jpeg"}
   ]:[]
  });
  setMediaAction("play",()=>audio.play().catch(()=>{}));
