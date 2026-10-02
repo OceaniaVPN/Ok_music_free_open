@@ -14,73 +14,68 @@ function normalizeJamendo(t) {
   };
 }
 
-function walkVk(value, out = []) {
-  if (!value || typeof value !== "object") return out;
-  if (Array.isArray(value)) {
-    for (const item of value) walkVk(item, out);
-    return out;
-  }
+function normalizeVk(t) {
+  const audio = t.url || t.audio_url || t.stream_url || "";
+  const title = t.title || t.name || "";
+  const artist = t.artist || t.performer || t.artist_name || "";
+  if (!audio || !title || !artist) return null;
 
-  const audio = value.url || value.audio_url || value.stream_url;
-  const title = value.title || value.name;
-  const artist = value.artist || value.performer;
-  if (audio && title && artist && (value.duration || value.id || value.track_id)) {
-    out.push({
-      id: "vk-" + String(value.owner_id ?? value.oid ?? "0") + "-" + String(value.id ?? value.track_id),
-      title: String(title),
-      artist: String(artist),
-      album: String(value.album?.title || value.album_name || ""),
-      image: String(value.thumb?.photo_600 || value.thumb?.photo_300 || value.image || ""),
-      audio: String(audio),
-      duration: Number(value.duration || 0),
-      license: "",
-      source: "VK",
-      sourceUrl: value.url || "https://vk.ru/",
-      genre: String(value.genre || "")
-    });
-  }
-
-  for (const [key, child] of Object.entries(value)) {
-    if (key !== "url" && key !== "audio_url" && key !== "stream_url") walkVk(child, out);
-  }
-  return out;
+  return {
+    id: "vk-" + String(t.owner_id ?? t.oid ?? "0") + "-" + String(t.id ?? t.track_id ?? Math.random()),
+    title: String(title),
+    artist: String(artist),
+    album: String(t.album?.title || t.album_name || ""),
+    image: String(t.thumb?.photo_600 || t.thumb?.photo_300 || t.image || ""),
+    audio: String(audio),
+    duration: Number(t.duration || 0),
+    license: "",
+    source: "VK",
+    sourceUrl: String(t.url || "https://vk.ru/"),
+    genre: String(t.genre || "")
+  };
 }
 
-async function searchVk(q, limit) {
-  const response = await fetch("https://vk.ru/al_audio.php", {
-    method: "POST",
-    headers: {
-      "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-      "accept": "application/json, text/plain, */*",
-      "x-requested-with": "XMLHttpRequest",
-      "user-agent": "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/150 Mobile Safari/537.36"
-    },
-    body: new URLSearchParams({
-      al: "1",
-      act: "section",
-      claim: "0",
-      is_layer: "0",
-      owner_id: "0",
-      section: "search",
-      q
-    })
+function uniqueTracks(tracks, limit) {
+  const seen = new Set();
+  return tracks.filter(track => {
+    if (!track?.id || seen.has(track.id)) return false;
+    seen.add(track.id);
+    return true;
+  }).slice(0, limit);
+}
+
+async function searchVk(q, limit, env) {
+  const token = String(env.VK_ACCESS_TOKEN || "").trim();
+  const userAgent = String(
+    env.VK_USER_AGENT ||
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+  ).trim();
+
+  if (!token) throw new Error("VK_ACCESS_TOKEN не задан");
+
+  const api = new URL("https://api.vk.com/method/audio.search");
+  api.searchParams.set("access_token", token);
+  api.searchParams.set("v", "5.199");
+  api.searchParams.set("q", q);
+  api.searchParams.set("count", String(Math.min(Math.max(limit, 1), 100)));
+  api.searchParams.set("sort", "2");
+
+  const response = await fetch(api, {
+    headers: { accept: "application/json", "user-agent": userAgent }
   });
 
   if (!response.ok) throw new Error("VK HTTP " + response.status);
-  const text = await response.text();
-  let data;
-  try {
-    data = JSON.parse(text.replace(/^<!--/, "").replace(/-->$/, ""));
-  } catch {
-    throw new Error("VK returned non-JSON");
+
+  const data = await response.json();
+
+  if (data?.error) {
+    const code = data.error.error_code ?? "unknown";
+    const message = data.error.error_msg || "VK API error";
+    throw new Error("VK " + code + ": " + message);
   }
 
-  const found = walkVk(data)
-    .filter(t => t.audio)
-    .filter((t, i, arr) => arr.findIndex(x => x.id === t.id) === i)
-    .slice(0, limit);
-
-  return found;
+  const items = Array.isArray(data?.response?.items) ? data.response.items : [];
+  return uniqueTracks(items.map(normalizeVk).filter(Boolean), limit);
 }
 
 async function searchJamendo(q, limit, env) {
@@ -111,8 +106,12 @@ export async function handleApi(request, env) {
     return Response.json({
       ok: true,
       service: env.APP_NAME || "Ok Music",
-      version: "3.0",
-      providers: ["VK", "Jamendo"]
+      version: "4.0",
+      providers: ["VK", "Jamendo"],
+      vk: {
+        configured: Boolean(String(env.VK_ACCESS_TOKEN || "").trim()),
+        userAgent: Boolean(String(env.VK_USER_AGENT || "").trim())
+      }
     });
   }
 
@@ -122,7 +121,7 @@ export async function handleApi(request, env) {
     if (!q) return Response.json({ ok: true, query: "", tracks: [], providers: [] });
 
     const [vkResult, jamendoResult] = await Promise.allSettled([
-      searchVk(q, limit),
+      searchVk(q, limit, env),
       searchJamendo(q, Math.max(6, Math.ceil(limit / 3)), env)
     ]);
 
@@ -132,9 +131,10 @@ export async function handleApi(request, env) {
 
     if (!tracks.length) {
       const errors = [
-        vkResult.status === "rejected" ? "VK: " + vkResult.reason?.message : "",
-        jamendoResult.status === "rejected" ? "Jamendo: " + jamendoResult.reason?.message : ""
+        vkResult.status === "rejected" ? "VK: " + (vkResult.reason?.message || "ошибка") : "",
+        jamendoResult.status === "rejected" ? "Jamendo: " + (jamendoResult.reason?.message || "ошибка") : ""
       ].filter(Boolean);
+
       return Response.json({
         ok: false,
         error: errors.length ? "Музыкальные каталоги недоступны" : "Ничего не найдено",
@@ -162,7 +162,7 @@ export async function handleApi(request, env) {
     const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 12), 6), 30);
 
     const [vkResult, jamendoResult] = await Promise.allSettled([
-      searchVk(query, limit),
+      searchVk(query, limit, env),
       searchJamendo(query, Math.max(4, Math.ceil(limit / 3)), env)
     ]);
 
@@ -178,7 +178,11 @@ export async function handleApi(request, env) {
         ...(vkTracks.length ? ["VK"] : []),
         ...(jamendoTracks.length ? ["Jamendo"] : [])
       ],
-      tracks
+      tracks,
+      errors: [
+        ...(vkResult.status === "rejected" ? ["VK: " + (vkResult.reason?.message || "ошибка")] : []),
+        ...(jamendoResult.status === "rejected" ? ["Jamendo: " + (jamendoResult.reason?.message || "ошибка")] : [])
+      ]
     });
   }
 
