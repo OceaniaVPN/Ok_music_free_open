@@ -120,18 +120,12 @@ function like(t){if(!t)return;const i=state.liked.findIndex(x=>x.id===t.id);if(i
 function play(t){
  if(!t)return;
  current=t;
- if(t.youtubeId){
-   audio.pause();
-   playing=true;
-   drawPlayer();
-   return;
- }
  if(!(t.audio||t.src)){toast("У этого трека нет прямого воспроизведения");return}
  audio.src=t.audio||t.src;
  audio.play().then(()=>{playing=true;updateMediaSession();drawPlayer()}).catch(()=>toast("Браузер не разрешил воспроизведение"))
 }
 function updateMediaSession(){
- if(!("mediaSession" in navigator)||!current||current.youtubeId)return;
+ if(!("mediaSession" in navigator)||!current)return;
  navigator.mediaSession.metadata=new MediaMetadata({
   title:current.title||"Ok Music",
   artist:current.artist||"",
