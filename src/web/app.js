@@ -185,13 +185,13 @@ async function loadMix(force=false){
    box.innerHTML=d.tracks.map(card).join("");
    status.textContent=(d.mode==="personalized"?"Под твои предпочтения":"Новая подборка")+" · "+(d.providers||[]).join(" + ");
    bind(box);
-   await loadLocalMusic();
  }catch(e){
    tracks=demos;
    box.innerHTML=demos.map(card).join("");
    status.textContent="Демо-подборка · каталоги пока недоступны";
    bind(box);
  }
+ await loadLocalMusic();
 }
 
 function mood(){
