@@ -130,51 +130,6 @@ function parseDuration(value) {
   return parts[0] || 0;
 }
 
-function normalizeYTMusic(item) {
-  const videoId = String(item?.playlistItemData?.videoId || "").trim();
-  if (!videoId) return null;
-
-  const columns = Array.isArray(item.flexColumns)
-    ? item.flexColumns.flatMap(column => column?.musicResponsiveListItemFlexColumnRenderer?.text?.runs || [])
-    : [];
-
-  const texts = columns.map(run => ({
-    text: String(run?.text || "").trim(),
-    browseId: String(run?.navigationEndpoint?.browseEndpoint?.browseId || "")
-  })).filter(x => x.text);
-
-  const title = firstText(item.flexColumns?.[0]?.musicResponsiveListItemFlexColumnRenderer?.text)
-    || texts[0]?.text
-    || "Без названия";
-
-  const artist = texts.find(x => x.browseId.startsWith("UC"))?.text
-    || texts[1]?.text
-    || "Неизвестный исполнитель";
-
-  const album = texts.find(x => x.browseId.startsWith("MPRE"))?.text || "";
-
-  const thumbnails = item.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails
-    || item.thumbnails
-    || [];
-
-  const durationText = item.fixedColumns?.[0]?.musicResponsiveListItemFixedColumnRenderer?.text;
-
-  return {
-    id: "ytmusic-" + videoId,
-    youtubeId: videoId,
-    title,
-    artist,
-    album,
-    image: String(thumbnails.at(-1)?.url || ""),
-    audio: "",
-    duration: parseDuration(durationText),
-    license: "",
-    source: "YouTube Music",
-    sourceUrl: "https://music.youtube.com/watch?v=" + encodeURIComponent(videoId),
-    genre: ""
-  };
-}
-
 async function searchJamendo(q, limit, env) {
   const clientId = env.JAMENDO_CLIENT_ID;
   if (!clientId) return [];
@@ -194,13 +149,6 @@ async function searchJamendo(q, limit, env) {
   if (!response.ok) throw new Error("Jamendo HTTP " + response.status);
   const data = await response.json();
   return (data.results || []).map(normalizeJamendo).filter(t => t.audio);
-}
-
-function providerErrors(youtubeResult, jamendoResult) {
-  return [
-    youtubeResult.status === "rejected" ? "Zaycev.net: " + (youtubeResult.reason?.message || "ошибка") : "",
-    jamendoResult.status === "rejected" ? "Jamendo: " + (jamendoResult.reason?.message || "ошибка") : ""
-  ].filter(Boolean);
 }
 
 export async function handleApi(request,env){
