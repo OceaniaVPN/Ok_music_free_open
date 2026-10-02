@@ -98,7 +98,7 @@ async function main(){
       id:"key-"+hash,title,artist,album,image,
       audio:"/music/"+encPath(rel),duration,license:"",
       source:"🔑 Ключник",sourceUrl:"/music/"+encPath(rel),
-      genre:metadata?.common?.genre?.[0]||""
+      genre:Array.isArray(metadata?.common?.genre)?metadata.common.genre.filter(Boolean).join("; "):""
     });
   }
   tracks.sort((a,b)=>a.title.localeCompare(b.title,"ru"));
