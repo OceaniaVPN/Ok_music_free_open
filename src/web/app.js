@@ -5,7 +5,7 @@ export function renderApp(request, env) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#090a10">
+<meta name="theme-color" content="#090a10"><script src="https://telegram.org/js/telegram-web-app.js?63"></script>
 <title>${appName}</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
@@ -114,7 +114,7 @@ function play(t){
  }
  if(!(t.audio||t.src)){toast("У этого трека нет прямого воспроизведения");return}
  audio.src=t.audio||t.src;
- audio.play().then(()=>{playing=true;drawPlayer()}).catch(()=>toast("Браузер не разрешил воспроизведение"))
+ audio.play().then(()=>{playing=true;updateMediaSession();drawPlayer()}).catch(()=>toast("Браузер не разрешил воспроизведение"))
 }
 function drawPlayer(){if(!current){playerEl.className="player";return}
  playerEl.className="player on";
@@ -127,12 +127,12 @@ function drawPlayer(){if(!current){playerEl.className="player";return}
  document.querySelector("#pause").onclick=()=>{if(playing){audio.pause();playing=false}else{audio.play();playing=true}drawPlayer()};document.querySelector("#seek").oninput=e=>{if(audio.duration)audio.currentTime=audio.duration*e.target.value/100}
 }
 audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration)}
-audio.onended=()=>{playing=false;drawPlayer()}
+audio.onplay=()=>{playing=true;updateMediaSession()};audio.onpause=()=>{playing=false;drawPlayer()};audio.onended=()=>{playing=false;drawPlayer()}
 document.querySelector("#closeModal").onclick=()=>modal.classList.remove("open");modal.onclick=e=>{if(e.target===modal)modal.classList.remove("open")};
 document.querySelector("#createPlaylist").onclick=()=>{const name=document.querySelector("#playlistName").value.trim();if(!name)return toast("Введи название");state.playlists.unshift({id:"pl-"+Date.now(),name,tracks:[]});save();document.querySelector("#playlistName").value="";modal.classList.remove("open");library();toast("Плейлист создан ✨")}
 function render(name){document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));({home,mood,search:searchView,library}[name]||home)()}
 document.querySelector("#nav").addEventListener("click",e=>{const b=e.target.closest("button[data-view]");if(b)render(b.dataset.view)});
-render("home");
+if(window.Telegram?.WebApp){window.Telegram.WebApp.ready();window.Telegram.WebApp.expand();window.Telegram.WebApp.setHeaderColor("#090a10");window.Telegram.WebApp.setBackgroundColor("#080910")}\nrender("home");
 </script>
 </body></html>`;
   return new Response(html,{headers:{"content-type":"text/html; charset=utf-8; charset=utf-8"}});
