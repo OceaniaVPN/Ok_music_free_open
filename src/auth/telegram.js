@@ -110,3 +110,7 @@ export async function createTelegramChallenge(env,challenge,user,chatId=""){
 export async function createStandaloneTelegramCode(env,user,chatId=""){
   return createTelegramChallenge(env,"",user,chatId);
 }
+
+export async function createStandaloneTelegramCode(env,user,chatId=""){
+  return createTelegramChallenge(env,"",user,chatId);
+}
