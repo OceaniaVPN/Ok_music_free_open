@@ -15,10 +15,3 @@ command = "node scripts/build-local-music.mjs"
 directory = "./public"
 binding = "ASSETS"
 
-[[durable_objects.bindings]]
-name = "AUTH_CODES"
-class_name = "AuthCodesV2"
-
-[[migrations]]
-tag = "auth-codes-v2"
-new_sqlite_classes = ["AuthCodesV2"]
