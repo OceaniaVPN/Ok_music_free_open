@@ -1,0 +1,27 @@
+name: Runtime check
+on:
+  push:
+    branches: ["main"]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - run: npm run build
+      - run: node --check src/index.js
+      - run: node --check src/api/index.js
+      - run: node --check src/api/mega-local.js
+      - run: node --check public/sw.js
+      - run: |
+          node <<'NODE'
+          const fs=require("fs");
+          const s=fs.readFileSync("src/web/app.js","utf8");
+          const a=s.indexOf("<script>"),b=s.lastIndexOf("</script>");
+          if(a<0||b<=a) throw Error("script missing");
+          new Function(s.slice(a+8,b));
+          if(/SoundHelix|Midnight Waves|Neon Drive|Afterglow|Ocean Lights/.test(s)) throw Error("demo audio remains");
+          if(!s.includes("const promise=audio.play()")) throw Error("direct play missing");
+          console.log("app runtime OK");
+          NODE
+      - run: test -n "$(find public/music -type f | head -1)"
