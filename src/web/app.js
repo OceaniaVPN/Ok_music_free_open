@@ -129,6 +129,53 @@ function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&l
 function save(){localStorage.setItem(KEY,JSON.stringify(state))}
 function toast(s){toastEl.textContent=s;toastEl.classList.add("show");clearTimeout(window._toast);window._toast=setTimeout(()=>toastEl.classList.remove("show"),1800)}
 function fmt(n){return Number.isFinite(n)&&n>0?Math.floor(n/60)+":"+String(Math.floor(n%60)).padStart(2,"0"):"0:00"}
+const OK_OFFLINE_CACHE="okmusic-audio-v2";
+const OK_OFFLINE_META="okmusic:offline:v2";
+function __okOfflineMeta(){
+  try{return JSON.parse(localStorage.getItem(OK_OFFLINE_META)||"{}")}catch{return {}}
+}
+function __okOfflineSetMeta(meta){try{localStorage.setItem(OK_OFFLINE_META,JSON.stringify(meta))}catch{}}
+async function __okOfflineCache(){return caches.open(OK_OFFLINE_CACHE)}
+window.__okOfflineList=async function(){return Object.keys(__okOfflineMeta())};
+window.__okOfflineHas=async function(id){
+  const meta=__okOfflineMeta(),key=String(id||"");
+  if(!meta[key])return false;
+  const cache=await __okOfflineCache();
+  return Boolean(await cache.match(meta[key].url));
+};
+window.__okOfflineSave=async function(t){
+  if(!t?.audio||String(t.audio).startsWith("mega://"))throw Error("Этот трек нельзя сохранить напрямую");
+  const url=new URL(t.audio,location.href).href;
+  const response=await fetch(url,{credentials:"same-origin"});
+  if(!response.ok)throw Error("Аудио HTTP "+response.status);
+  const cache=await __okOfflineCache();
+  await cache.put(url,response.clone());
+  const meta=__okOfflineMeta();
+  meta[String(t.id)]={
+    url,title:t.title||"",artist:t.artist||"",album:t.album||"",
+    image:t.image||"",source:t.source||"",savedAt:Date.now()
+  };
+  __okOfflineSetMeta(meta);
+  return true;
+};
+window.__okOfflineResolve=async function(t){
+  const meta=__okOfflineMeta(),entry=meta[String(t?.id||"")];
+  if(!entry?.url)return null;
+  try{
+    const cache=await __okOfflineCache(),response=await cache.match(entry.url);
+    if(!response)return null;
+    return URL.createObjectURL(await response.blob());
+  }catch{return null}
+};
+window.__okOfflineRemove=async function(id){
+  const meta=__okOfflineMeta(),key=String(id||""),entry=meta[key];
+  if(entry?.url){try{await (await __okOfflineCache()).delete(entry.url)}catch{}}
+  delete meta[key];__okOfflineSetMeta(meta);
+};
+window.__okOfflineClear=async function(){
+  try{await caches.delete(OK_OFFLINE_CACHE)}catch{}
+  try{localStorage.removeItem(OK_OFFLINE_META)}catch{}
+};
 async function refreshOfflineButtons(container=view){
  if(!window.__okOfflineList)return;
  try{const ids=new Set(await window.__okOfflineList());container.querySelectorAll("[data-offline]").forEach(b=>{const on=ids.has(b.dataset.offline);b.classList.toggle("is-offline",on);if(b.id==="trackOffline")b.textContent=on?"✓ Сохранено":"⇩ Офлайн";else if(b.classList.contains("offline-btn"))b.textContent=on?"✓":"⇩"});const count=ids.size;const text=document.querySelector("#offlineHomeText");if(text)text.textContent=count?"Сохранено "+count+" треков · доступны без сети.":"Сохраняй треки кнопкой ⇩ и слушай их без интернета.";const clear=document.querySelector("#clearOffline");if(clear)clear.disabled=!count}catch{}
@@ -264,20 +311,7 @@ function play(t,{fromEnded=false}={}){
  Promise.resolve(window.__okOfflineResolve?.(t)).then(cached=>{if(token!==window.__okPlayToken||current?.id!==t.id)return;if(window.__okCurrentBlobUrl&&window.__okCurrentBlobUrl!==cached)try{URL.revokeObjectURL(window.__okCurrentBlobUrl)}catch{}window.__okCurrentBlobUrl=cached||"";const target=cached||src;if(audio.src!==new URL(target,location.href).href){audio.src=target;audio.load()}return audio.play()}).then(()=>{if(token===window.__okPlayToken){playing=true;updateMediaSession();drawPlayer();preloadNext()}}).catch(error=>{console.warn("Ok Music playback:",error);toast("Не удалось воспроизвести трек")});
 }
 
- if(!t)return;
- const idx=findTrackIndex(t);
- currentIndex=idx;
- current=t;
- drawHomeWave();
- updateMediaSession();
- if(!(t.audio||t.src)){toast("У этого трека нет прямого воспроизведения");return}
- const src=t.audio||t.src;
- if(audio.src!==new URL(src,location.href).href){
-   audio.src=src;
-   audio.load();
- }
- audio.play().then(()=>{playing=true;updateMediaSession();drawPlayer();preloadNext()}).catch(()=>toast("Браузер не разрешил воспроизведение"));
-}
+
 function playNext(){
  const next=tracks[currentIndex+1];
  if(next){play(next,{fromEnded:true});return}
