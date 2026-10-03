@@ -676,7 +676,7 @@ async function browserAuth(){
   const d=await r.json();
   if(!r.ok||!d.ok)throw Error(d.error||"Не удалось создать запрос");
   challenge=d.challenge;botUrl=d.botUrl||"";
-  status.textContent="Запрос готов. Открой Telegram → отправь боту /start → затем /code.";
+  status.textContent="Открой Telegram и отправь боту /code. Затем введи полученный код.";
  }catch(e){status.textContent=e.message||"Ошибка"}
  get.onclick=()=>{if(botUrl)window.open(botUrl,"_blank","noopener,noreferrer")};
  verify.onclick=async()=>{
