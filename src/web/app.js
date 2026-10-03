@@ -454,16 +454,16 @@ async function loadMix(force=false){
    status.textContent=(d.mode==="personalized"?"Под твои предпочтения":"Новая подборка")+" · "+(d.providers||[]).join(" + ");
    bind(box);
  }catch(e){
-   tracks=demos;
-   box.innerHTML=demos.map(card).join("");
-   status.textContent="Демо-подборка · каталоги пока недоступны";
+   tracks=[...localTracks];
+   box.innerHTML=localTracks.length?localTracks.slice(0,8).map(card).join(""):'<div class="empty" style="grid-column:1/-1">Подборка пока недоступна.</div>';
+   status.textContent="Каталоги временно недоступны";
    bind(box);
  }
 }
 
 function mood(){
  const moodItems=[["🌙","Ночной вайб","Спокойное и атмосферное"],["⚡","Энергия","Больше ритма и движения"],["☁️","Chill","Расслабиться и выдохнуть"],["💜","Любовь","Мягкие и тёплые треки"],["🚗","В дорогу","Музыка для долгой поездки"],["🔥","Вечеринка","Ритм, который не отпускает"],["🖤","Фонк","Бас, дрифт и ночной вайб"]];
- view.innerHTML='<div class="section"><h2>Какое настроение?</h2><small>Выбери атмосферу</small></div><div class="moods">'+moodItems.map((x,i)=>'<button class="mood-card" data-mood="'+i+'"><b>'+x[0]+'</b><strong>'+x[1]+'</strong><span>'+x[2]+'</span></button>').join('')+'</div><div class="section"><h2>Популярное</h2><small>Из твоего каталога</small></div><div class="grid">'+localTracks.map(card).join('')+'</div>';
+ view.innerHTML='<div class="section"><h2>Какое настроение?</h2><small>Выбери атмосферу</small></div><div class="moods">'+moodItems.map((x,i)=>'<button class="mood-card" data-mood="'+i+'"><b>'+x[0]+'</b><strong>'+x[1]+'</strong><span>'+x[2]+'</span></button>').join('')+'</div><div class="section"><h2>Популярное</h2><small>Из твоего каталога</small></div><div class="grid">'+(localTracks.length?localTracks:tracks).map(card).join('')+'</div>';
  bind();view.querySelectorAll("[data-mood]").forEach(b=>b.onclick=()=>{
  const i=Number(b.dataset.mood),item=moodItems[i];
  applyMusicTheme(["night","energy","chill","love","road","party","phonk"][i]||"default");
