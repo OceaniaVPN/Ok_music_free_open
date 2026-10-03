@@ -81,10 +81,7 @@ function applySpatial(){
 function audioFxLoop(){if(fxReady&&playing)applySpatial();requestAnimationFrame(audioFxLoop)}
 requestAnimationFrame(audioFxLoop);
 const demos=[
-{id:"demo-1",title:"Midnight Waves",artist:"Ok Music",image:"",audio:"/music/demo-1.wav",source:"Local"},
-{id:"demo-2",title:"Neon Drive",artist:"Ok Music",image:"",audio:"/music/demo-2.wav",source:"Local"},
-{id:"demo-3",title:"Afterglow",artist:"Ok Music",image:"",audio:"/music/demo-3.wav",source:"Local"},
-{id:"demo-4",title:"Ocean Lights",artist:"Ok Music",image:"",audio:"/music/demo-4.wav",source:"Local"}];
+{id:"demo-1",title:"Local Demo",artist:"Ok Music",image:"",audio:"/music/demo-1.mp3",source:"Local"}];
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
 function save(){localStorage.setItem(KEY,JSON.stringify(state))}
 function toast(s){toastEl.textContent=s;toastEl.classList.add("show");clearTimeout(window._toast);window._toast=setTimeout(()=>toastEl.classList.remove("show"),1800)}
