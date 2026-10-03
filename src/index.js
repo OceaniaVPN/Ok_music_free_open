@@ -189,7 +189,7 @@ export class AuthCodesV2 extends DurableObject {
     }
     if(request.method==="POST"&&url.pathname==="/activate"){
       const challenge=String(body.challenge||""),chatId=String(body.chatId||"");
-      const ch=await get("challenge:"+challenge);
+      const ch=challenge?await get("challenge:"+challenge):true;
       if(!ch||!chatId)return Response.json({ok:false},{status:400});
       await put("chat:"+chatId,{challenge});
       return Response.json({ok:true});
@@ -224,11 +224,11 @@ export class AuthCodesV2 extends DurableObject {
     if(request.method==="POST"&&url.pathname==="/consume"){
       const code=String(body.code||"");
       const record=await get("code:"+code);
-      if(!record||record.challenge!==String(body.challenge||"")){
+      if(!record||(record.challenge&&record.challenge!==String(body.challenge||""))){
         return Response.json({ok:false,error:"Код неверный или уже использован"},{status:401});
       }
       await this.ctx.storage.delete("code:"+code);
-      await this.ctx.storage.delete("challenge:"+record.challenge);
+      if(record.challenge)await this.ctx.storage.delete("challenge:"+record.challenge);
       if(record.chatId)await this.ctx.storage.delete("chat:"+record.chatId);
       return Response.json({ok:true,user:record.user});
     }
