@@ -294,7 +294,8 @@ const TASTE_GENRES=["Русский рэп","Поп","Рок","Электрон�
  document.querySelector("#refreshMix").onclick=()=>loadMix(true);
 document.querySelector("#mixPlay").onclick=()=>{const t=waveTrack();if(t)play(t)};
 drawHomeWave();
-bind();
+ const initialMix=document.querySelector("#mix");if(initialMix){initialMix.innerHTML=demos.slice(0,8).map(card).join("");bind(initialMix)}
+ bind();
  void loadLocalMusic();
  void loadMix();
 }
