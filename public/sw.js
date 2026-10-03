@@ -38,11 +38,7 @@ self.addEventListener("fetch",event=>{
         const cached=await cache.match(request);
         if(cached)return cached;
         try{
-          const response=await fetch(request);
-          if(response.ok || response.type==="opaque"){
-            cache.put(request,response.clone()).catch(()=>{});
-          }
-          return response;
+          return await fetch(request);
         }catch{
           return cached||new Response("Offline audio unavailable",{status:503});
         }
