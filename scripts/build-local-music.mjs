@@ -6,7 +6,10 @@ import { parseFile, selectCover } from "music-metadata";
 const root=process.cwd();
 const musicDir=path.join(root,"music");
 const publicDir=path.join(root,"public");
-const publicMusic=path.join(publicDir,"music");\nconst fonDir=path.join(root,"fon");\nconst publicFon=path.join(publicDir,"fon");\nconst fonGenerated=path.join(root,"src","fon.js");
+const publicMusic=path.join(publicDir,"music");
+const fonDir=path.join(root,"fon");
+const publicFon=path.join(publicDir,"fon");
+const fonGenerated=path.join(root,"src","fon.js");
 const generated=path.join(root,"src","local-music.js");
 const audioExt=new Set([".mp3",".m4a",".ogg",".opus",".wav",".aac"]);
 const imageExt=[".jpg",".jpeg",".png",".webp"];
@@ -68,7 +71,13 @@ async function readEmbeddedCover(file,hash){
   }
 }
 async function main(){
-  const tracks=[];\n  fs.rmSync(publicFon,{recursive:true,force:true});\n  fs.mkdirSync(publicFon,{recursive:true});\n  const fonFiles=walk(fonDir).filter(f=>imageExt.includes(path.extname(f).toLowerCase()));\n  for(const file of fonFiles){const rel=path.relative(fonDir,file);const out=path.join(publicFon,rel);fs.mkdirSync(path.dirname(out),{recursive:true});fs.copyFileSync(file,out);}\n  fs.writeFileSync(fonGenerated,"export const FON_IMAGES = "+JSON.stringify(fonFiles.map(f=>"/fon/"+encPath(path.relative(fonDir,f))))+";\\n");
+  const tracks=[];
+  fs.rmSync(publicFon,{recursive:true,force:true});
+  fs.mkdirSync(publicFon,{recursive:true});
+  const fonFiles=walk(fonDir).filter(f=>imageExt.includes(path.extname(f).toLowerCase()));
+  for(const file of fonFiles){const rel=path.relative(fonDir,file);const out=path.join(publicFon,rel);fs.mkdirSync(path.dirname(out),{recursive:true});fs.copyFileSync(file,out);}
+  fs.writeFileSync(fonGenerated,"export const FON_IMAGES = "+JSON.stringify(fonFiles.map(f=>"/fon/"+encPath(path.relative(fonDir,f))))+";\
+");
   const files=walk(musicDir).filter(f=>audioExt.has(path.extname(f).toLowerCase()));
   for(const file of files){
     const rel=path.relative(musicDir,file);
@@ -104,7 +113,8 @@ async function main(){
     });
   }
   tracks.sort((a,b)=>a.title.localeCompare(b.title,"ru"));
-  fs.writeFileSync(generated,"export const LOCAL_MUSIC = "+JSON.stringify(tracks,null,2)+";\n");
+  fs.writeFileSync(generated,"export const LOCAL_MUSIC = "+JSON.stringify(tracks,null,2)+";
+");
   console.log("🔐 Ключник: "+tracks.length+" tracks, embedded covers extracted");
 }
 await main();
