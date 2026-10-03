@@ -83,6 +83,8 @@ async function main(){
     const title=metadata?.common?.title?.trim()||filenameMeta.title||"Без названия";
     const album=metadata?.common?.album?.trim()||(path.basename(path.dirname(rel))==="."?"":path.basename(path.dirname(rel)));
     const duration=Number(metadata?.format?.duration)||0;
+    const genres=Array.isArray(metadata?.common?.genre)?metadata.common.genre.filter(Boolean):[];
+    const genre=genres.join("; ")||String(path.basename(path.dirname(rel))==="."?"":path.basename(path.dirname(rel))).trim();
     let image=parsed.picture?.url||"";
     if(!image){
       const coverFile=findCoverFile(file);
@@ -98,7 +100,7 @@ async function main(){
       id:"key-"+hash,title,artist,album,image,
       audio:"/music/"+encPath(rel),duration,license:"",
       source:"🔐 Ключник",sourceUrl:"/music/"+encPath(rel),
-      genre:Array.isArray(metadata?.common?.genre)?metadata.common.genre.filter(Boolean).join("; "):""
+      genre
     });
   }
   tracks.sort((a,b)=>a.title.localeCompare(b.title,"ru"));
