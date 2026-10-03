@@ -32,10 +32,10 @@ export async function handleTelegramWebhook(request, env) {
       chat_id: id,
       text: "🎵 Ok Music\n\nОткрой музыкальный плеер прямо в Telegram.",
       reply_markup: {
-        inline_keyboard: [[{
-          text: "🎧 Открыть Ok Music",
-          web_app: { url: appUrl(request, env) }
-        }]]
+        inline_keyboard: [
+          [{text:"🌐 Войти и открыть в браузере",login_url:{url:appUrl(request,env)}}],
+          [{text:"🎧 Открыть в Telegram",web_app:{url:appUrl(request,env)}}]
+        ]
       }
     });
   } catch (error) {
