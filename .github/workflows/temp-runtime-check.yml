@@ -1,0 +1,27 @@
+name: Temporary runtime syntax check
+on:
+  push:
+    branches: ["main"]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Worker files
+        run: |
+          node --check src/index.js
+          node --check src/api/index.js
+          node --check src/api/mega-local.js
+      - name: Check embedded browser JS
+        run: |
+          node <<'NODE'
+          const fs=require("fs");
+          const s=fs.readFileSync("src/web/app.js","utf8");
+          const start=s.indexOf("<script>");
+          const end=s.lastIndexOf("</script>");
+          if(start<0||end<=start) throw new Error("script block not found");
+          new Function(s.slice(start+8,end));
+          console.log("embedded app.js: OK");
+          NODE
+      - name: Check service worker
+        run: node --check public/sw.js
