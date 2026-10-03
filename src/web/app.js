@@ -665,7 +665,36 @@ async function browserAuth(){
  if(status)status.textContent="Открой нашего Telegram-бота и нажми «Войти и открыть в браузере».";
 }
 
-</script>
+<script>
+(async function(){
+ const gate=document.getElementById("authGate"),get=document.getElementById("getTelegramCode"),input=document.getElementById("telegramCode"),verify=document.getElementById("verifyTelegramCode"),status=document.getElementById("authStatus");
+ if(!gate)return;
+ if(window.Telegram?.WebApp?.initData){gate.remove();return}
+ try{const r=await fetch("/api/auth/me",{credentials:"same-origin",cache:"no-store"});const d=await r.json();if(d.authenticated){gate.remove();return}}catch{}
+ let challenge="";
+ get.onclick=async()=>{
+  get.disabled=true;status.textContent="Создаю запрос…";
+  try{
+   const r=await fetch("/api/auth/challenge",{method:"POST",credentials:"same-origin"});
+   const d=await r.json();if(!r.ok||!d.ok)throw Error(d.error||"Не удалось создать запрос");
+   challenge=d.challenge;
+   if(d.botUrl)window.open(d.botUrl,"_blank","noopener,noreferrer");
+   status.textContent="Бот открыт. Нажми Start, получи код и введи его здесь.";
+  }catch(e){status.textContent=e.message||"Ошибка";get.disabled=false}
+ };
+ verify.onclick=async()=>{
+  const code=(input.value||"").replace(/\D/g,"");
+  if(!challenge)return status.textContent="Сначала нажми «Получить код в Telegram».";
+  if(code.length!==6)return status.textContent="Нужно 6 цифр.";
+  verify.disabled=true;status.textContent="Проверяю…";
+  try{
+   const r=await fetch("/api/auth/verify",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({challenge,code})});
+   const d=await r.json();if(!r.ok||!d.ok)throw Error(d.error||"Код неверный или уже использован");
+   gate.remove();location.reload();
+  }catch(e){status.textContent=e.message||"Ошибка";verify.disabled=false}
+ };
+})();
+</script></script>
 </body></html>`;
   return new Response(html,{headers:{"content-type":"text/html; charset=utf-8","Referrer-Policy":"origin"}});
 }
