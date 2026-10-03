@@ -165,7 +165,7 @@ function playableAudio(src){
   const u=new URL(raw,location.href);
   if(u.origin===location.origin)return u.href;
   const h=u.hostname.toLowerCase();
-  if(h==="jamendo.com"||h.endsWith(".jamendo.com")||h==="storage.jamendo.com"||h.endsWith(".storage.jamendo.com")||h==="soundhelix.com"||h.endsWith(".soundhelix.com")){
+  if(h==="jamendo.com"||h.endsWith(".jamendo.com")||h==="storage.jamendo.com"||h.endsWith(".storage.jamendo.com")){
    return location.origin+"/api/audio?url="+encodeURIComponent(u.href);
   }
   return u.href;
