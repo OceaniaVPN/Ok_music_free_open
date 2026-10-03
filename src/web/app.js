@@ -384,7 +384,9 @@ function bind(container=view){container.querySelectorAll("[data-offline]").forEa
 function waveTrack(){return current||tracks[0]||localTracks[0]||null}
 function drawHomeWave(){
  const box=document.querySelector("#homeWave");if(!box)return;
- const t=waveTrack(),liked=state.liked.some(x=>x.id===t.id);
+ const t=waveTrack();
+ if(!t){box.innerHTML='<div class="wave-empty"><strong>🎵 Каталог загружается</strong><span>Подожди немного — локальная музыка появится здесь.</span></div>';return}
+ const liked=state.liked.some(x=>x.id===t.id);
  box.innerHTML='<div class="wave-cover" id="waveOpen">'+(t.image?'<img src="'+esc(t.image)+'" loading="eager">':"♫")+'<span class="wave-badge">♫ Моя волна</span></div><div class="wave-info"><div class="wave-meta"><h2>'+esc(t.title)+'</h2><div class="sub">'+esc(t.artist)+(t.source?" · "+esc(t.source):"")+'</div></div><div class="wave-actions"><button id="wavePrev" title="Предыдущий">⏮</button><button id="wavePlay" class="wave-main" title="Воспроизвести">'+(playing&&current?.id===t.id?"Ⅱ":"▶")+'</button><button id="waveNext" title="Следующий">⏭</button><button id="waveLike" title="Любимое">'+(liked?"♥":"♡")+'</button></div></div>';
  document.querySelector("#waveOpen").onclick=()=>openTrackProfile(t.id);
  document.querySelector("#wavePrev").onclick=playPrevious;
@@ -419,7 +421,9 @@ async function loadLocalMusic(attempt=0){
   if(d.mega?.ready===false&&attempt<4)setTimeout(()=>void loadLocalMusic(attempt+1),2500);
   if(!localTracks.length){box.innerHTML='<div class="empty" style="grid-column:1/-1">Ключник пока пуст.</div>';return}
   const renderLocal=()=>{box.innerHTML=localTracks.map(card).join("");bind(box)};
-  tracks=[...tracks,...localTracks.filter(t=>!tracks.some(x=>x.id===t.id))];renderLocal();
+  tracks=[...tracks,...localTracks.filter(t=>!tracks.some(x=>x.id===t.id))];
+  renderLocal();
+  if(!current){drawHomeWave()}
   if(window.__megaEnrichLocalTracks){
    const idle=window.requestIdleCallback?fn=>window.requestIdleCallback(fn,{timeout:4500}):fn=>setTimeout(fn,900);
    idle(()=>{
