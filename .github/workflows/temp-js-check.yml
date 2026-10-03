@@ -1,0 +1,25 @@
+name: Temporary JS check
+on:
+  push:
+    branches: ["main"]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: node --check src/index.js
+      - run: node --check src/api/index.js
+      - run: node --check src/api/mega-local.js
+      - run: node --check public/sw.js
+      - run: |
+          node <<'NODE'
+          const fs=require("fs");
+          const s=fs.readFileSync("src/web/app.js","utf8");
+          const a=s.indexOf("<script>"),b=s.lastIndexOf("</script>");
+          if(a<0||b<=a) throw Error("script missing");
+          new Function(s.slice(a+8,b));
+          for(const x of ["data-offline","function toggleOffline","function waveTrack"]) if(!s.includes(x)) throw Error("missing "+x);
+          const g=fs.readFileSync("scripts/build-local-music.mjs","utf8");
+          if(!g.includes("metadata?.common?.genre")) throw Error("genre extraction missing");
+          console.log("runtime OK");
+          NODE
