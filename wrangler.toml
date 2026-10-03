@@ -18,3 +18,8 @@ binding = "ASSETS"
 [exports.AuthCodes]
 type = "durable-object"
 state = "deleted"
+
+
+[exports.AuthCodesV2]
+type = "durable-object"
+state = "deleted"
