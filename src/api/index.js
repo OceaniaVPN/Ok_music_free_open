@@ -63,7 +63,7 @@ function zaycevResult(q) {
 async function proxyAudio(url, request) {
   const target = new URL(url);
   const host = target.hostname.toLowerCase();
-  const allowed = host === "api.jamendo.com" || host === "jamendo.com" || host.endsWith(".jamendo.com") || host === "storage.jamendo.com" || host.endsWith(".storage.jamendo.com");
+  const allowed = host === "api.jamendo.com" || host === "jamendo.com" || host.endsWith(".jamendo.com") || host === "storage.jamendo.com" || host.endsWith(".storage.jamendo.com") || host === "soundhelix.com" || host.endsWith(".soundhelix.com");
   if (!allowed) return Response.json({ ok: false, error: "Audio host is not allowed" }, { status: 403 });
   const headers = new Headers();
   const range = request.headers.get("range");
