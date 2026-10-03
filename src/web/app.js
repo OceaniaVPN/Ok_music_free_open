@@ -426,10 +426,12 @@ async function loadLocalMusic(attempt=0){
   tracks=[...tracks,...localTracks.filter(t=>!tracks.some(x=>x.id===t.id))];renderLocal();
   if(window.__megaEnrichLocalTracks){
    const idle=window.requestIdleCallback?fn=>window.requestIdleCallback(fn,{timeout:4500}):fn=>setTimeout(fn,900);
-   idle(()=>void Promise.resolve(window.__megaEnrichLocalTracks(localTracks,{onTrack:t=>{
-     const ti=tracks.findIndex(x=>x.id===t.id);if(ti>=0)tracks[ti]=t;
-     renderLocal();if(current?.id===t.id){current=t;drawPlayer();updateMediaSession()}
-   }})).catch(error=>console.warn("🔐 Ключник metadata background:",error));
+   idle(()=>{
+    void Promise.resolve(window.__megaEnrichLocalTracks(localTracks,{onTrack:t=>{
+      const ti=tracks.findIndex(x=>x.id===t.id);if(ti>=0)tracks[ti]=t;
+      renderLocal();if(current?.id===t.id){current=t;drawPlayer();updateMediaSession()}
+    }})).catch(error=>console.warn("🔐 Ключник metadata background:",error));
+   });
   }
  }catch(e){
   console.error("🔐 Ключник:",e);localTracks=[];box.innerHTML='<div class="empty" style="grid-column:1/-1">Не удалось загрузить 🔐 Ключник.</div>';
