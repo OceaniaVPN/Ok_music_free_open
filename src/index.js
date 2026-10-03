@@ -172,6 +172,8 @@ export class AuthCodes extends DurableObject {
   constructor(ctx,env){super(ctx,env);this.ctx=ctx}
   async fetch(request){
     const url=new URL(request.url);
+    const authResponse=await handleAuth(request,env);
+    if(authResponse)return authResponse;
     let body={};
     try{body=await request.json()}catch{}
     const now=Math.floor(Date.now()/1000);
