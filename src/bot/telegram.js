@@ -19,21 +19,6 @@ export async function handleTelegramWebhook(request,env){
     if(id===null)return Response.json({ok:true});
     const text=textOf(update);
 
-    if(/^\/code(?:@[^\s]+)?(?:\s|$)/i.test(text)){
-      const user=update.message.from;
-      const code=await createTelegramCode(env,{
-        id:String(user?.id||""),
-        first_name:String(user?.first_name||""),
-        last_name:String(user?.last_name||""),
-        username:String(user?.username||""),
-        photo_url:""
-      },id);
-      await sendTelegram(env,id,code
-        ? "🔐 Код входа в Ok Music\n\n"+code+"\n\nВведи его на сайте. Код одноразовый и действует 5 минут."
-        : "❌ Не удалось создать код. Попробуй ещё раз.");
-      return Response.json({ok:true});
-    }
-
     if(/^\/start(?:@[^\s]+)?(?:\s|$)/i.test(text)||/^\/app(?:@[^\s]+)?(?:\s|$)/i.test(text)){
       const appUrl=String(env.TELEGRAM_WEBAPP_URL||"").replace(/\/$/,"");
       if(appUrl){
