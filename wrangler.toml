@@ -6,3 +6,6 @@ compatibility_date = "2026-10-01"
 APP_NAME = "Ok Music"
 JAMENDO_CLIENT_ID = "84646146"
 VK_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+
+[assets]
+directory = "./public"
