@@ -199,6 +199,17 @@ export class AuthCodesV2 extends DurableObject {
       const record=await get("chat:"+chatId);
       return Response.json({ok:true,challenge:record?.challenge||""});
     }
+    if(request.method==="POST"&&url.pathname==="/code-cooldown"){
+      const chatId=String(body.chatId||"");
+      if(!chatId)return Response.json({ok:false},{status:400});
+      const key="code-cooldown:"+chatId;
+      const now=Date.now();
+      const last=Number(await get(key)||0);
+      const wait=Math.max(0,1800-Math.floor((now-last)/1000));
+      if(wait>0)return Response.json({ok:true,allowed:false,wait});
+      await put(key,now);
+      return Response.json({ok:true,allowed:true,wait:0});
+    }
     if(request.method==="POST"&&url.pathname==="/bind"){
       const challenge=String(body.challenge||"");
       const ch=await get("challenge:"+challenge);
