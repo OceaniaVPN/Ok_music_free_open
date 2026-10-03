@@ -36,7 +36,32 @@ button,input{font:inherit;touch-action:manipulation}button{border:1px solid var(
 @media(max-width:1000px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}.moods{grid-template-columns:repeat(3,minmax(0,1fr))}.hero{padding:34px}}
 @media(max-width:700px){.app{padding:12px 11px calc(220px + env(safe-area-inset-bottom))}.top{margin:1px 0 17px;padding-bottom:13px}.brand h1{font-size:21px}.logo{width:48px;height:48px;border-radius:16px}.hero{padding:22px 19px;border-radius:25px}.hero h2{font-size:clamp(31px,9vw,44px);letter-spacing:-1.8px}.hero p{font-size:12px}.searchbar{flex-direction:column}.searchbar button{width:100%}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.card{padding:8px;border-radius:20px}.cover{border-radius:15px}.cover .play,.offline-btn{opacity:1;transform:none;width:40px;height:40px}.offline-btn{left:8px;bottom:8px}.cover .play{right:8px;bottom:8px}.card-body{padding:9px 2px 2px}.title{font-size:12px}.sub{font-size:10px}.source-badge{font-size:7px;padding:4px 6px}.meta-pill{font-size:8px;padding:4px 6px}.section{margin:25px 1px 11px}.section h2{font-size:19px}.section small{font-size:9px}.wave-card{padding:9px;border-radius:24px}.wave-cover{aspect-ratio:1/1;border-radius:18px}.wave-info{grid-template-columns:1fr;gap:9px;padding:12px 3px 3px}.wave-info h2{font-size:22px}.wave-actions{justify-content:space-between}.taste-panel{padding:14px;border-radius:21px}.offline-panel{padding:13px 14px;border-radius:19px}.moods{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.mood-card{min-height:130px;padding:14px}.result{gap:8px;padding:8px}.mini{width:54px;height:54px;flex-basis:54px}.actions{gap:4px}.icon,.actions .offline-btn{width:35px;height:35px}.track-actions .offline-btn{width:auto;height:auto}.result .track-meta{display:none}.track-profile{padding:14px;border-radius:22px}.track-head{grid-template-columns:100px minmax(0,1fr);gap:12px;align-items:start}.track-cover{width:100px;height:100px;border-radius:17px}.track-profile h2{font-size:22px}.profile-grid{grid-template-columns:repeat(2,1fr);gap:8px}.player{bottom:calc(79px + env(safe-area-inset-bottom));width:calc(100% - 10px);padding:8px 9px;border-radius:19px;grid-template-columns:45px minmax(0,1fr) auto}.pcover{width:45px;height:45px}.pc{gap:4px}.pc .big{width:42px;height:42px}.fx-panel{padding-top:10px}.eq-grid{gap:3px}.eq-band input{height:92px;writing-mode:vertical-lr;direction:rtl}.nav{width:calc(100% - 12px);bottom:max(6px,env(safe-area-inset-bottom));padding:5px;border-radius:20px}.nav button{min-height:50px;font-size:19px;padding:7px 3px}.nav button span{font-size:8px}.input{font-size:16px}.empty{padding:28px 15px}.playlist{padding:10px;gap:9px}.playlist .pic{width:48px;height:48px}.playlist button{padding:9px 8px;font-size:10px}}
 @media(max-width:350px){.app{padding-left:8px;padding-right:8px}.grid{gap:8px}.card{padding:7px}.title{font-size:11px}.sub{font-size:9px}.meta-pill{font-size:7px}.source-badge{display:none}}
-@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.001ms!important;transition-duration:.001ms!important;scroll-behavior:auto!important}}</style></head>
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.001ms!important;transition-duration:.001ms!important;scroll-behavior:auto!important}}
+/* layout repair: overlay controls only on artwork, never on result rows */
+.cover{position:relative}
+.cover .play,.cover .offline-btn{position:absolute}
+.actions .offline-btn,.track-actions .offline-btn{position:static;width:40px;height:40px;border-radius:13px;padding:0}
+.result{min-width:0}
+.result .meta{min-width:0;overflow:hidden}
+.result .actions{flex:0 0 auto;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.player{min-width:0}
+.pmeta{overflow:hidden}
+@media(max-width:700px){
+  .app{width:100%;max-width:100%;overflow-x:clip}
+  .hero,.taste-panel,.offline-panel,.wave-card,.track-profile{width:100%;max-width:100%}
+  .grid{width:100%;min-width:0}
+  .card{min-width:0}
+  .result{width:100%;max-width:100%;overflow:hidden;align-items:flex-start}
+  .result .actions{max-width:150px}
+  .result .meta span,.result .meta strong{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .player{left:5px;right:5px;width:auto;transform:none;max-width:none;overflow:hidden}
+  .pc{min-width:0}
+  .pc .icon{flex:0 0 38px}
+  .fx-panel{overflow:hidden}
+  .eq-grid{min-width:0}
+  .nav{left:6px;right:6px;width:auto;transform:none}
+}
+</style></head>
 <body>
 <div class="app">
   <header class="top"><div class="brand"><div class="logo">♫</div><div><h1>Ok Music</h1><span>Твоя музыка. Твоё настроение.</span></div></div><button class="avatar" id="tasteBtn" title="Мой музыкальный вкус">✦</button></header>
