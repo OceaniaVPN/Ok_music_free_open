@@ -255,9 +255,9 @@ try{applyMusicTheme(localStorage.getItem("okmusic:theme")||"default")}catch{appl
 const AUDIO_KEY="okmusic:audio";
 const eqBands=["60","250","1K","4K","12K"];
 let audioFx={eq:[0,0,0,0,0]};
-try{audioFx={...audioFx,...JSON.parse(localStorage.getItem(AUDIO_KEY)||"{}")}}catch{}\neqEnabled=audioFx.eqEnabled!==false;
+try{audioFx={...audioFx,...JSON.parse(localStorage.getItem(AUDIO_KEY)||"{}")}}catch{}
+let audioCtx=null,audioSource=null,eqPreGain=null,eqNodes=[],fxReady=false,showEq=false,eqEnabled=audioFx.eqEnabled!==false;
 function saveAudioFx(){localStorage.setItem(AUDIO_KEY,JSON.stringify(audioFx))}
-let audioCtx=null,audioSource=null,eqPreGain=null,eqNodes=[],fxReady=false,showEq=false,eqEnabled=true;
 let eqLimiter=null,spatial3dNode=null,spatial3dFrame=0;
 let spatial3d=0;
 try{spatial3d=Math.max(0,Math.min(1,Number(JSON.parse(localStorage.getItem(AUDIO_KEY)||"{}").spatial3d)||0))}catch{}
