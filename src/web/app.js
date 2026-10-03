@@ -18,13 +18,14 @@ export function renderApp(request, env) {
 *{box-sizing:border-box}
 html{background:var(--bg)}
 body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}
-html.photo-bg body{
+html.photo-bg body{background:var(--bg) !important}
+html.photo-bg body:before{
+ content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
  background:
- linear-gradient(rgba(3,10,6,.62),rgba(3,10,6,.78)),
- var(--photo-bg-url) center center / cover fixed no-repeat !important;
- background-attachment:fixed !important;
+ linear-gradient(rgba(3,10,6,.58),rgba(3,10,6,.76)),
+ var(--photo-bg-url) center center / cover no-repeat;
+ opacity:1;filter:none;animation:none;
 }
-html.photo-bg body:before{opacity:.08}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-behavior:smooth}
 body{
  font-family:Manrope,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
@@ -235,6 +236,7 @@ html,body,.app,.top,.hero,.card,.wave-card,.taste-panel,.track-profile,.result,.
 <div id="modal" class="modal"><div class="dialog"><h3>Новый плейлист</h3><p>Придумай название — треки можно будет добавлять из поиска.</p><input id="playlistName" class="input" placeholder="Например: Ночная поездка"><div class="row"><button id="closeModal">Отмена</button><button id="createPlaylist" class="primary">Создать</button></div></div></div>
 <div id="toast" class="toast"></div><div id="tasteModal" class="modal"><div class="dialog"><h3>🎧 Мой музыкальный вкус</h3><p>Выбери любимые направления и настроение — Ok Music будет учитывать их в каждом миксе.</p><div class="taste-grid"><div class="taste-field"><label>Любимые жанры</label><div id="genreChips" class="chips"></div></div><div class="taste-field"><label>Настроение</label><div id="moodChips" class="chips"></div></div></div><div style="margin-top:14px"><label style="display:block;font-size:11px;color:var(--muted);margin-bottom:7px">Любимые исполнители</label><input id="tasteArtists" class="input" placeholder="Например: Miyagi, The Weeknd, Кино"></div><div style="margin-top:14px"><label style="display:block;font-size:11px;color:var(--muted);margin-bottom:7px">Что хочется сейчас</label><input id="tasteNow" class="input" placeholder="Например: спокойный русский рэп для дороги"></div><div class="taste-actions"><button id="tasteCancel">Отмена</button><button id="tasteSave" class="primary" style="flex:1">Сохранить вкус ✨</button></div></div></div>
 <script>
+const FON_IMAGES=["/fon/Picsart_26-10-03_20-41-00-386.png"];
 const view=document.querySelector("#view"), playerEl=document.querySelector("#player"), modal=document.querySelector("#modal"), toastEl=document.querySelector("#toast");
 const KEY="okmusic:v2";
 const KEY_VERSION=2;
@@ -275,14 +277,14 @@ function applyPhotoBackground(enabled,index=0){
 }
 try{
  const bg=JSON.parse(localStorage.getItem(BG_KEY)||"null");
- if(bg?.on&&FON_IMAGES.length)applyPhotoBackground(true,bg.index||0);
  const bgToggle=document.querySelector("#bgToggle");
  if(bgToggle){
-   bgToggle.checked=Boolean(bg?.on&&FON_IMAGES.length);
    bgToggle.disabled=!FON_IMAGES.length;
-   bgToggle.onchange=()=>applyPhotoBackground(bgToggle.checked,bgIndex);
+   bgToggle.checked=Boolean(bg?.on&&FON_IMAGES.length);
+   if(bg?.on&&FON_IMAGES.length) applyPhotoBackground(true,bg.index||0);
+   bgToggle.addEventListener("change",()=>applyPhotoBackground(bgToggle.checked,bgIndex));
  }
-}catch{}
+}catch(error){console.warn("Ok Music photo background:",error)}
 
 const AUDIO_KEY="okmusic:audio";
 const eqBands=["60","250","1K","4K","12K"];
