@@ -6,3 +6,5 @@ header { padding: 18px 0; }
 nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; position: sticky; bottom: 8px; }
 button { padding: 12px 8px; border: 0; border-radius: 12px; background: #242630; color: inherit; }
 footer { margin-top: 20px; padding: 16px 0; opacity: .65; font-size: 12px; text-align: center; }
+
+.card-actions{display:flex;gap:7px;align-items:center;margin-top:9px}.card-actions button{min-width:34px;height:30px;border:1px solid rgba(255,255,255,.09);border-radius:10px;background:rgba(255,255,255,.045);color:var(--text);font:inherit;cursor:pointer}.card-actions .offline-btn{font-size:15px}.card-actions .offline-btn.is-offline{color:var(--green);border-color:rgba(78,228,143,.3);background:rgba(78,228,143,.08)}
