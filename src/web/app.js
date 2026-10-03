@@ -18,13 +18,11 @@ export function renderApp(request, env) {
 *{box-sizing:border-box}
 html{background:var(--bg)}
 body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}
-html.photo-bg body{background:var(--bg) !important}
-html.photo-bg body:before{
- content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+html.photo-bg body{
  background:
  linear-gradient(rgba(3,10,6,.58),rgba(3,10,6,.76)),
- var(--photo-bg-url) center center / cover no-repeat;
- opacity:1;filter:none;animation:none;
+ var(--photo-bg-url) center center / cover fixed no-repeat !important;
+ background-attachment:fixed !important;
 }
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-behavior:smooth}
 body{
