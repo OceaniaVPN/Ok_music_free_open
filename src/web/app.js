@@ -312,6 +312,13 @@ function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&l
 function save(){localStorage.setItem(KEY,JSON.stringify(state))}
 function toast(s){toastEl.textContent=s;toastEl.classList.add("show");clearTimeout(window._toast);window._toast=setTimeout(()=>toastEl.classList.remove("show"),1800)}
 function fmt(n){return Number.isFinite(n)&&n>0?Math.floor(n/60)+":"+String(Math.floor(n%60)).padStart(2,"0"):"0:00"}
+function playableAudio(t){
+ if(!t)return "";
+ if(t.zaycevId)return "/api/zaycev/play?id="+encodeURIComponent(String(t.zaycevId));
+ if(t.audio&&!String(t.audio).startsWith("mega://"))return String(t.audio);
+ if(t.src&&!String(t.src).startsWith("mega://"))return String(t.src);
+ return "";
+}
 const OK_OFFLINE_CACHE="okmusic-audio-v2";
 const OK_OFFLINE_META="okmusic:offline:v2";
 function __okOfflineMeta(){
@@ -327,9 +334,10 @@ window.__okOfflineHas=async function(id){
   return Boolean(await cache.match(meta[key].url));
 };
 window.__okOfflineSave=async function(t){
-  if(!t?.audio||String(t.audio).startsWith("mega://"))throw Error("Этот трек нельзя сохранить напрямую");
-  const url=new URL(t.audio,location.href).href;
-  const response=await fetch(url,{credentials:"same-origin"});
+  const raw=playableAudio(t);
+  if(!raw)throw Error(String(t?.audio||"").startsWith("mega://")?"Этот трек из MEGA пока нельзя сохранить":"У трека нет аудиопотока");
+  const url=new URL(raw,location.href).href;
+  const response=await fetch(url,{credentials:"same-origin",cache:"no-store"});
   if(!response.ok)throw Error("Аудио HTTP "+response.status);
   const cache=await __okOfflineCache();
   await cache.put(url,response.clone());
@@ -366,7 +374,7 @@ async function refreshOfflineButtons(container=view){
 async function toggleOffline(t,button){
  if(!t||!window.__okOfflineSave)return;button.disabled=true;
  try{if(await window.__okOfflineHas(t.id)){await window.__okOfflineRemove(t.id);toast("Удалено из офлайн")}else{button.textContent="…";await window.__okOfflineSave(t);toast("Сохранено для офлайн 🎧")}}
- catch(error){console.warn("Ok Music offline:",error);toast("Не удалось сохранить трек")}
+ catch(error){console.warn("Ok Music offline:",error);toast(error?.message?.includes("MEGA")?"MEGA пока не поддерживает офлайн-сохранение":"Не удалось сохранить трек")}
  finally{button.disabled=false;await refreshOfflineButtons(view)}
 }
 async function clearOffline(){if(!window.__okOfflineClear)return;try{await window.__okOfflineClear();toast("Офлайн-кэш очищен");await refreshOfflineButtons(view)}catch{toast("Не удалось очистить кэш")}}
@@ -491,8 +499,8 @@ function like(t){if(!t)return;const i=state.liked.findIndex(x=>x.id===t.id);if(i
 function findTrackIndex(t){return tracks.findIndex(x=>x?.id===t?.id)}
 function preloadNext(){
  const i=findTrackIndex(current), next=i>=0?tracks[i+1]:null, token=++nextPreloadToken;
- if(!next?.audio&&!next?.src){nextAudio.removeAttribute("src");return}
- const src=next.audio||next.src;
+ const src=playableAudio(next);
+ if(!src){nextAudio.removeAttribute("src");return}
  if(nextAudio.src===new URL(src,location.href).href)return;
  nextAudio.src=src;
  nextAudio.load();
@@ -501,8 +509,8 @@ function preloadNext(){
 function play(t,{fromEnded=false}={}){
  if(!t)return;
  const idx=findTrackIndex(t);currentIndex=idx;current=t;drawHomeWave();updateMediaSession();
- const src=t.audio||t.src;
- if(!src){toast("У этого трека нет прямого воспроизведения");return}
+ const src=playableAudio(t);
+ if(!src){toast(String(t?.audio||"").startsWith("mega://")?"MEGA-трек пока не готов к воспроизведению":"У этого трека нет аудиопотока");return}
  const token=++window.__okPlayToken;
  try{
   const absolute=new URL(src,location.href).href;
