@@ -16,7 +16,15 @@ export function renderApp(request, env) {
  --shadow:0 24px 70px rgba(0,0,0,.42)
 }
 *{box-sizing:border-box}
-html,html.photo-bg body{background:linear-gradient(rgba(3,10,6,.72),rgba(3,10,6,.82)),var(--photo-bg-url) center/cover fixed no-repeat,var(--bg)}html.photo-bg body:before{opacity:.22}body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}
+html{background:var(--bg)}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}
+html.photo-bg body{
+ background:
+ linear-gradient(rgba(3,10,6,.62),rgba(3,10,6,.78)),
+ var(--photo-bg-url) center center / cover fixed no-repeat !important;
+ background-attachment:fixed !important;
+}
+html.photo-bg body:before{opacity:.08}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-behavior:smooth}
 body{
  font-family:Manrope,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
