@@ -170,44 +170,60 @@ HTMLMediaElement.prototype.play=function(){
 
 // Legacy class kept exported so the already-provisioned namespace remains intact.
 export class AuthCodes extends DurableObject {
-  async fetch(){
-    return new Response("AuthCodes legacy namespace", {status:404});
-  }
+  async fetch(){ return new Response("AuthCodes legacy namespace",{status:404}); }
 }
 
-// New SQLite-backed namespace for browser one-time authentication.
 export class AuthCodesV2 extends DurableObject {
   constructor(ctx,env){super(ctx,env);this.ctx=ctx}
   async fetch(request){
     const url=new URL(request.url);
-    let body={};
-    try{body=await request.json()}catch{}
-    const now=Math.floor(Date.now()/1000);
-    const get=async key=>await this.ctx.storage.get(key);
-    const put=async(key,value,ttl)=>this.ctx.storage.put(key,value,{expiration:Date.now()+ttl*1000});
+    let body={}; try{body=await request.json()}catch{}
+    const ttl=Number(body.ttl)||300;
+    const get=key=>this.ctx.storage.get(key);
+    const put=(key,value)=>this.ctx.storage.put(key,value,{expiration:Date.now()+ttl*1000});
+
     if(request.method==="POST"&&url.pathname==="/challenge"){
       if(!body.challenge)return Response.json({ok:false},{status:400});
-      await put("challenge:"+body.challenge,{created:now},Number(body.ttl)||300);
+      await put("challenge:"+String(body.challenge),{created:Date.now()});
       return Response.json({ok:true});
     }
+    if(request.method==="POST"&&url.pathname==="/activate"){
+      const challenge=String(body.challenge||""),chatId=String(body.chatId||"");
+      const ch=await get("challenge:"+challenge);
+      if(!ch||!chatId)return Response.json({ok:false},{status:400});
+      await put("chat:"+chatId,{challenge});
+      return Response.json({ok:true});
+    }
+    if(request.method==="POST"&&url.pathname==="/active"){
+      const chatId=String(body.chatId||"");
+      const record=await get("chat:"+chatId);
+      return Response.json({ok:true,challenge:record?.challenge||""});
+    }
     if(request.method==="POST"&&url.pathname==="/bind"){
-      const ch=await get("challenge:"+body.challenge);
+      const challenge=String(body.challenge||"");
+      const ch=await get("challenge:"+challenge);
       if(!ch||!body.code||!body.user?.id)return Response.json({ok:false},{status:400});
-      await put("code:"+body.code,{challenge:String(body.challenge),user:body.user},Number(body.ttl)||300);
+      await put("code:"+String(body.code),{
+        challenge,
+        user:body.user,
+        chatId:String(body.chatId||"")
+      });
       return Response.json({ok:true});
     }
     if(request.method==="POST"&&url.pathname==="/consume"){
       const code=String(body.code||"");
       const record=await get("code:"+code);
-      if(!record||record.challenge!==String(body.challenge||""))return Response.json({ok:false,error:"Код неверный или уже использован"},{status:401});
+      if(!record||record.challenge!==String(body.challenge||"")){
+        return Response.json({ok:false,error:"Код неверный или уже использован"},{status:401});
+      }
       await this.ctx.storage.delete("code:"+code);
       await this.ctx.storage.delete("challenge:"+record.challenge);
+      if(record.chatId)await this.ctx.storage.delete("chat:"+record.chatId);
       return Response.json({ok:true,user:record.user});
     }
     return Response.json({ok:false},{status:404});
   }
 }
-
 
 export default {
   async fetch(request,env,ctx) {
