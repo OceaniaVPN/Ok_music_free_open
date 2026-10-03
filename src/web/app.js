@@ -69,7 +69,7 @@ function bind(){
   const b=e.target.closest("button");
   if(!b||!view.contains(b))return;
   const id=b.dataset.play||b.dataset.like||b.dataset.add;
-  if(b.dataset.open){window.open(b.dataset.open,"_blank","noopener,noreferrer");return;}const id=b.dataset.play||b.dataset.like||b.dataset.add;if(!id)return;
+  if(b.dataset.open){window.open(b.dataset.open,"_blank","noopener,noreferrer");return;}if(!id)return;
   const t=tracks.find(x=>String(x.id)===String(id))||state.liked.find(x=>String(x.id)===String(id));
   if(!t)return;
   e.preventDefault();e.stopPropagation();
