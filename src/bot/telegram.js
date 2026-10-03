@@ -1,3 +1,5 @@
+import { createTelegramCode } from "../auth/telegram.js";
+
 async function sendTelegram(env,chatId,text,reply_markup){
   const token=String(env.TELEGRAM_BOT_TOKEN||"");
   if(!token)throw new Error("TELEGRAM_BOT_TOKEN is not configured");
