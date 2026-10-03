@@ -666,7 +666,7 @@ async function browserAuth(){
 (async function(){
  const gate=document.getElementById("authGate"),get=document.getElementById("getTelegramCode"),input=document.getElementById("telegramCode"),verify=document.getElementById("verifyTelegramCode"),status=document.getElementById("authStatus");
  if(!gate)return;
- try{const r=await fetch("/api/auth/me",{credentials:"same-origin",cache:"no-store"});const d=await r.json();if(d.authenticated){gate.remove();return}}catch{}
+ try{const r=await fetch("/api/auth/me",{credentials:"same-origin",cache:"no-store"});const d=await r.json();if(d.authenticated){gate.remove();render("home");return}}catch{}
  const botName=String(document.querySelector('meta[name="telegram-bot"]')?.content||"").replace(/^@/,"");
  const botUrl=botName?"https://t.me/"+botName:"";
  status.textContent="В Telegram отправь боту /code, затем введи полученный 6-значный код.";
