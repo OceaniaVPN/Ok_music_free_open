@@ -5,10 +5,10 @@ export function renderApp(request, env) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#090a10"><meta name="referrer" content="strict-origin-when-cross-origin"><script src="https://telegram.org/js/telegram-web-app.js?63"></script>
+<meta name="theme-color" content="#07080f"><meta name="referrer" content="strict-origin-when-cross-origin"><script defer src="https://telegram.org/js/telegram-web-app.js?63"></script>
 <title>${appName}</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+
 :root{color-scheme:dark;font-family:Manrope,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--bg:#03040a;--panel:rgba(13,15,27,.68);--text:#f7f8ff;--muted:#9298ae;--line:rgba(255,255,255,.09);--violet:#8b7cff;--cyan:#48e7ff;--pink:#ff5eb8;--lime:#c8ff72;--radius:26px;--glow:0 22px 80px rgba(0,0,0,.42)}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{position:relative;isolation:isolate;overflow-x:hidden;overscroll-behavior-x:none;background:radial-gradient(circle at 12% -4%,rgba(139,124,255,.18),transparent 30%),radial-gradient(circle at 92% 8%,rgba(72,231,255,.13),transparent 27%),radial-gradient(circle at 58% 78%,rgba(255,94,184,.09),transparent 30%),linear-gradient(160deg,#04040b 0%,#070912 48%,#04040a 100%)}
@@ -59,6 +59,107 @@ body{background:radial-gradient(900px 620px at -10% -15%,rgba(155,140,255,.26),t
 .nav button.active{color:#fff;background:linear-gradient(135deg,rgba(155,140,255,.22),rgba(77,231,255,.1),rgba(255,99,187,.12));box-shadow:0 0 25px rgba(155,140,255,.12),inset 0 1px rgba(255,255,255,.08)}
 .player{border-color:rgba(255,255,255,.14);box-shadow:0 25px 85px rgba(0,0,0,.55),0 0 40px rgba(155,140,255,.08),inset 0 1px rgba(255,255,255,.09)}
 @media(max-width:700px){.top{padding:4px 1px}.hero{padding:24px 20px}.card:hover{transform:translateY(-4px)}}
+
+/* OK MUSIC — Aurora Glass v3 */
+:root{
+  --bg:#05060b;--panel:rgba(12,14,23,.68);--panel-2:rgba(18,21,35,.58);
+  --text:#fbfbff;--muted:#8f96aa;--line:rgba(255,255,255,.085);
+  --violet:#9d8cff;--cyan:#65e8ff;--pink:#ff6bc1;--lime:#d2ff7b;
+  --shadow:0 30px 100px rgba(0,0,0,.44);--soft-shadow:0 16px 50px rgba(0,0,0,.25);
+}
+html{scroll-behavior:smooth}
+body{
+  background:
+    radial-gradient(900px 620px at -8% -12%,rgba(129,104,255,.22),transparent 60%),
+    radial-gradient(700px 560px at 108% 4%,rgba(48,211,255,.15),transparent 58%),
+    radial-gradient(760px 620px at 62% 112%,rgba(255,82,180,.12),transparent 60%),
+    linear-gradient(155deg,#04050a 0%,#070911 47%,#05060a 100%);
+}
+body:before{
+  inset:-35%;filter:blur(110px);opacity:.40;animation:aurora 26s ease-in-out infinite alternate;
+  background:conic-gradient(from 225deg at 50% 50%,rgba(142,119,255,.28),rgba(69,227,255,.13),rgba(255,93,185,.20),rgba(142,119,255,.28));
+}
+body:after{opacity:.11}
+.app{width:min(1240px,100%);padding:18px 20px 228px}
+.top{margin:3px 0 18px}
+.logo{
+  width:54px;height:54px;border-radius:19px;
+  background:
+    radial-gradient(circle at 30% 20%,rgba(255,255,255,.42),transparent 28%),
+    linear-gradient(135deg,#9d8cff 0%,#e979ca 50%,#63e9ff 100%);
+  box-shadow:0 18px 52px rgba(122,102,255,.28),inset 0 1px rgba(255,255,255,.46);
+}
+.brand h1{font-size:22px}
+.avatar{border-color:rgba(255,255,255,.09);backdrop-filter:blur(18px)}
+.hero-v2{
+  min-height:500px;padding:32px 34px 28px;border-radius:36px;
+  display:flex;flex-direction:column;justify-content:space-between;
+  background:
+    linear-gradient(145deg,rgba(18,20,36,.88),rgba(9,12,21,.70) 60%,rgba(26,10,30,.74)),
+    radial-gradient(circle at 76% 20%,rgba(113,101,255,.28),transparent 40%);
+  box-shadow:var(--shadow),inset 0 1px rgba(255,255,255,.14);
+}
+.hero-v2:before{width:430px;height:430px;right:-210px;top:-190px;background:radial-gradient(circle,rgba(76,224,255,.30),transparent 68%);filter:blur(12px)}
+.hero-v2:after{width:500px;height:240px;left:20%;bottom:-170px;background:radial-gradient(ellipse,rgba(255,95,187,.22),transparent 68%)}
+.hero-v2 .hero-grid{
+  position:absolute;inset:0;pointer-events:none;opacity:.12;
+  background-image:linear-gradient(rgba(255,255,255,.10) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.10) 1px,transparent 1px);
+  background-size:42px 42px;
+  mask-image:linear-gradient(to bottom,black,transparent 80%);
+}
+.hero-v2 .hero-main{position:relative;z-index:2;max-width:900px}
+.hero-kicker{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:22px}
+.hero-kicker span{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border-radius:999px;font-size:9px;font-weight:900;letter-spacing:.8px;color:#dfe4f7;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09);backdrop-filter:blur(16px)}
+.hero-kicker .live-dot:before{content:"";width:6px;height:6px;border-radius:50%;background:#bfff76;box-shadow:0 0 12px #bfff76;animation:pulseDot 1.8s ease-in-out infinite}
+@keyframes pulseDot{50%{transform:scale(.68);opacity:.55}}
+.hero-v2 h2{max-width:850px;margin:0;font-size:clamp(46px,7vw,84px);line-height:.93;letter-spacing:-4px}
+.hero-v2 h2 em{background:linear-gradient(100deg,#fff 5%,#a995ff 38%,#64e8ff 72%,#ff6ac4);-webkit-background-clip:text;background-clip:text}
+.hero-v2 p{max-width:720px;margin:20px 0 24px;color:#c5cada;font-size:14px;line-height:1.72}
+.hero-v2 .searchbar{max-width:900px;padding:7px;border:1px solid rgba(255,255,255,.10);border-radius:23px;background:rgba(2,3,8,.44);box-shadow:0 18px 45px rgba(0,0,0,.22);backdrop-filter:blur(18px)}
+.hero-v2 .searchbar .input{min-height:56px;border:0;background:transparent;box-shadow:none;border-radius:17px}
+.hero-v2 .searchbar .primary{min-width:150px;border-radius:17px}
+.hero-quick{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
+.hero-quick button{padding:8px 11px;border-radius:999px;background:rgba(255,255,255,.035);font-size:10px;color:#bec4d6;border-color:rgba(255,255,255,.07)}
+.hero-quick button:hover{background:rgba(255,255,255,.08);transform:none;color:#fff}
+.hero-bottom{position:relative;z-index:2;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-top:34px;padding-top:18px;border-top:1px solid rgba(255,255,255,.08)}
+.hero-note{display:flex;align-items:center;gap:10px;color:#aeb5c7;font-size:10px}
+.hero-note strong{color:#fff}
+.hero-providers{display:flex;gap:7px;flex-wrap:wrap}
+.hero-providers span{padding:7px 9px;border-radius:999px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.07);font-size:9px;font-weight:800;color:#cdd2e2}
+.section{margin:38px 3px 15px}
+.section h2{font-size:23px}
+.section small{color:#8f96aa}
+.section-actions button{background:rgba(255,255,255,.045);backdrop-filter:blur(14px)}
+.wave-card,.taste-panel,.track-profile{
+  background:linear-gradient(145deg,rgba(17,19,31,.76),rgba(8,10,18,.67));
+  box-shadow:var(--shadow),inset 0 1px rgba(255,255,255,.085);
+}
+.card{
+  background:linear-gradient(155deg,rgba(20,22,37,.76),rgba(8,10,18,.71));
+  box-shadow:0 17px 48px rgba(0,0,0,.23),inset 0 1px rgba(255,255,255,.075);
+}
+.card:hover{transform:translateY(-8px) scale(1.008);box-shadow:0 30px 72px rgba(0,0,0,.36),0 0 0 1px rgba(157,140,255,.08),inset 0 1px rgba(255,255,255,.10)}
+.cover{box-shadow:inset 0 1px rgba(255,255,255,.12),0 12px 30px rgba(0,0,0,.18)}
+.mood-card{background:linear-gradient(145deg,rgba(29,31,53,.76),rgba(9,11,19,.68));box-shadow:0 18px 55px rgba(0,0,0,.25),inset 0 1px rgba(255,255,255,.08)}
+.player{background:rgba(8,10,17,.76);box-shadow:0 28px 100px rgba(0,0,0,.58),inset 0 1px rgba(255,255,255,.08)}
+.nav{background:rgba(7,9,16,.72);box-shadow:0 22px 70px rgba(0,0,0,.54),inset 0 1px rgba(255,255,255,.08)}
+.empty{background:rgba(9,11,18,.34)}
+.toast{background:rgba(13,15,25,.93)}
+@media(max-width:700px){
+  .app{padding:12px 11px calc(222px + env(safe-area-inset-bottom))}
+  .hero-v2{min-height:470px;padding:23px 19px 20px;border-radius:27px}
+  .hero-v2 h2{font-size:clamp(39px,12vw,56px);letter-spacing:-2.8px}
+  .hero-v2 p{font-size:12px;margin:17px 0 19px}
+  .hero-v2 .searchbar{padding:5px;border-radius:19px}
+  .hero-v2 .searchbar .input{min-height:50px}
+  .hero-v2 .searchbar .primary{width:100%;min-height:49px}
+  .hero-bottom{margin-top:24px;align-items:flex-start}
+  .hero-providers{width:100%}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*:before,*:after{scroll-behavior:auto!important;animation-duration:.001ms!important;transition-duration:.001ms!important}
+}
+
 </style></head>
 <body>
 <div class="app">
@@ -187,27 +288,32 @@ function playPrevious(){
 function addToPlaylist(t){if(!t)return;if(!state.playlists.length){toast("Сначала создай плейлист");modal.classList.add("open");document.querySelector("#playlistName").focus();return}const names=state.playlists.map((p,i)=>(i+1)+". "+p.name+" ("+p.tracks.length+")").join("\n");const answer=window.prompt("Добавить в какой плейлист?\\n\\n"+names+"\\n\\nВведи номер:","1");const n=Number(answer);if(!Number.isInteger(n)||!state.playlists[n-1])return;const p=state.playlists[n-1];if(p.tracks.some(x=>x.id===t.id)){toast("Трек уже есть в плейлисте");return}p.tracks.push(t);save();toast("Добавлено в «"+p.name+"» ✨")}
 const TASTE_GENRES=["Русский рэп","Поп","Рок","Электроника","Хип-хоп","Фонк","R&B","Lo-fi","Инди","Метал","Классика","Джаз","K-pop"]; const TASTE_MOODS=["Спокойно","Энергично","Грустно","Романтично","Ночью","Для дороги","Вечеринка","Фон для работы"]; function openTaste(){const m=document.querySelector("#tasteModal"),g=document.querySelector("#genreChips"),mo=document.querySelector("#moodChips");g.innerHTML=TASTE_GENRES.map(x=>'<button class="chip '+(state.taste.genres.includes(x)?"on":"")+'" data-g="'+esc(x)+'">'+esc(x)+'</button>').join("");mo.innerHTML=TASTE_MOODS.map(x=>'<button class="chip '+(state.taste.moods.includes(x)?"on":"")+'" data-m="'+esc(x)+'">'+esc(x)+'</button>').join("");g.querySelectorAll("[data-g]").forEach(b=>b.onclick=()=>{const x=b.dataset.g;state.taste.genres=state.taste.genres.includes(x)?state.taste.genres.filter(v=>v!==x):[...state.taste.genres,x];b.classList.toggle("on")});mo.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{const x=b.dataset.m;state.taste.moods=state.taste.moods.includes(x)?state.taste.moods.filter(v=>v!==x):[...state.taste.moods,x];b.classList.toggle("on")});document.querySelector("#tasteArtists").value=state.taste.artists||"";document.querySelector("#tasteNow").value=state.taste.now||"";m.classList.add("open")} document.querySelector("#tasteBtn").onclick=openTaste; document.querySelector("#tasteCancel").onclick=()=>document.querySelector("#tasteModal").classList.remove("open"); document.querySelector("#tasteSave").onclick=()=>{state.taste.artists=document.querySelector("#tasteArtists").value.trim();state.taste.now=document.querySelector("#tasteNow").value.trim();save();document.querySelector("#tasteModal").classList.remove("open");toast("Вкус сохранён ✨");render("home")}; async function home(){
  tracks=demos;
- view.innerHTML='<section class="hero"><div style="position:relative;z-index:2;display:inline-flex;align-items:center;gap:7px;margin-bottom:14px;padding:7px 10px;border:1px solid rgba(255,255,255,.1);border-radius:999px;background:rgba(255,255,255,.045);backdrop-filter:blur(12px);font-size:9px;font-weight:800;letter-spacing:.7px;color:#cfd3e4">● OK MUSIC · LIVE CATALOG</div><h2>Музыка, которая звучит <em>как ты.</em></h2><p>Умная подборка из музыкальных каталогов подстраивается под твои любимые треки.</p><div class="searchbar"><input id="homeQ" class="input" placeholder="Исполнитель, трек или настроение"><button id="homeSearch" class="primary">Найти музыку</button></div></section><div id="homeWave" class="wave-card"></div><div class="taste-panel"><h3>🎧 Твой музыкальный профиль</h3><p>Настрой предпочтения, и алгоритм будет учитывать их в каждом новом миксе.</p><button id="editTaste" style="margin-top:12px">Настроить вкус</button></div><div class="section"><div><h2>✨ Твой микс</h2><small id="mixStatus">Подбираю музыку…</small></div><div class="section-actions"><button id="refreshMix" title="Пересобрать подборку">↻</button><button id="mixPlay" class="home-play" title="Слушать микс">▶</button></div></div><div id="mix" class="grid"><div class="empty" style="grid-column:1/-1">Создаю персональную подборку…</div></div><div class="section"><div><h2>🔐 Ключник</h2><small>GitHub + MEGA</small></div></div><div id="localMusic" class="grid"><div class="empty" style="grid-column:1/-1">Загружаю локальную музыку…</div></div>';
- document.querySelector("#homeSearch").onclick=()=>doSearch(document.querySelector("#homeQ").value);document.querySelector("#homeQ").onkeydown=e=>{if(e.key==="Enter")doSearch(e.target.value)};
+ view.innerHTML='<section class="hero hero-v2"><div class="hero-grid"></div><div class="hero-main"><div class="hero-kicker"><span>✦ OK MUSIC</span><span class="live-dot">КАТАЛОГ ОНЛАЙН</span><span>ЧИСТЫЙ ЗВУК</span></div><h2>Твоя музыка.<br><em>Твой ритм.</em></h2><p>Поиск, любимые треки, умные подборки и твоя библиотека — в одном музыкальном пространстве без лишних экранов.</p><div class="searchbar"><input id="homeQ" class="input" placeholder="Исполнитель, трек или настроение" autocomplete="off"><button id="homeSearch" class="primary">Найти музыку</button></div><div class="hero-quick"><button type="button" data-quick-q="Ночной вайб">🌙 Ночной вайб</button><button type="button" data-quick-q="Энергия">⚡ Энергия</button><button type="button" data-quick-q="Lo-fi">☁ Lo-fi</button><button type="button" data-quick-q="В дорогу">🚗 В дорогу</button></div></div><div class="hero-bottom"><div class="hero-note">🔐 <span><strong>Ключник</strong> · локальная музыка + MEGA metadata</span></div><div class="hero-providers"><span>Zaycev</span><span>Jamendo</span><span>MEGA</span></div></div></section><div id="homeWave" class="wave-card"></div><div class="taste-panel"><h3>🎧 Твой музыкальный профиль</h3><p>Настрой предпочтения, и алгоритм будет учитывать их в каждом новом миксе.</p><button id="editTaste" style="margin-top:12px">Настроить вкус</button></div><div class="section"><div><h2>✨ Твой микс</h2><small id="mixStatus">Подбираю музыку…</small></div><div class="section-actions"><button id="refreshMix" title="Пересобрать подборку">↻</button><button id="mixPlay" class="home-play" title="Слушать микс">▶</button></div></div><div id="mix" class="grid"><div class="empty" style="grid-column:1/-1">Создаю персональную подборку…</div></div><div class="section"><div><h2>🔐 Ключник</h2><small>GitHub + MEGA</small></div></div><div id="localMusic" class="grid"><div class="empty" style="grid-column:1/-1">Загружаю локальную музыку…</div></div>';
+ document.querySelector("#homeSearch").onclick=()=>doSearch(document.querySelector("#homeQ").value);document.querySelector("#homeQ").onkeydown=e=>{if(e.key==="Enter")doSearch(e.target.value)};view.querySelectorAll("[data-quick-q]").forEach(b=>b.onclick=()=>doSearch(b.dataset.quickQ));
  document.querySelector("#editTaste").onclick=openTaste;
  document.querySelector("#refreshMix").onclick=()=>loadMix(true);
 document.querySelector("#mixPlay").onclick=()=>{const t=waveTrack();if(t)play(t)};
 drawHomeWave();
 bind();
- await loadMix();
+ void loadLocalMusic();
+ void loadMix();
 }
-async function loadLocalMusic(){
+async function loadLocalMusic(attempt=0){
  const box=document.querySelector("#localMusic");if(!box)return;
  try{
-  const r=await fetch("/api/local-music",{cache:"no-store"});const d=await r.json();if(!d.ok)throw Error("Ключник недоступен");
+  const r=await fetch("/api/local-music",{cache:attempt?"no-store":"default"});const d=await r.json();if(!d.ok)throw Error("Ключник недоступен");
   localTracks=Array.isArray(d.tracks)?d.tracks:[];
+  if(d.mega?.ready===false&&attempt<4)setTimeout(()=>void loadLocalMusic(attempt+1),2500);
   if(!localTracks.length){box.innerHTML='<div class="empty" style="grid-column:1/-1">Ключник пока пуст.</div>';return}
   const renderLocal=()=>{box.innerHTML=localTracks.map(card).join("");bind(box)};
   tracks=[...tracks,...localTracks.filter(t=>!tracks.some(x=>x.id===t.id))];renderLocal();
-  if(window.__megaEnrichLocalTracks)await window.__megaEnrichLocalTracks(localTracks,{onTrack:t=>{
-   const ti=tracks.findIndex(x=>x.id===t.id);if(ti>=0)tracks[ti]=t;
-   renderLocal();if(current?.id===t.id){current=t;drawPlayer();updateMediaSession()}
-  }});
+  if(window.__megaEnrichLocalTracks){
+   const idle=window.requestIdleCallback?fn=>window.requestIdleCallback(fn,{timeout:4500}):fn=>setTimeout(fn,900);
+   idle(()=>void Promise.resolve(window.__megaEnrichLocalTracks(localTracks,{onTrack:t=>{
+     const ti=tracks.findIndex(x=>x.id===t.id);if(ti>=0)tracks[ti]=t;
+     renderLocal();if(current?.id===t.id){current=t;drawPlayer();updateMediaSession()}
+   }})).catch(error=>console.warn("🔐 Ключник metadata background:",error));
+  }
  }catch(e){
   console.error("🔐 Ключник:",e);localTracks=[];box.innerHTML='<div class="empty" style="grid-column:1/-1">Не удалось загрузить 🔐 Ключник.</div>';
  }
@@ -234,7 +340,6 @@ async function loadMix(force=false){
    status.textContent="Демо-подборка · каталоги пока недоступны";
    bind(box);
  }
- await loadLocalMusic();
 }
 
 function mood(){
