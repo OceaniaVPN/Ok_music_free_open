@@ -176,6 +176,7 @@ async function loadLocalMusic(attempt=0){
   localTracks=Array.isArray(d.tracks)?d.tracks:[];try{localStorage.setItem(cacheKey,JSON.stringify(localTracks))}catch{}
   if(d.mega?.ready===false&&attempt<4)setTimeout(()=>void loadLocalMusic(attempt+1),2500);
   tracks=[...tracks,...localTracks.filter(t=>!tracks.some(x=>x.id===t.id))];paint();
+  if(window.__megaEnrichLocalTracks)setTimeout(async()=>{try{await window.__megaEnrichLocalTracks(localTracks,{onTrack:t=>{const i=tracks.findIndex(x=>x.id===t.id);if(i>=0)tracks[i]=t;paint();if(current?.id===t.id){current=t;drawPlayer();updateMediaSession()}}})}catch(error){console.warn("Ключник metadata background:",error)}},700);
  }catch(e){try{if(!localTracks.length){localTracks=JSON.parse(localStorage.getItem(cacheKey)||"[]");if(Array.isArray(localTracks)&&localTracks.length){tracks=[...tracks,...localTracks.filter(t=>!tracks.some(x=>x.id===t.id))];paint();return}}}catch{}console.warn("Ключник:",e);if(!localTracks.length)box.innerHTML='<div class="empty" style="grid-column:1/-1">Не удалось загрузить 🔐 Ключник.</div>'}
 }
 async function loadMix(force=false){
