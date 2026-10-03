@@ -9,7 +9,3 @@ VK_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (K
 
 [build]
 command = "node scripts/build-local-music.mjs"
-
-[assets]
-directory = "./public"
-binding = "ASSETS"
