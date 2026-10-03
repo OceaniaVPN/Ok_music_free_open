@@ -308,11 +308,7 @@ function eqPanel(){
  if(!showEq)return "";
  return '<div class="fx-panel"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><strong>🎚 Эквалайзер</strong><small style="color:var(--muted)">±12 дБ</small></div><div class="eq-grid">'+eqBands.map((b,i)=>'<label class="eq-band"><input data-eq="'+i+'" type="range" min="-12" max="12" step="1" value="'+Number(audioFx.eq[i]||0)+'"><small>'+b+' Hz</small></label>').join("")+'</div></div>';
 }
-const demos=[
-{id:"demo-1",title:"Midnight Waves",artist:"Ok Music",image:"",audio:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",source:"Demo"},
-{id:"demo-2",title:"Neon Drive",artist:"Ok Music",image:"",audio:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",source:"Demo"},
-{id:"demo-3",title:"Afterglow",artist:"Ok Music",image:"",audio:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",source:"Demo"},
-{id:"demo-4",title:"Ocean Lights",artist:"Ok Music",image:"",audio:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",source:"Demo"}];
+const demos=[];
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
 function save(){localStorage.setItem(KEY,JSON.stringify(state))}
 function toast(s){toastEl.textContent=s;toastEl.classList.add("show");clearTimeout(window._toast);window._toast=setTimeout(()=>toastEl.classList.remove("show"),1800)}
@@ -385,7 +381,7 @@ function result(t){
  return '<div class="result"><div class="mini">'+(t.image?'<img src="'+esc(t.image)+'" loading="lazy">':"♫")+'</div><div class="meta"><strong>'+esc(t.title||"Без названия")+'</strong><span>'+esc(t.artist||"Неизвестный исполнитель")+(t.album?" · "+esc(t.album):"")+(t.source?" · "+esc(t.source):"")+'</span>'+(pills.length?'<div class="track-meta">'+pills.map(x=>'<span class="meta-pill">'+esc(x)+'</span>').join("")+'</div>':"")+'</div><div class="actions"><button class="icon" data-like="'+esc(t.id)+'">'+(liked?"♥":"♡")+'</button><button class="icon" data-add="'+esc(t.id)+'">＋</button><button class="offline-btn" data-offline="'+esc(t.id)+'" aria-label="Офлайн" title="Сохранить для офлайн">⇩</button><button class="icon" data-play="'+esc(t.id)+'">▶</button></div></div>';
 }
 function bind(container=view){container.querySelectorAll("[data-offline]").forEach(b=>b.onclick=e=>{e.stopPropagation();const t=tracks.find(t=>t.id===b.dataset.offline)||state.liked.find(t=>t.id===b.dataset.offline);toggleOffline(t,b)});container.querySelectorAll("[data-play]").forEach(b=>b.onclick=e=>{e.stopPropagation();play(tracks.find(t=>t.id===b.dataset.play)||state.liked.find(t=>t.id===b.dataset.play))});container.querySelectorAll("[data-track-profile]").forEach(b=>b.onclick=e=>{if(e.target.closest("button"))return;openTrackProfile(b.dataset.trackProfile)});container.querySelectorAll("[data-like]").forEach(b=>b.onclick=()=>like(tracks.find(t=>t.id===b.dataset.like)||state.liked.find(t=>t.id===b.dataset.like)));container.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>addToPlaylist(tracks.find(t=>t.id===b.dataset.add)||state.liked.find(t=>t.id===b.dataset.add)));void refreshOfflineButtons(container)}
-function waveTrack(){return current||tracks[0]||demos[0]}
+function waveTrack(){return current||tracks[0]||localTracks[0]||null}
 function drawHomeWave(){
  const box=document.querySelector("#homeWave");if(!box)return;
  const t=waveTrack(),liked=state.liked.some(x=>x.id===t.id);
@@ -403,14 +399,14 @@ function playPrevious(){
 }
 function addToPlaylist(t){if(!t)return;if(!state.playlists.length){toast("Сначала создай плейлист");modal.classList.add("open");document.querySelector("#playlistName").focus();return}const names=state.playlists.map((p,i)=>(i+1)+". "+p.name+" ("+p.tracks.length+")").join("\n");const answer=window.prompt("Добавить в какой плейлист?\\n\\n"+names+"\\n\\nВведи номер:","1");const n=Number(answer);if(!Number.isInteger(n)||!state.playlists[n-1])return;const p=state.playlists[n-1];if(p.tracks.some(x=>x.id===t.id)){toast("Трек уже есть в плейлисте");return}p.tracks.push(t);save();toast("Добавлено в «"+p.name+"» ✨")}
 const TASTE_GENRES=["Русский рэп","Поп","Рок","Электроника","Хип-хоп","Фонк","R&B","Lo-fi","Инди","Метал","Классика","Джаз","K-pop"]; const TASTE_MOODS=["Спокойно","Энергично","Грустно","Романтично","Ночью","Для дороги","Вечеринка","Фон для работы"]; function openTaste(){const m=document.querySelector("#tasteModal"),g=document.querySelector("#genreChips"),mo=document.querySelector("#moodChips");g.innerHTML=TASTE_GENRES.map(x=>'<button class="chip '+(state.taste.genres.includes(x)?"on":"")+'" data-g="'+esc(x)+'">'+esc(x)+'</button>').join("");mo.innerHTML=TASTE_MOODS.map(x=>'<button class="chip '+(state.taste.moods.includes(x)?"on":"")+'" data-m="'+esc(x)+'">'+esc(x)+'</button>').join("");g.querySelectorAll("[data-g]").forEach(b=>b.onclick=()=>{const x=b.dataset.g;state.taste.genres=state.taste.genres.includes(x)?state.taste.genres.filter(v=>v!==x):[...state.taste.genres,x];b.classList.toggle("on")});mo.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{const x=b.dataset.m;state.taste.moods=state.taste.moods.includes(x)?state.taste.moods.filter(v=>v!==x):[...state.taste.moods,x];b.classList.toggle("on")});document.querySelector("#tasteArtists").value=state.taste.artists||"";document.querySelector("#tasteNow").value=state.taste.now||"";m.classList.add("open")} document.querySelector("#tasteBtn").onclick=openTaste; document.querySelector("#tasteCancel").onclick=()=>document.querySelector("#tasteModal").classList.remove("open"); document.querySelector("#tasteSave").onclick=()=>{state.taste.artists=document.querySelector("#tasteArtists").value.trim();state.taste.now=document.querySelector("#tasteNow").value.trim();save();document.querySelector("#tasteModal").classList.remove("open");toast("Вкус сохранён ✨");render("home")}; async function home(){
- tracks=demos;
+ tracks=[];
  view.innerHTML='<section class="hero hero-v2"><div class="hero-grid"></div><div class="hero-main"><div class="hero-kicker"><span>✦ OK MUSIC</span><span class="live-dot">КАТАЛОГ ОНЛАЙН</span><span>ЧИСТЫЙ ЗВУК</span></div><h2>Твоя музыка.<br><em>Твой ритм.</em></h2><p>Поиск, любимые треки, умные подборки и твоя библиотека — в одном музыкальном пространстве без лишних экранов.</p><div class="searchbar"><input id="homeQ" class="input" placeholder="Исполнитель, трек или настроение" autocomplete="off"><button id="homeSearch" class="primary">Найти музыку</button></div><div class="hero-quick"><button type="button" data-quick-q="Ночной вайб">🌙 Ночной вайб</button><button type="button" data-quick-q="Энергия">⚡ Энергия</button><button type="button" data-quick-q="Lo-fi">☁ Lo-fi</button><button type="button" data-quick-q="В дорогу">🚗 В дорогу</button></div></div><div class="hero-bottom"><div class="hero-note">🔐 <span><strong>Ключник</strong> · локальная музыка + MEGA metadata</span></div><div class="hero-providers"><span>Zaycev</span><span>Jamendo</span><span>MEGA</span></div></div></section><div id="homeWave" class="wave-card"></div><div class="taste-panel"><h3>🎧 Твой музыкальный профиль</h3><p>Настрой предпочтения, и алгоритм будет учитывать их в каждом новом миксе.</p><button id="editTaste" style="margin-top:12px">Настроить вкус</button></div><div class="offline-panel" id="offlineHome"><div><strong>◉ Офлайн-режим</strong><span id="offlineHomeText">Сохраняй треки кнопкой ⇩ и слушай их без интернета.</span></div><button id="clearOffline">Очистить</button></div><div class="section"><div><h2>✨ Твой микс</h2><small id="mixStatus">Подбираю музыку…</small></div><div class="section-actions"><button id="refreshMix" title="Пересобрать подборку">↻</button><button id="mixPlay" class="home-play" title="Слушать микс">▶</button></div></div><div id="mix" class="grid"><div class="empty" style="grid-column:1/-1">Создаю персональную подборку…</div></div><div class="section"><div><h2>🔐 Ключник</h2><small>GitHub + MEGA</small></div></div><div id="localMusic" class="grid"><div class="empty" style="grid-column:1/-1">Загружаю локальную музыку…</div></div>';
  document.querySelector("#homeSearch").onclick=()=>doSearch(document.querySelector("#homeQ").value);document.querySelector("#homeQ").onkeydown=e=>{if(e.key==="Enter")doSearch(e.target.value)};view.querySelectorAll("[data-quick-q]").forEach(b=>b.onclick=()=>doSearch(b.dataset.quickQ));
  document.querySelector("#editTaste").onclick=openTaste;
  document.querySelector("#refreshMix").onclick=()=>loadMix(true);
 document.querySelector("#mixPlay").onclick=()=>{const t=waveTrack();if(t)play(t)};
 drawHomeWave();
- const initialMix=document.querySelector("#mix");if(initialMix){initialMix.innerHTML=demos.slice(0,8).map(card).join("");bind(initialMix)}
+ const initialMix=document.querySelector("#mix");if(initialMix){initialMix.innerHTML='<div class="empty" style="grid-column:1/-1">Создаю персональную подборку…</div>'}
  bind();
  void loadLocalMusic();
  void loadMix();
@@ -463,11 +459,11 @@ async function loadMix(force=false){
 
 function mood(){
  const moodItems=[["🌙","Ночной вайб","Спокойное и атмосферное"],["⚡","Энергия","Больше ритма и движения"],["☁️","Chill","Расслабиться и выдохнуть"],["💜","Любовь","Мягкие и тёплые треки"],["🚗","В дорогу","Музыка для долгой поездки"],["🔥","Вечеринка","Ритм, который не отпускает"],["🖤","Фонк","Бас, дрифт и ночной вайб"]];
- view.innerHTML='<div class="section"><h2>Какое настроение?</h2><small>Выбери атмосферу</small></div><div class="moods">'+moodItems.map((x,i)=>'<button class="mood-card" data-mood="'+i+'"><b>'+x[0]+'</b><strong>'+x[1]+'</strong><span>'+x[2]+'</span></button>').join('')+'</div><div class="section"><h2>Популярное</h2><small>Для хорошего настроения</small></div><div class="grid">'+demos.map(card).join('')+'</div>';
+ view.innerHTML='<div class="section"><h2>Какое настроение?</h2><small>Выбери атмосферу</small></div><div class="moods">'+moodItems.map((x,i)=>'<button class="mood-card" data-mood="'+i+'"><b>'+x[0]+'</b><strong>'+x[1]+'</strong><span>'+x[2]+'</span></button>').join('')+'</div><div class="section"><h2>Популярное</h2><small>Из твоего каталога</small></div><div class="grid">'+localTracks.map(card).join('')+'</div>';
  bind();view.querySelectorAll("[data-mood]").forEach(b=>b.onclick=()=>{
  const i=Number(b.dataset.mood),item=moodItems[i];
  applyMusicTheme(["night","energy","chill","love","road","party","phonk"][i]||"default");
- toast("Подбираю: "+item[1]);tracks=[...demos];view.querySelector(".section h2").textContent=item[1];
+ toast("Подбираю: "+item[1]);tracks=[...localTracks];view.querySelector(".section h2").textContent=item[1];
 });
 }
 function searchView(){
@@ -500,9 +496,19 @@ function preloadNext(){
  void token;
 }
 function play(t,{fromEnded=false}={}){
- if(!t)return;const idx=findTrackIndex(t);currentIndex=idx;current=t;drawHomeWave();updateMediaSession();if(!(t.audio||t.src)){toast("У этого трека нет прямого воспроизведения");return}
- const src=t.audio||t.src,token=++window.__okPlayToken;
- Promise.resolve(window.__okOfflineResolve?.(t)).then(cached=>{if(token!==window.__okPlayToken||current?.id!==t.id)return;if(window.__okCurrentBlobUrl&&window.__okCurrentBlobUrl!==cached)try{URL.revokeObjectURL(window.__okCurrentBlobUrl)}catch{}window.__okCurrentBlobUrl=cached||"";const target=cached||src;if(audio.src!==new URL(target,location.href).href){audio.src=target;audio.load()}return audio.play()}).then(()=>{if(token===window.__okPlayToken){playing=true;updateMediaSession();drawPlayer();preloadNext()}}).catch(error=>{console.warn("Ok Music playback:",error);toast("Не удалось воспроизвести трек")});
+ if(!t)return;
+ const idx=findTrackIndex(t);currentIndex=idx;current=t;drawHomeWave();updateMediaSession();
+ const src=t.audio||t.src;
+ if(!src){toast("У этого трека нет прямого воспроизведения");return}
+ const token=++window.__okPlayToken;
+ try{
+  const absolute=new URL(src,location.href).href;
+  if(audio.src!==absolute){audio.src=src;audio.load()}
+  const promise=audio.play();
+  Promise.resolve(promise).then(()=>{
+   if(token===window.__okPlayToken&&current?.id===t.id){playing=true;updateMediaSession();drawPlayer();preloadNext()}
+  }).catch(error=>{console.warn("Ok Music playback:",error);toast(error?.name==="NotAllowedError"?"Нажми ▶ ещё раз для запуска":"Не удалось воспроизвести трек")});
+ }catch(error){console.warn("Ok Music playback:",error);toast("Не удалось воспроизвести трек")}
 }
 
 
