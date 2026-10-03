@@ -37,7 +37,8 @@ function parseZaycevSearch(html,limit){
     const attrs=imgTag?imgTag[0]:"";
     const imageMatch=attrs.match(/(?:data-src|data-original|data-lazy-src|poster|src)=["']([^"']+)["']/i);
     const srcsetMatch=attrs.match(/(?:data-srcset|srcset)=["']([^"']+)["']/i);
-    const image=imageMatch?imageMatch[1]:(srcsetMatch?srcsetMatch[1].split(",").pop().trim().split(/\s+/)[0]:"");
+    const imageCandidates=[imageMatch?.[1],srcsetMatch?srcsetMatch[1].split(",").pop().trim().split(/\s+/)[0]:""].filter(Boolean);
+    const image=imageCandidates.find(x=>/cdnimg\.zaycev\.net\/commonImage\/album\//i.test(x)||/\/album\//i.test(x))||imageCandidates[0]||"";
     const dm=stripHtml(chunk).match(/\b(\d{1,2}:\d{2})\b/);
     seen.add(id);out.push({id,title,artist,image,duration:dm?parseDuration(dm[1]):0,sourceUrl:new URL(trackLink[1],ZAYCEV_BASE).href});
     if(out.length>=limit)break;
@@ -238,6 +239,7 @@ export async function handleApi(request,env){
     const jitter=(t)=>{let n=h;for(const c of String(t.id))n=(n*33+c.charCodeAt(0))>>>0;return (n%1000)/100000};
     const ranked=pool.filter(t=>score(t)>-100000).map(t=>({t,s:score(t)+jitter(t)})).sort((a,b)=>b.s-a.s);
     const preferred=ranked.filter(x=>wanted.some(a=>a&&String(x.t.artist||"").toLowerCase().includes(a)));
+    const zaycevRanked=ranked.filter(x=>x.t.source==="Zaycev.net");
     const rest=ranked.filter(x=>!wanted.some(a=>a&&String(x.t.artist||"").toLowerCase().includes(a)));
     const final=[];
     const used=new Set();
@@ -248,6 +250,8 @@ export async function handleApi(request,env){
     // If there are enough favorite-artist candidates, reserve roughly half the mix for them.
     const preferredTarget=Math.min(Math.ceil(limit/2),preferred.length);
     for(const x of preferred.slice(0,preferredTarget))add(x.t);
+    const zaycevTarget=Math.min(zaycevRanked.length,Math.max(2,Math.floor(limit/4)));
+    for(const x of zaycevRanked)if(final.length<limit&&final.filter(t=>t.source==="Zaycev.net").length<zaycevTarget)add(x.t);
     const buckets=new Map();
     for(const x of [...preferred.slice(preferredTarget),...rest]){
       const key=String(x.t.artist||"Неизвестный").toLowerCase();
