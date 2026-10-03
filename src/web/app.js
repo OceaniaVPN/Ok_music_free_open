@@ -654,7 +654,7 @@ initTelegram();window.addEventListener("DOMContentLoaded",initTelegram,{once:tru
 if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js",{scope:"/"}).catch(e=>console.warn("Ok Music PWA:",e));
 
 async function browserAuth(){
- const gate=document.querySelector("#authGate"),status=document.querySelector("#authStatus"),host=document.querySelector("#telegramLogin");
+ const gate=document.querySelector("#authGate"),status=document.querySelector("#authStatus");
  const inTelegram=Boolean(window.Telegram?.WebApp?.initData);
  if(inTelegram){gate?.classList.remove("open");render("home");return}
  try{
@@ -662,33 +662,9 @@ async function browserAuth(){
    const d=await r.json();
    if(d.authenticated){gate?.classList.remove("open");render("home");return}
  }catch{}
- if(!host)return;
- const bot=String(document.documentElement.dataset.telegramBot||"").replace(/^@/,"");
- if(!bot){status.textContent="Telegram-бот для входа ещё не настроен.";return}
- window.onTelegramAuth=async user=>{
-   status.textContent="Проверяю авторизацию…";
-   try{
-     const r=await fetch("/api/auth/telegram",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify(user)});
-     const d=await r.json();
-     if(!r.ok||!d.ok)throw Error(d.error||"Telegram не подтвердил вход");
-     gate.classList.remove("open");
-     toast("Вход выполнен 👋");
-     render("home");
-   }catch(error){status.textContent=error.message||"Не удалось войти через Telegram"}
- };
- const script=document.createElement("script");
- script.src="https://telegram.org/js/telegram-widget.js?22";
- script.async=true;
- script.setAttribute("data-telegram-login",bot);
- script.setAttribute("data-size","large");
- script.setAttribute("data-userpic","false");
- script.setAttribute("data-request-access","write");
- script.setAttribute("data-onauth","onTelegramAuth(user)");
- script.onload=()=>{status.textContent="Нажми кнопку Telegram для входа."};
- script.onerror=()=>{status.textContent="Не удалось загрузить Telegram Login."};
- host.appendChild(script);
+ if(status)status.textContent="Открой нашего Telegram-бота и нажми «Войти и открыть в браузере».";
 }
-browserAuth();
+
 </script>
 </body></html>`;
   return new Response(html,{headers:{"content-type":"text/html; charset=utf-8","Referrer-Policy":"origin"}});
