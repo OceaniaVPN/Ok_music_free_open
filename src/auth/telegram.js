@@ -80,7 +80,7 @@ export async function createTelegramCode(env,user,chatId=""){
   const a=new Uint32Array(1);
   crypto.getRandomValues(a);
   const code=String(100000+(a[0]%900000));
-  const r=await doCall(env,"/issue",{
+  const r=await doCall(env,"/bind",{
     method:"POST",
     headers:{"content-type":"application/json"},
     body:JSON.stringify({code,user,chatId:String(chatId||""),ttl:300})
