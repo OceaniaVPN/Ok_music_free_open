@@ -62,7 +62,22 @@ function toast(s){toastEl.textContent=s;toastEl.classList.add("show");clearTimeo
 function fmt(n){return Number.isFinite(n)&&n>0?Math.floor(n/60)+":"+String(Math.floor(n%60)).padStart(2,"0"):"0:00"}
 function card(t){return '<article class="card"><div class="cover">'+(t.image?'<img src="'+esc(t.image)+'" loading="lazy">':"♫")+'<button class="play" data-play="'+esc(t.id)+'">▶</button></div><div class="title">'+esc(t.title)+'</div><div class="sub">'+esc(t.artist)+'</div></article>'}
 function result(t){const liked=state.liked.some(x=>x.id===t.id);return '<div class="result"><div class="mini">'+(t.image?'<img src="'+esc(t.image)+'" loading="lazy">':"♫")+'</div><div class="meta"><strong>'+esc(t.title)+'</strong><span>'+esc(t.artist)+(t.source?" · "+esc(t.source):"")+(t.album?" · "+esc(t.album):"")+'</span></div><div class="actions"><button class="icon" data-like="'+esc(t.id)+'">'+(liked?"♥":"♡")+'</button><button class="icon" data-add="'+esc(t.id)+'">＋</button><button class="icon" data-play="'+esc(t.id)+'">▶</button></div></div>'}
-function bind(container=view){container.querySelectorAll("[data-play]").forEach(b=>b.onclick=()=>play(tracks.find(t=>t.id===b.dataset.play)||state.liked.find(t=>t.id===b.dataset.play)));container.querySelectorAll("[data-like]").forEach(b=>b.onclick=()=>like(tracks.find(t=>t.id===b.dataset.like)||state.liked.find(t=>t.id===b.dataset.like)));container.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>addToPlaylist(tracks.find(t=>t.id===b.dataset.add)||state.liked.find(t=>t.id===b.dataset.add)))}
+function bind(){
+ if(view.dataset.bound==="1")return;
+ view.dataset.bound="1";
+ view.addEventListener("click",e=>{
+  const b=e.target.closest("button");
+  if(!b||!view.contains(b))return;
+  const id=b.dataset.play||b.dataset.like||b.dataset.add;
+  if(!id)return;
+  const t=tracks.find(x=>String(x.id)===String(id))||state.liked.find(x=>String(x.id)===String(id));
+  if(!t)return;
+  e.preventDefault();e.stopPropagation();
+  if(b.dataset.play)void play(t);
+  else if(b.dataset.like)like(t);
+  else if(b.dataset.add)addToPlaylist(t);
+ });
+}
 function addToPlaylist(t){if(!t)return;if(!state.playlists.length){toast("Сначала создай плейлист");modal.classList.add("open");document.querySelector("#playlistName").focus();return}const names=state.playlists.map((p,i)=>(i+1)+". "+p.name+" ("+p.tracks.length+")").join("\n");const answer=window.prompt("Добавить в какой плейлист?\\n\\n"+names+"\\n\\nВведи номер:","1");const n=Number(answer);if(!Number.isInteger(n)||!state.playlists[n-1])return;const p=state.playlists[n-1];if(p.tracks.some(x=>x.id===t.id)){toast("Трек уже есть в плейлисте");return}p.tracks.push(t);save();toast("Добавлено в «"+p.name+"» ✨")}
 const TASTE_GENRES=["Русский рэп","Поп","Рок","Электроника","Хип-хоп","R&B","Lo-fi","Инди","Метал","Классика","Джаз","K-pop"]; const TASTE_MOODS=["Спокойно","Энергично","Грустно","Романтично","Ночью","Для дороги","Вечеринка","Фон для работы"]; function openTaste(){const m=document.querySelector("#tasteModal"),g=document.querySelector("#genreChips"),mo=document.querySelector("#moodChips");g.innerHTML=TASTE_GENRES.map(x=>'<button class="chip '+(state.taste.genres.includes(x)?"on":"")+'" data-g="'+esc(x)+'">'+esc(x)+'</button>').join("");mo.innerHTML=TASTE_MOODS.map(x=>'<button class="chip '+(state.taste.moods.includes(x)?"on":"")+'" data-m="'+esc(x)+'">'+esc(x)+'</button>').join("");g.querySelectorAll("[data-g]").forEach(b=>b.onclick=()=>{const x=b.dataset.g;state.taste.genres=state.taste.genres.includes(x)?state.taste.genres.filter(v=>v!==x):[...state.taste.genres,x];b.classList.toggle("on")});mo.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{const x=b.dataset.m;state.taste.moods=state.taste.moods.includes(x)?state.taste.moods.filter(v=>v!==x):[...state.taste.moods,x];b.classList.toggle("on")});document.querySelector("#tasteArtists").value=state.taste.artists||"";document.querySelector("#tasteNow").value=state.taste.now||"";m.classList.add("open")} document.querySelector("#tasteBtn").onclick=openTaste; document.querySelector("#tasteCancel").onclick=()=>document.querySelector("#tasteModal").classList.remove("open"); document.querySelector("#tasteSave").onclick=()=>{state.taste.artists=document.querySelector("#tasteArtists").value.trim();state.taste.now=document.querySelector("#tasteNow").value.trim();save();document.querySelector("#tasteModal").classList.remove("open");toast("Вкус сохранён ✨");render("home")}; async function home(){
  tracks=demos;
@@ -116,19 +131,37 @@ function library(){
  ps.querySelectorAll("[data-pl]").forEach(b=>b.onclick=()=>openPlaylist(b.dataset.pl));ps.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{state.playlists=state.playlists.filter(p=>p.id!==b.dataset.del);save();library();toast("Плейлист удалён")});
 }
 function openPlaylist(id){const p=state.playlists.find(x=>x.id===id);if(!p)return;tracks=p.tracks;view.innerHTML='<div class="section"><h2>'+esc(p.name)+'</h2><small>'+p.tracks.length+' треков</small></div><div class="results">'+(p.tracks.length?p.tracks.map(result).join(""):'<div class="empty">Добавляй треки из поиска.</div>')+'</div>';bind()}
-function like(t){if(!t)return;const i=state.liked.findIndex(x=>x.id===t.id);if(i>=0){state.liked.splice(i,1);toast("Убрано из любимого")}else{state.liked.unshift(t);toast("♥ Добавлено в любимое")}save();render(document.querySelector(".nav button.active").dataset.view)}
+function like(t){if(!t)return;const i=state.liked.findIndex(x=>x.id===t.id);if(i>=0){state.liked.splice(i,1);toast("Убрано из любимого")}else{state.liked.unshift(t);toast("♥ Добавлено в любимое")}save();const active=document.querySelector(".nav button.active");render(active?.dataset.view||"home")}
+function playableAudio(src){
+ const raw=String(src||"").trim();
+ if(!raw)return "";
+ try{
+  const u=new URL(raw,location.href);
+  if(u.origin===location.origin)return u.href;
+  const h=u.hostname.toLowerCase();
+  if(h==="jamendo.com"||h.endsWith(".jamendo.com")||h==="storage.jamendo.com"||h.endsWith(".storage.jamendo.com")||h==="soundhelix.com"||h.endsWith(".soundhelix.com")){
+   return location.origin+"/api/audio?url="+encodeURIComponent(u.href);
+  }
+  return u.href;
+ }catch{return raw}
+}
 function play(t){
  if(!t)return;
+ if(current?.id===t.id&&!t.youtubeId&&playing){audio.pause();return}
  current=t;
- if(t.youtubeId){
-   audio.pause();
-   playing=true;
-   drawPlayer();
-   return;
+ playing=false;
+ audio.pause();
+ drawPlayer();
+ if(t.youtubeId)return;
+ const src=playableAudio(t.audio||t.src);
+ if(!src){toast("У этого трека нет прямого воспроизведения");return}
+ audio.src=src;
+ audio.load();
+ const p=audio.play();
+ if(p&&typeof p.then==="function"){
+  p.then(()=>{if(current?.id===t.id){playing=true;updateMediaSession();drawPlayer()}})
+   .catch(error=>{console.warn("Ok Music playback:",error);if(current?.id===t.id)toast("Не удалось запустить аудио")});
  }
- if(!(t.audio||t.src)){toast("У этого трека нет прямого воспроизведения");return}
- audio.src=t.audio||t.src;
- audio.play().then(()=>{playing=true;updateMediaSession();drawPlayer()}).catch(()=>toast("Браузер не разрешил воспроизведение"))
 }
 function updateMediaSession(){
  if(!("mediaSession" in navigator)||!current||current.youtubeId)return;
@@ -149,7 +182,7 @@ function drawPlayer(){if(!current){playerEl.className="player";return}
  if(current.youtubeId){
    const ytOrigin=location.origin;
    const ytReferrer=location.href.split("#")[0];
-   const ytUrl="https://www.youtube.com/embed/"+encodeURIComponent(current.youtubeId)+"?autoplay=1&playsinline=1&enablejsapi=1&origin="+encodeURIComponent(ytOrigin)+"&widget_referrer="+encodeURIComponent(ytReferrer)+"&rel=0";
+   const ytUrl="https://www.youtube-nocookie.com/embed/"+encodeURIComponent(current.youtubeId)+"?autoplay=1&playsinline=1&controls=1&enablejsapi=1&origin="+encodeURIComponent(ytOrigin)+"&widget_referrer="+encodeURIComponent(ytReferrer)+"&rel=0&modestbranding=1";
    playerEl.innerHTML='<div class="yt-frame"><iframe id="ytFrame" title="YouTube Music" src="'+ytUrl+'" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div><div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+' · YouTube Music</span><small id="ytStatus" style="display:block;color:var(--muted);font-size:10px;margin-top:4px">Загрузка YouTube…</small></div><div class="pc"><button id="closeYT" class="big">■</button></div>';
    document.querySelector("#closeYT").onclick=()=>{current=null;playing=false;playerEl.className="player";};
    const ytStatus=document.querySelector("#ytStatus");
@@ -168,7 +201,7 @@ function drawPlayer(){if(!current){playerEl.className="player";return}
    return;
  }
  playerEl.innerHTML='<div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>';
- document.querySelector("#pause").onclick=()=>{if(playing){audio.pause();playing=false}else{audio.play();playing=true}drawPlayer()};document.querySelector("#seek").oninput=e=>{if(audio.duration)audio.currentTime=audio.duration*e.target.value/100}
+ document.querySelector("#pause").onclick=()=>{if(playing){audio.pause();playing=false;drawPlayer();return}const p=audio.play();if(p&&typeof p.then==="function")p.then(()=>{playing=true;drawPlayer()}).catch(()=>toast("Не удалось запустить аудио"))};document.querySelector("#seek").oninput=e=>{if(audio.duration)audio.currentTime=audio.duration*e.target.value/100}
 }
 
 window.addEventListener("message",e=>{
@@ -188,7 +221,9 @@ window.addEventListener("message",e=>{
  }
 });
 audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
-audio.onplay=()=>{playing=true;if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer()};audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer()};audio.onended=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()};audio.onerror=()=>{toast("Не удалось загрузить аудио");playing=false;drawPlayer()}
+audio.onloadedmetadata=()=>{if(current)drawPlayer()};
+audio.oncanplay=()=>{if(current&&playing)drawPlayer()};
+audio.onplay=()=>{playing=true;if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer()};audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";if(current&&!current.youtubeId)drawPlayer()};audio.onended=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()};audio.onerror=()=>{console.warn("Ok Music audio error",audio.error);playing=false;drawPlayer();toast("Не удалось загрузить аудио")}
 document.querySelector("#closeModal").onclick=()=>modal.classList.remove("open");modal.onclick=e=>{if(e.target===modal)modal.classList.remove("open")};
 document.querySelector("#createPlaylist").onclick=()=>{const name=document.querySelector("#playlistName").value.trim();if(!name)return toast("Введи название");state.playlists.unshift({id:"pl-"+Date.now(),name,tracks:[]});save();document.querySelector("#playlistName").value="";modal.classList.remove("open");library();toast("Плейлист создан ✨")}
 function render(name){document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));({home,mood,search:searchView,library}[name]||home)()}
