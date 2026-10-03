@@ -5,7 +5,7 @@ export function renderApp(request, env) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#06100d"><meta name="referrer" content="strict-origin-when-cross-origin"><script defer src="https://telegram.org/js/telegram-web-app.js?63"></script>
+<meta name="theme-color" content="#06100d"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><link rel="manifest" href="/manifest.webmanifest"><meta name="referrer" content="strict-origin-when-cross-origin"><script defer src="https://telegram.org/js/telegram-web-app.js?63"></script>
 <title>${appName}</title>
 <style>@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
 :root{color-scheme:dark;font-family:Manrope,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--bg:#06100d;--text:#f5fff9;--muted:#94a99f;--line:rgba(189,255,224,.12);--a:#78f0b5;--b:#ffb45c;--c:#ff7183;--card:rgba(10,24,18,.76);--shadow:0 28px 90px rgba(0,0,0,.48)}
