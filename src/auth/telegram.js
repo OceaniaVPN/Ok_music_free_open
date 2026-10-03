@@ -42,7 +42,7 @@ async function verifyTelegramPayload(data,botToken){
   const key=await crypto.subtle.importKey("raw",secret,{name:"HMAC",hash:"SHA-256"},false,["sign"]);
   const expected=new Uint8Array(await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(check)));
   const actual=fromBase64url(received.replace(/[^A-Za-z0-9_-]/g,""));
-  // Telegram Login Widget returns a hexadecimal HMAC.
+  // Telegram LoginUrl returns a hexadecimal HMAC.
   const hex=Array.from(expected,b=>b.toString(16).padStart(2,"0")).join("");
   const hexBytes=new TextEncoder().encode(hex);
   const receivedHex=new TextEncoder().encode(received.toLowerCase());
@@ -69,6 +69,7 @@ async function readSession(request,botToken){
   const [payload,sig]=token.split(".");
   if(!payload||!sig)return null;
   const expected=await hmac(botToken,payload);
+  const actual=fromBase64url(sig);
   if(!constantTimeEqual(expected,actual))return null;
   try{
     const data=JSON.parse(new TextDecoder().decode(fromBase64url(payload)));
