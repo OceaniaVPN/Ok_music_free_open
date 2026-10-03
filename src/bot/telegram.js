@@ -1,4 +1,4 @@
-import { activateTelegramChallenge, createTelegramChallenge, getActiveTelegramChallenge } from "../auth/telegram.js";
+import { activateTelegramChallenge, checkTelegramCodeCooldown, createTelegramChallenge, getActiveTelegramChallenge } from "../auth/telegram.js";
 
 async function sendTelegram(env,chatId,text,reply_markup){
 
@@ -33,10 +33,16 @@ export async function handleTelegramWebhook(request,env){
         : "❌ Запрос авторизации истёк. Вернись на сайт и нажми «Получить код в Telegram» ещё раз.");
       return Response.json({ok:true});
     }
-    if(/^\/code(?:@[^\\s]+)?(?:\\s|$)/i.test(text)){
+    if(/^\/code(?:@[^\s]+)?(?:\s|$)/i.test(text)){
       const challenge=await getActiveTelegramChallenge(env,id);
       if(!challenge){
-        await sendTelegram(env,id,"❌ Активного запроса авторизации нет. Сначала открой сайт и нажми «Получить код в Telegram».");
+        await sendTelegram(env,id,"❌ Сначала открой Ok Music в браузере и нажми «Получить код в Telegram».");
+        return Response.json({ok:true});
+      }
+      const limit=await checkTelegramCodeCooldown(env,id);
+      if(!limit.allowed){
+        const minutes=Math.ceil(Number(limit.wait||0)/60);
+        await sendTelegram(env,id,"⏳ Новый код можно получить через "+minutes+" мин.");
         return Response.json({ok:true});
       }
       const user=update.message.from;
@@ -48,8 +54,8 @@ export async function handleTelegramWebhook(request,env){
         photo_url:""
       },id);
       await sendTelegram(env,id,code
-        ? "🔐 Код входа в Ok Music\n\n"+code+"\n\nВведи этот код на сайте. Код одноразовый и действует 5 минут."
-        : "❌ Запрос авторизации истёк. Вернись на сайт и нажми «Получить код в Telegram» ещё раз.");
+        ? "🔐 Код входа в Ok Music\n\n"+code+"\n\nВведи его на сайте. Код одноразовый и действует 5 минут."
+        : "❌ Запрос авторизации истёк. Открой сайт и создай новый запрос.");
       return Response.json({ok:true});
     }
     if(/^\/start(?:@[^\s]+)?(?:\s|$)/i.test(text)||/^\/app(?:@[^\s]+)?(?:\s|$)/i.test(text)){
