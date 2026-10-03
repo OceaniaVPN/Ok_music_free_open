@@ -3,7 +3,6 @@ import { handleMegaLocalMusic } from "./api/mega-local.js";
 import { handleApi } from "./api/index.js";
 import { handleTelegramWebhook } from "./bot/telegram.js";
 import { renderApp } from "./web/app.js";
-import { handleAuth } from "./auth/telegram.js";
 
 const MEGA_RUNTIME=String.raw`<script>
 window.__megaMetaReady=null;
@@ -169,72 +168,6 @@ HTMLMediaElement.prototype.play=function(){
 
 
 // Legacy class kept exported so the already-provisioned namespace remains intact.
-export class AuthCodes extends DurableObject {
-  async fetch(){ return new Response("AuthCodes legacy namespace",{status:404}); }
-}
-
-export class AuthCodesV2 extends DurableObject {
-  constructor(ctx,env){super(ctx,env);this.ctx=ctx}
-  async fetch(request){
-    const url=new URL(request.url);
-    let body={}; try{body=await request.json()}catch{}
-    const ttl=Number(body.ttl)||300;
-    const get=key=>this.ctx.storage.get(key);
-    const put=(key,value)=>this.ctx.storage.put(key,value,{expiration:Date.now()+ttl*1000});
-
-    if(request.method==="POST"&&url.pathname==="/challenge"){
-      if(!body.challenge)return Response.json({ok:false},{status:400});
-      await put("challenge:"+String(body.challenge),{created:Date.now()});
-      return Response.json({ok:true});
-    }
-    if(request.method==="POST"&&url.pathname==="/activate"){
-      const challenge=String(body.challenge||""),chatId=String(body.chatId||"");
-      const ch=challenge?await get("challenge:"+challenge):true;
-      if(!ch||!chatId)return Response.json({ok:false},{status:400});
-      await put("chat:"+chatId,{challenge});
-      return Response.json({ok:true});
-    }
-    if(request.method==="POST"&&url.pathname==="/active"){
-      const chatId=String(body.chatId||"");
-      const record=await get("chat:"+chatId);
-      return Response.json({ok:true,challenge:record?.challenge||""});
-    }
-    if(request.method==="POST"&&url.pathname==="/code-cooldown"){
-      const chatId=String(body.chatId||"");
-      if(!chatId)return Response.json({ok:false},{status:400});
-      const key="code-cooldown:"+chatId;
-      const now=Date.now();
-      const last=Number(await get(key)||0);
-      const wait=Math.max(0,1800-Math.floor((now-last)/1000));
-      if(wait>0)return Response.json({ok:true,allowed:false,wait});
-      await put(key,now);
-      return Response.json({ok:true,allowed:true,wait:0});
-    }
-    if(request.method==="POST"&&url.pathname==="/bind"){
-      const challenge=String(body.challenge||"");
-      const ch=challenge?await get("challenge:"+challenge):true;
-      if(!ch||!body.code||!body.user?.id)return Response.json({ok:false},{status:400});
-      await put("code:"+String(body.code),{
-        challenge,
-        user:body.user,
-        chatId:String(body.chatId||"")
-      });
-      return Response.json({ok:true});
-    }
-    if(request.method==="POST"&&url.pathname==="/consume"){
-      const code=String(body.code||"");
-      const record=await get("code:"+code);
-      if(!record||(record.challenge&&record.challenge!==String(body.challenge||""))){
-        return Response.json({ok:false,error:"Код неверный или уже использован"},{status:401});
-      }
-      await this.ctx.storage.delete("code:"+code);
-      if(record.challenge)await this.ctx.storage.delete("challenge:"+record.challenge);
-      if(record.chatId)await this.ctx.storage.delete("chat:"+record.chatId);
-      return Response.json({ok:true,user:record.user});
-    }
-    return Response.json({ok:false},{status:404});
-  }
-}
 
 export default {
   async fetch(request,env,ctx) {
