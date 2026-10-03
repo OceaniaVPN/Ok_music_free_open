@@ -1,4 +1,3 @@
-import { FON_IMAGES } from "../fon.js";
 export function renderApp(request, env) {
   const appName = env.APP_NAME || "Ok Music";
   const html = String.raw`<!doctype html>
@@ -6,8 +5,7 @@ export function renderApp(request, env) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#06100d"><meta name="referrer" content="strict-origin-when-cross-origin"><meta name="telegram-bot" content="${String(env.TELEGRAM_BOT_USERNAME||"").replace(/"/g,"&quot;")}"><script defer src="https://telegram.org/js/telegram-web-app.js?63"></script>
-<title>${appName}</title>
+<meta name="theme-color" content="#06100d"><meta name="referrer" content="strict-origin-when-cross-origin"><title>${appName}</title>
 <style>
 :root{
  color-scheme:dark;
@@ -219,7 +217,7 @@ img{max-width:100%}
 html,body,.app,.top,.hero,.card,.wave-card,.taste-panel,.track-profile,.result,.playlist,.player,.nav,.dialog,.mood-card,.offline-panel,.input,.logo,.primary,.nav button.active,.home-play{transition:background-color .65s ease,background .65s ease,border-color .65s ease,color .65s ease,box-shadow .65s ease,filter .65s ease}
 </style></head>
 <body><script>document.documentElement.dataset.telegramBot="${String(env.TELEGRAM_BOT_USERNAME||"").replace(/"/g,"&quot;")}";</script>
-<div id="authGate" class="modal open" style="z-index:500"><div class="dialog" style="text-align:center"><div style="font-size:38px;margin-bottom:10px">🎵</div><h3>Вход в Ok Music</h3><p>Введи одноразовый код, который бот выдаст по команде <b>/code</b>.</p><button id="getTelegramCode" class="primary" style="width:100%;margin:12px 0">📩 Открыть Telegram</button><div style="display:flex;gap:8px;margin-top:12px"><input id="telegramCode" class="input" inputmode="numeric" maxlength="6" placeholder="6-значный код" style="text-align:center;letter-spacing:5px;flex:1"><button id="verifyTelegramCode" class="primary">Войти</button></div><div id="authStatus" style="font-size:10px;color:var(--muted);margin-top:10px">Создаю запрос авторизации…</div></div></div><div class="app">
+<div class="app">
   <header class="top"><div class="brand"><div class="logo">♫</div><div><h1>Ok Music</h1><span>Твоя музыка. Твоё настроение.</span></div></div><div class="top-tools"><label class="bg-toggle" title="Переключить фото-фон">ипучка нажми <input id="bgToggle" type="checkbox" aria-label="ипучка нажми"></label><button class="avatar" id="tasteBtn" title="Мой музыкальный вкус">✦</button></div></header>
   <main id="view"></main>
 </div>
@@ -664,25 +662,7 @@ async function browserAuth(){
  if(status)status.textContent="Открой Telegram, отправь боту /code и введи полученный код.";
 }
 
-(async function(){
- const gate=document.getElementById("authGate"),get=document.getElementById("getTelegramCode"),input=document.getElementById("telegramCode"),verify=document.getElementById("verifyTelegramCode"),status=document.getElementById("authStatus");
- if(!gate)return;
- try{const r=await fetch("/api/auth/me",{credentials:"same-origin",cache:"no-store"});const d=await r.json();if(d.authenticated){gate.remove();render("home");return}}catch{}
- const botName=String(document.querySelector('meta[name="telegram-bot"]')?.content||"").replace(/^@/,"");
- const botUrl=botName?"https://t.me/"+botName:"";
- status.textContent="В Telegram отправь боту /code, затем введи полученный 6-значный код.";
- get.onclick=()=>{if(botUrl)window.open(botUrl,"_blank","noopener,noreferrer")};
- verify.onclick=async()=>{
-  const code=(input.value||"").replace(/\D/g,"");
-  if(code.length!==6)return status.textContent="Нужно 6 цифр.";
-  verify.disabled=true;status.textContent="Проверяю…";
-  try{
-   const r=await fetch("/api/auth/verify",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({code})});
-   const d=await r.json();if(!r.ok||!d.ok)throw Error(d.error||"Код неверный или уже использован");
-   gate.remove();location.reload();
-  }catch(e){status.textContent=e.message||"Ошибка";verify.disabled=false}
- };
-})();</script>
+</script>
 </body></html>`;
   return new Response(html,{headers:{"content-type":"text/html; charset=utf-8","Referrer-Policy":"origin"}});
 }
