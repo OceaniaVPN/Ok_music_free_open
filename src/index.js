@@ -168,12 +168,18 @@ HTMLMediaElement.prototype.play=function(){
 </script>`;
 
 
+// Legacy class kept exported so the already-provisioned namespace remains intact.
 export class AuthCodes extends DurableObject {
+  async fetch(){
+    return new Response("AuthCodes legacy namespace", {status:404});
+  }
+}
+
+// New SQLite-backed namespace for browser one-time authentication.
+export class AuthCodesV2 extends DurableObject {
   constructor(ctx,env){super(ctx,env);this.ctx=ctx}
   async fetch(request){
     const url=new URL(request.url);
-    const authResponse=await handleAuth(request,env);
-    if(authResponse)return authResponse;
     let body={};
     try{body=await request.json()}catch{}
     const now=Math.floor(Date.now()/1000);
@@ -206,6 +212,9 @@ export class AuthCodes extends DurableObject {
 export default {
   async fetch(request,env,ctx) {
     const url=new URL(request.url);
+
+    const authResponse=await handleAuth(request,env);
+    if(authResponse)return authResponse;
 
     if (url.pathname==="/api/local-music") return handleMegaLocalMusic(request,env,ctx);
     if (url.pathname.startsWith("/api/")) return handleApi(request,env);
