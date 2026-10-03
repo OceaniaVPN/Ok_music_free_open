@@ -92,6 +92,12 @@ export async function getActiveTelegramChallenge(env,chatId){
   const d=await r.json().catch(()=>({}));
   return String(d.challenge||"");
 }
+export async function checkTelegramCodeCooldown(env,chatId){
+  if(chatId===null)return {allowed:false,wait:0};
+  const r=await doCall(env,"/code-cooldown",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({chatId:String(chatId),ttl:1800})});
+  if(!r.ok)return {allowed:false,wait:0,error:true};
+  return r.json().catch(()=>({allowed:false,wait:0,error:true}));
+}
 export async function createTelegramChallenge(env,challenge,user,chatId=""){
 
   if(!challenge||!user?.id)return false;
