@@ -184,7 +184,6 @@ function drawPlayer(){if(!current){playerEl.className="player";return}
  document.querySelector("#pause").onclick=()=>{if(playing){audio.pause();playing=false;drawPlayer();return}const p=audio.play();if(p&&typeof p.then==="function")p.then(()=>{playing=true;drawPlayer()}).catch(()=>toast("Не удалось запустить аудио"))};document.querySelector("#seek").oninput=e=>{if(audio.duration)audio.currentTime=audio.duration*e.target.value/100}
 }
 
-window.addEventListener("message",e=>{
  audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
 audio.onloadedmetadata=()=>{if(current)drawPlayer()};
 audio.oncanplay=()=>{if(current&&playing)drawPlayer()};
