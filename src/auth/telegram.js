@@ -37,7 +37,6 @@ async function verifyTelegramPayload(data,botToken){
   const received=String(input.hash||"");
   delete input.hash;
   delete input.signature;
-  delete input.photo_url;
   const check=Object.keys(input).sort().map(k=>k+"="+String(input[k]??"")).join("\n");
   const secret=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(botToken));
   const key=await crypto.subtle.importKey("raw",secret,{name:"HMAC",hash:"SHA-256"},false,["sign"]);
