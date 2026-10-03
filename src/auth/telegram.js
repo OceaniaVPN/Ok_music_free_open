@@ -1,132 +1,88 @@
 const COOKIE="okmusic_session";
-const MAX_AGE=60*60*24*30;
+const SESSION_AGE=60*60*24*30;
+const CODE_TTL=5*60;
 
-function base64url(bytes){
-  let s="";
-  for(const b of bytes)s+=String.fromCharCode(b);
+function cookie(token,maxAge=SESSION_AGE){
+  return COOKIE+"="+encodeURIComponent(token)+"; Path=/; Max-Age="+maxAge+"; HttpOnly; Secure; SameSite=Lax";
+}
+function b64(bytes){
+  let s=""; for(const b of bytes)s+=String.fromCharCode(b);
   return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
-function base64urlText(text){
-  return base64url(new TextEncoder().encode(text));
+function unb64(s){
+  s=String(s||"").replace(/-/g,"+").replace(/_/g,"/");
+  s+="=".repeat((4-s.length%4)%4);
+  const r=atob(s),o=new Uint8Array(r.length);
+  for(let i=0;i<r.length;i++)o[i]=r.charCodeAt(i);
+  return o;
 }
-function fromBase64url(text){
-  const s=String(text||"").replace(/-/g,"+").replace(/_/g,"/");
-  const pad="=".repeat((4-s.length%4)%4);
-  const raw=atob(s+pad),out=new Uint8Array(raw.length);
-  for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);
-  return out;
+async function sign(data,key){
+  const k=await crypto.subtle.importKey("raw",new TextEncoder().encode(key),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
+  return new Uint8Array(await crypto.subtle.sign("HMAC",k,new TextEncoder().encode(data)));
 }
-async function hmac(keyText,data){
-  const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(keyText),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
-  return new Uint8Array(await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(data)));
+function randomToken(bytes=18){
+  const a=new Uint8Array(bytes);crypto.getRandomValues(a);return b64(a);
 }
-function constantTimeEqual(a,b){
-  if(a.length!==b.length)return false;
-  let x=0;
-  for(let i=0;i<a.length;i++)x|=a[i]^b[i];
-  return x===0;
+async function session(user,secret){
+  const payload=b64(new TextEncoder().encode(JSON.stringify({u:user,t:Math.floor(Date.now()/1000)})));
+  return payload+"."+b64(await sign(payload,secret));
 }
-function cookieValue(request){
-  const raw=request.headers.get("Cookie")||"";
-  const hit=raw.split(";").map(x=>x.trim()).find(x=>x.startsWith(COOKIE+"="));
+function getCookie(request){
+  const hit=(request.headers.get("Cookie")||"").split(";").map(x=>x.trim()).find(x=>x.startsWith(COOKIE+"="));
   return hit?decodeURIComponent(hit.slice(COOKIE.length+1)):"";
 }
-async function verifyTelegramPayload(data,botToken){
-  if(!botToken)throw Error("Telegram bot token is not configured");
-  const input={...data};
-  const received=String(input.hash||"");
-  delete input.hash;
-  delete input.signature;
-  const check=Object.keys(input).sort().map(k=>k+"="+String(input[k]??"")).join("\n");
-  const secret=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(botToken));
-  const key=await crypto.subtle.importKey("raw",secret,{name:"HMAC",hash:"SHA-256"},false,["sign"]);
-  const expected=new Uint8Array(await crypto.subtle.sign("HMAC",key,new TextEncoder().encode(check)));
-  const actual=fromBase64url(received.replace(/[^A-Za-z0-9_-]/g,""));
-  // Telegram LoginUrl returns a hexadecimal HMAC.
-  const hex=Array.from(expected,b=>b.toString(16).padStart(2,"0")).join("");
-  const hexBytes=new TextEncoder().encode(hex);
-  const receivedHex=new TextEncoder().encode(received.toLowerCase());
-  if(hexBytes.length!==receivedHex.length||!constantTimeEqual(hexBytes,receivedHex))return null;
-  const authDate=Number(data.auth_date||0);
-  if(!authDate||Math.abs(Date.now()/1000-authDate)>86400)return null;
-  if(!data.id)return null;
-  return {
-    id:String(data.id),
-    first_name:String(data.first_name||""),
-    last_name:String(data.last_name||""),
-    username:String(data.username||""),
-    photo_url:String(data.photo_url||"")
-  };
-}
-async function makeSession(user,botToken){
-  const payload=base64urlText(JSON.stringify({u:user,t:Math.floor(Date.now()/1000)}));
-  const sig=base64url(await hmac(botToken,payload));
-  return payload+"."+sig;
-}
-async function readSession(request,botToken){
-  if(!botToken)return null;
-  const token=cookieValue(request);
-  const [payload,sig]=token.split(".");
-  if(!payload||!sig)return null;
-  const expected=await hmac(botToken,payload);
-  const actual=fromBase64url(sig);
-  if(!constantTimeEqual(expected,actual))return null;
+async function readSession(request,secret){
+  if(!secret)return null;
+  const token=getCookie(request),parts=token.split(".");
+  if(parts.length!==2)return null;
+  const expected=await sign(parts[0],secret);
+  const actual=unb64(parts[1]);
+  if(expected.length!==actual.length||!expected.every((v,i)=>v===actual[i]))return null;
   try{
-    const data=JSON.parse(new TextDecoder().decode(fromBase64url(payload)));
-    if(!data?.u||Date.now()/1000-Number(data.t||0)>MAX_AGE)return null;
-    return data.u;
+    const d=JSON.parse(new TextDecoder().decode(unb64(parts[0])));
+    if(!d?.u||Date.now()/1000-Number(d.t||0)>SESSION_AGE)return null;
+    return d.u;
   }catch{return null}
 }
-function cookie(token,maxAge=MAX_AGE){
-  return COOKIE+"="+encodeURIComponent(token)+"; Path=/; Max-Age="+maxAge+"; HttpOnly; Secure; SameSite=Lax";
+async function doCall(env,path,options={}){
+  if(!env.AUTH_CODES)return new Response("AuthCodes binding is not configured",{status:503});
+  const id=env.AUTH_CODES.idFromName("global");
+  return env.AUTH_CODES.get(id).fetch("https://auth"+path,{...options});
 }
 export async function handleAuth(request,env){
   const url=new URL(request.url);
-  // Telegram LoginUrl appends the signed user fields to the browser URL.
-  if(request.method==="GET" && url.searchParams.has("hash") && url.searchParams.has("id") && url.searchParams.has("auth_date")){
-    try{
-      const data=Object.fromEntries(url.searchParams.entries());
-      const user=await verifyTelegramPayload(data,env.TELEGRAM_BOT_TOKEN);
-      if(user){
-        const session=await makeSession(user,env.TELEGRAM_BOT_TOKEN);
-        const clean=new URL(request.url);
-        for(const key of ["id","first_name","last_name","username","photo_url","auth_date","hash"])clean.searchParams.delete(key);
-        return new Response(null,{status:302,headers:{
-          "location":clean.href,
-          "cache-control":"no-store",
-          "set-cookie":cookie(session)
-        }});
-      }
-    }catch{}
-    const clean=new URL(request.url);
-    for(const key of ["id","first_name","last_name","username","photo_url","auth_date","hash"])clean.searchParams.delete(key);
-    return new Response("Telegram authorization failed",{status:401,headers:{"content-type":"text/plain; charset=utf-8","cache-control":"no-store"}});
+
+  if(url.pathname==="/api/auth/challenge"&&request.method==="POST"){
+    const challenge=randomToken(18);
+    const r=await doCall(env,"/challenge",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({challenge,ttl:CODE_TTL})});
+    if(!r.ok)return Response.json({ok:false,error:"Не удалось создать запрос авторизации"},{status:503});
+    return Response.json({ok:true,challenge,botUrl:"https://t.me/"+String(env.TELEGRAM_BOT_USERNAME||"").replace(/^@/,"")+"?start=auth_"+challenge,expiresIn:CODE_TTL});
   }
+
+  if(url.pathname==="/api/auth/verify"&&request.method==="POST"){
+    try{
+      const body=await request.json(),challenge=String(body.challenge||""),code=String(body.code||"").replace(/\D/g,"");
+      if(!challenge||code.length!==6)return Response.json({ok:false,error:"Нужен 6-значный код"},{status:400});
+      const r=await doCall(env,"/consume",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({challenge,code})});
+      const result=await r.json();
+      if(!result.ok)return Response.json({ok:false,error:result.error||"Код неверный или уже использован"},{status:401});
+      const token=await session(result.user,env.TELEGRAM_BOT_TOKEN);
+      return new Response(JSON.stringify({ok:true,user:result.user}),{status:200,headers:{"content-type":"application/json","cache-control":"no-store","set-cookie":cookie(token)}});
+    }catch(error){return Response.json({ok:false,error:error?.message||"Ошибка авторизации"},{status:400})}
+  }
+
   if(url.pathname==="/api/auth/me"){
     const user=await readSession(request,env.TELEGRAM_BOT_TOKEN);
     return Response.json({ok:true,authenticated:Boolean(user),user:user||null});
   }
   if(url.pathname==="/api/auth/logout"&&request.method==="POST"){
-    return new Response(JSON.stringify({ok:true}),{status:200,headers:{
-      "content-type":"application/json; charset=utf-8",
-      "set-cookie":cookie("",0)
-    }});
-  }
-  if(url.pathname==="/api/auth/telegram"&&request.method==="POST"){
-    try{
-      if(!env.TELEGRAM_BOT_TOKEN)return Response.json({ok:false,error:"TELEGRAM_BOT_TOKEN не настроен"},{status:503});
-      const data=await request.json();
-      const user=await verifyTelegramPayload(data,env.TELEGRAM_BOT_TOKEN);
-      if(!user)return Response.json({ok:false,error:"Неверная или устаревшая авторизация Telegram"},{status:401});
-      const session=await makeSession(user,env.TELEGRAM_BOT_TOKEN);
-      return new Response(JSON.stringify({ok:true,user}),{status:200,headers:{
-        "content-type":"application/json; charset=utf-8",
-        "cache-control":"no-store",
-        "set-cookie":cookie(session)
-      }});
-    }catch(error){
-      return Response.json({ok:false,error:error?.message||"Ошибка авторизации"},{status:400});
-    }
+    return new Response(JSON.stringify({ok:true}),{headers:{"content-type":"application/json","set-cookie":cookie("",0)}});
   }
   return null;
+}
+export async function createTelegramChallenge(env,challenge,user){
+  if(!challenge||!user?.id)return false;
+  const code=String(Math.floor(100000+Math.random()*900000));
+  const r=await doCall(env,"/bind",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({challenge,code,user,ttl:CODE_TTL})});
+  return r.ok?code:false;
 }
