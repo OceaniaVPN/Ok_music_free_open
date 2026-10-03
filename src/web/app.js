@@ -1,3 +1,4 @@
+import { FON_IMAGES } from "../fon.js";
 export function renderApp(request, env) {
   const appName = env.APP_NAME || "Ok Music";
   const html = String.raw`<!doctype html>
@@ -16,7 +17,7 @@ export function renderApp(request, env) {
  --shadow:0 24px 70px rgba(0,0,0,.42)
 }
 *{box-sizing:border-box}
-html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}
+html,html.photo-bg body{background:linear-gradient(rgba(3,10,6,.72),rgba(3,10,6,.82)),var(--photo-bg-url) center/cover fixed no-repeat,var(--bg)}html.photo-bg body:before{opacity:.22}body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-behavior:smooth}
 body{
  font-family:Manrope,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
@@ -44,7 +45,7 @@ button:hover{transform:translateY(-2px);background:rgba(78,228,143,.08);border-c
 button:disabled{opacity:.5;cursor:wait;transform:none}
 img{max-width:100%}
 .app{width:min(1180px,100%);margin:0 auto;padding:20px 20px 220px}
-.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:3px 0 22px;padding-bottom:15px;border-bottom:1px solid rgba(166,255,205,.08)}
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:3px 0 22px;padding-bottom:15px;border-bottom:1px solid rgba(166,255,205,.08)}.top-tools{display:flex;align-items:center;gap:9px}.bg-toggle{display:flex;align-items:center;gap:7px;padding:7px 9px;border-radius:14px;background:rgba(5,17,10,.62);backdrop-filter:blur(12px);font-size:9px;color:var(--muted);white-space:nowrap}.bg-toggle input{width:36px;height:18px;margin:0;accent-color:var(--green)}
 .brand{display:flex;align-items:center;gap:13px;min-width:0}
 .logo{
  width:52px;height:52px;display:grid;place-items:center;border-radius:17px;
@@ -219,7 +220,7 @@ html,body,.app,.top,.hero,.card,.wave-card,.taste-panel,.track-profile,.result,.
 </style></head>
 <body><script>document.documentElement.dataset.telegramBot="${String(env.TELEGRAM_BOT_USERNAME||"").replace(/"/g,"&quot;")}";</script>
 <div id="authGate" class="modal open" style="z-index:500"><div class="dialog" style="text-align:center"><div style="font-size:38px;margin-bottom:10px">🎵</div><h3>Вход в Ok Music</h3><p>Введи одноразовый код, который бот выдаст по команде <b>/code</b>.</p><button id="getTelegramCode" class="primary" style="width:100%;margin:12px 0">📩 Открыть Telegram</button><div style="display:flex;gap:8px;margin-top:12px"><input id="telegramCode" class="input" inputmode="numeric" maxlength="6" placeholder="6-значный код" style="text-align:center;letter-spacing:5px;flex:1"><button id="verifyTelegramCode" class="primary">Войти</button></div><div id="authStatus" style="font-size:10px;color:var(--muted);margin-top:10px">Создаю запрос авторизации…</div></div></div><div class="app">
-  <header class="top"><div class="brand"><div class="logo">♫</div><div><h1>Ok Music</h1><span>Твоя музыка. Твоё настроение.</span></div></div><button class="avatar" id="tasteBtn" title="Мой музыкальный вкус">✦</button></header>
+  <header class="top"><div class="brand"><div class="logo">♫</div><div><h1>Ok Music</h1><span>Твоя музыка. Твоё настроение.</span></div></div><div class="top-tools"><label class="bg-toggle" title="Переключить фото-фон">ипучка нажми <input id="bgToggle" type="checkbox" aria-label="ипучка нажми"></label><button class="avatar" id="tasteBtn" title="Мой музыкальный вкус">✦</button></div></header>
   <main id="view"></main>
 </div>
 <div id="player" class="player"></div>
@@ -228,7 +229,7 @@ html,body,.app,.top,.hero,.card,.wave-card,.taste-panel,.track-profile,.result,.
 <div id="toast" class="toast"></div><div id="tasteModal" class="modal"><div class="dialog"><h3>🎧 Мой музыкальный вкус</h3><p>Выбери любимые направления и настроение — Ok Music будет учитывать их в каждом миксе.</p><div class="taste-grid"><div class="taste-field"><label>Любимые жанры</label><div id="genreChips" class="chips"></div></div><div class="taste-field"><label>Настроение</label><div id="moodChips" class="chips"></div></div></div><div style="margin-top:14px"><label style="display:block;font-size:11px;color:var(--muted);margin-bottom:7px">Любимые исполнители</label><input id="tasteArtists" class="input" placeholder="Например: Miyagi, The Weeknd, Кино"></div><div style="margin-top:14px"><label style="display:block;font-size:11px;color:var(--muted);margin-bottom:7px">Что хочется сейчас</label><input id="tasteNow" class="input" placeholder="Например: спокойный русский рэп для дороги"></div><div class="taste-actions"><button id="tasteCancel">Отмена</button><button id="tasteSave" class="primary" style="flex:1">Сохранить вкус ✨</button></div></div></div>
 <script>
 const view=document.querySelector("#view"), playerEl=document.querySelector("#player"), modal=document.querySelector("#modal"), toastEl=document.querySelector("#toast");
-const KEY="okmusic:v2";
+const KEY="okmusic:v2";\nconst bgToggle=document.querySelector("#bgToggle");if(bgToggle){try{const bg=JSON.parse(localStorage.getItem(BG_KEY)||"null");bgToggle.checked=Boolean(bg?.on&&FON_IMAGES.length)}catch{}bgToggle.onchange=()=>applyPhotoBackground(bgToggle.checked,bgIndex);}\n
 let state;
 try{state=JSON.parse(localStorage.getItem(KEY)||"{}")}catch{state={}}
 state=state&&typeof state==="object"?state:{};
@@ -251,7 +252,7 @@ function applyMusicTheme(id){
  try{localStorage.setItem("okmusic:theme",t.id)}catch{}
  try{if(window.Telegram?.WebApp){window.Telegram.WebApp.setHeaderColor(t.telegram);window.Telegram.WebApp.setBackgroundColor(t.telegram)}}catch{}
 }
-try{applyMusicTheme(localStorage.getItem("okmusic:theme")||"default")}catch{applyMusicTheme("default")}
+try{applyMusicTheme(localStorage.getItem("okmusic:theme")||"default")}catch{applyMusicTheme("default")}\nconst BG_KEY="okmusic:bg";\nlet bgIndex=0;\nfunction applyPhotoBackground(enabled,index=0){const on=Boolean(enabled)&&FON_IMAGES.length>0;const safe=on?Math.max(0,Math.min(FON_IMAGES.length-1,Number(index)||0)):0;bgIndex=safe;document.documentElement.classList.toggle("photo-bg",on);if(on)document.documentElement.style.setProperty("--photo-bg-url",'url("'+FON_IMAGES[safe]+'")');else document.documentElement.style.removeProperty("--photo-bg-url");try{localStorage.setItem(BG_KEY,JSON.stringify({on,index:safe}))}catch{}}\ntry{const bg=JSON.parse(localStorage.getItem(BG_KEY)||"null");if(bg?.on&&FON_IMAGES.length)applyPhotoBackground(true,bg.index||0)}catch{}\n
 const AUDIO_KEY="okmusic:audio";
 const eqBands=["60","250","1K","4K","12K"];
 let audioFx={eq:[0,0,0,0,0]};
