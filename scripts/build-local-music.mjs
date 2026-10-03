@@ -76,8 +76,7 @@ async function main(){
   fs.mkdirSync(publicFon,{recursive:true});
   const fonFiles=walk(fonDir).filter(f=>imageExt.includes(path.extname(f).toLowerCase()));
   for(const file of fonFiles){const rel=path.relative(fonDir,file);const out=path.join(publicFon,rel);fs.mkdirSync(path.dirname(out),{recursive:true});fs.copyFileSync(file,out);}
-  fs.writeFileSync(fonGenerated,"export const FON_IMAGES = "+JSON.stringify(fonFiles.map(f=>"/fon/"+encPath(path.relative(fonDir,f))))+";\
-");
+  fs.writeFileSync(fonGenerated, `export const FON_IMAGES = ${JSON.stringify(fonFiles.map(f=>"/fon/"+encPath(path.relative(fonDir,f))))};\n`);
   const files=walk(musicDir).filter(f=>audioExt.has(path.extname(f).toLowerCase()));
   for(const file of files){
     const rel=path.relative(musicDir,file);
@@ -113,8 +112,7 @@ async function main(){
     });
   }
   tracks.sort((a,b)=>a.title.localeCompare(b.title,"ru"));
-  fs.writeFileSync(generated,"export const LOCAL_MUSIC = "+JSON.stringify(tracks,null,2)+";
-");
+  fs.writeFileSync(generated, `export const LOCAL_MUSIC = ${JSON.stringify(tracks,null,2)};\n`);
   console.log("🔐 Ключник: "+tracks.length+" tracks, embedded covers extracted");
 }
 await main();
