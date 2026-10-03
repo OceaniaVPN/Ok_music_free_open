@@ -665,7 +665,6 @@ async function browserAuth(){
  if(status)status.textContent="Открой нашего Telegram-бота и нажми «Войти и открыть в браузере».";
 }
 
-<script>
 (async function(){
  const gate=document.getElementById("authGate"),get=document.getElementById("getTelegramCode"),input=document.getElementById("telegramCode"),verify=document.getElementById("verifyTelegramCode"),status=document.getElementById("authStatus");
  if(!gate)return;
@@ -693,8 +692,7 @@ async function browserAuth(){
    gate.remove();location.reload();
   }catch(e){status.textContent=e.message||"Ошибка";verify.disabled=false}
  };
-})();
-</script></script>
+})();</script>
 </body></html>`;
   return new Response(html,{headers:{"content-type":"text/html; charset=utf-8","Referrer-Policy":"origin"}});
 }
