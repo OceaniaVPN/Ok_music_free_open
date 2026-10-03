@@ -1,0 +1,30 @@
+name: syntax-check
+on:
+  push:
+    branches: ["fix/repair-deployed-backup-2026-10-03"]
+  pull_request:
+    branches: ["main"]
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check browser script
+        run: |
+          node - <<'NODE'
+          const fs=require("fs");
+          const s=fs.readFileSync("src/web/app.js","utf8");
+          const m=s.match(/<script>([\\s\\S]*?)<\\/script>/);
+          if(!m) throw new Error("embedded script not found");
+          new Function(m[1]);
+          console.log("app.js browser script: OK");
+          NODE
+      - name: Check Worker modules
+        run: |
+          node --check src/index.js
+          node --check src/api/index.js
+          node --check src/api/mega-local.js
+          node --check src/bot/telegram.js
+          echo "Worker modules: OK"
+      - name: Check service worker
+        run: node --check public/sw.js
