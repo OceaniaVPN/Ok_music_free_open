@@ -16,8 +16,8 @@ binding = "ASSETS"
 
 [[durable_objects.bindings]]
 name = "AUTH_CODES"
-class_name = "AuthCodes"
+class_name = "AuthCodesV2"
 
 [[migrations]]
-tag = "auth-codes-v1"
-new_sqlite_classes = ["AuthCodes"]
+tag = "auth-codes-v2"
+new_sqlite_classes = ["AuthCodesV2"]
