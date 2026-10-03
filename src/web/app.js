@@ -655,24 +655,21 @@ if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js",{scope
 
 async function browserAuth(){
  const gate=document.querySelector("#authGate"),status=document.querySelector("#authStatus");
- const inTelegram=Boolean(window.Telegram?.WebApp?.initData);
- if(inTelegram){gate?.classList.remove("open");render("home");return}
  try{
    const r=await fetch("/api/auth/me",{cache:"no-store",credentials:"same-origin"});
    const d=await r.json();
    if(d.authenticated){gate?.classList.remove("open");render("home");return}
  }catch{}
- if(status)status.textContent="Открой нашего Telegram-бота и нажми «Войти и открыть в браузере».";
+ if(status)status.textContent="Открой Telegram, отправь боту /code и введи полученный код.";
 }
 
 (async function(){
  const gate=document.getElementById("authGate"),get=document.getElementById("getTelegramCode"),input=document.getElementById("telegramCode"),verify=document.getElementById("verifyTelegramCode"),status=document.getElementById("authStatus");
  if(!gate)return;
- if(window.Telegram?.WebApp?.initData){gate.remove();return}
  try{const r=await fetch("/api/auth/me",{credentials:"same-origin",cache:"no-store"});const d=await r.json();if(d.authenticated){gate.remove();return}}catch{}
  const botName=String(document.querySelector('meta[name="telegram-bot"]')?.content||"").replace(/^@/,"");
  const botUrl=botName?"https://t.me/"+botName:"";
- status.textContent="Открой Telegram и отправь боту /code. Затем введи полученный код.";
+ status.textContent="В Telegram отправь боту /code, затем введи полученный 6-значный код.";
  get.onclick=()=>{if(botUrl)window.open(botUrl,"_blank","noopener,noreferrer")};
  verify.onclick=async()=>{
   const code=(input.value||"").replace(/\D/g,"");
