@@ -53,7 +53,7 @@ export async function handleTelegramWebhook(request,env){
       return Response.json({ok:true});
     }
     if(/^\/start(?:@[^\s]+)?(?:\s|$)/i.test(text)||/^\/app(?:@[^\s]+)?(?:\s|$)/i.test(text)){
-      const appUrl=String(env.TELEGRAM_WEBAPP_URL||"").replace(/\\/$/,"");
+      const appUrl=String(env.TELEGRAM_WEBAPP_URL||"").replace(/\/$/,"");
       if(appUrl){
         await sendTelegram(env,id,"🎵 Ok Music\n\nОткрывай приложение:",{
           inline_keyboard:[[{text:"🎵 Открыть Ok Music",web_app:{url:appUrl}}]]
