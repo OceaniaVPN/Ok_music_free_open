@@ -259,24 +259,20 @@ function preloadNext(){
  void token;
 }
 function play(t,{fromEnded=false}={}){
- if(!t)return;const idx=findTrackIndex(t);currentIndex=idx;current=t;drawHomeWave();updateMediaSession();if(!(t.audio||t.src)){toast("У этого трека нет прямого воспроизведения");return}
- const src=t.audio||t.src,token=++window.__okPlayToken;
- Promise.resolve(window.__okOfflineResolve?.(t)).then(cached=>{if(token!==window.__okPlayToken||current?.id!==t.id)return;if(window.__okCurrentBlobUrl&&window.__okCurrentBlobUrl!==cached)try{URL.revokeObjectURL(window.__okCurrentBlobUrl)}catch{}window.__okCurrentBlobUrl=cached||"";const target=cached||src;if(audio.src!==new URL(target,location.href).href){audio.src=target;audio.load()}return audio.play()}).then(()=>{if(token===window.__okPlayToken){playing=true;updateMediaSession();drawPlayer();preloadNext()}}).catch(error=>{console.warn("Ok Music playback:",error);toast("Не удалось воспроизвести трек")});
-}
-
  if(!t)return;
- const idx=findTrackIndex(t);
- currentIndex=idx;
- current=t;
- drawHomeWave();
- updateMediaSession();
+ const idx=findTrackIndex(t);currentIndex=idx;current=t;drawHomeWave();updateMediaSession();
  if(!(t.audio||t.src)){toast("У этого трека нет прямого воспроизведения");return}
- const src=t.audio||t.src;
- if(audio.src!==new URL(src,location.href).href){
-   audio.src=src;
-   audio.load();
- }
- audio.play().then(()=>{playing=true;updateMediaSession();drawPlayer();preloadNext()}).catch(()=>toast("Браузер не разрешил воспроизведение"));
+ const src=t.audio||t.src,token=++window.__okPlayToken;
+ Promise.resolve(window.__okOfflineResolve?.(t)).then(cached=>{
+   if(token!==window.__okPlayToken||current?.id!==t.id)return;
+   if(window.__okCurrentBlobUrl&&window.__okCurrentBlobUrl!==cached)try{URL.revokeObjectURL(window.__okCurrentBlobUrl)}catch{}
+   window.__okCurrentBlobUrl=cached||"";
+   const target=cached||src;
+   if(audio.src!==new URL(target,location.href).href){audio.src=target;audio.load()}
+   return audio.play();
+ }).then(()=>{
+   if(token===window.__okPlayToken){playing=true;updateMediaSession();drawPlayer();preloadNext()}
+ }).catch(error=>{console.warn("Ok Music playback:",error);toast("Не удалось воспроизвести трек")});
 }
 function playNext(){
  const next=tracks[currentIndex+1];
