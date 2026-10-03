@@ -197,11 +197,11 @@ export async function handleApi(request,env){
     const queries=[...artistQueries,...artistQueries.map(a=>a+" "+tasteTerms),genres+" "+moods,preferredArtists.join(" ")+" "+now,base,mood+" "+genres+" "+preferredArtists.join(" ")].map(x=>x.replace(/\s+/g," ").trim()).filter(Boolean);
     const refreshTail=refresh?refresh.slice(-6):"";
     const refreshQueries=refresh?[...queries,...artistQueries.map(a=>a+" "+genres+" "+refreshTail),genres+" "+moods+" "+refreshTail,now+" "+refreshTail]:queries;
-    const uniqueQueries=[...new Set(refreshQueries)].filter(Boolean).slice(0,10);
-    const fetchLimit=Math.min(40,Math.max(24,limit*3));
+    const uniqueQueries=[...new Set(refreshQueries)].filter(Boolean).slice(0,4);
+    const fetchLimit=Math.min(24,Math.max(12,limit*2));
     const [zr,jr]=await Promise.all([
       Promise.allSettled(uniqueQueries.map(q=>fetchZaycevSearch(q,fetchLimit))),
-      Promise.allSettled(uniqueQueries.slice(0,6).map(q=>searchJamendo(q,10,env)))
+      Promise.allSettled(uniqueQueries.slice(0,3).map(q=>searchJamendo(q,8,env)))
     ]);
     const zaycev=zr.flatMap(r=>r.status==="fulfilled"?r.value:[]),
       jam=jr.flatMap(r=>r.status==="fulfilled"?r.value:[]);
