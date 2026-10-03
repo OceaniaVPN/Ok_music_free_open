@@ -670,22 +670,16 @@ async function browserAuth(){
  if(!gate)return;
  if(window.Telegram?.WebApp?.initData){gate.remove();return}
  try{const r=await fetch("/api/auth/me",{credentials:"same-origin",cache:"no-store"});const d=await r.json();if(d.authenticated){gate.remove();return}}catch{}
- let challenge="",botUrl="";
- try{
-  const r=await fetch("/api/auth/challenge",{method:"POST",credentials:"same-origin"});
-  const d=await r.json();
-  if(!r.ok||!d.ok)throw Error(d.error||"Не удалось создать запрос");
-  challenge=d.challenge;botUrl=d.botUrl||"";
-  status.textContent="Открой Telegram и отправь боту /code. Затем введи полученный код.";
- }catch(e){status.textContent=e.message||"Ошибка"}
+ const botName=String(document.querySelector('meta[name="telegram-bot"]')?.content||"").replace(/^@/,"");
+ const botUrl=botName?"https://t.me/"+botName:"";
+ status.textContent="Открой Telegram и отправь боту /code. Затем введи полученный код.";
  get.onclick=()=>{if(botUrl)window.open(botUrl,"_blank","noopener,noreferrer")};
  verify.onclick=async()=>{
   const code=(input.value||"").replace(/\D/g,"");
-  if(!challenge)return status.textContent="Запрос авторизации ещё не создан.";
   if(code.length!==6)return status.textContent="Нужно 6 цифр.";
   verify.disabled=true;status.textContent="Проверяю…";
   try{
-   const r=await fetch("/api/auth/verify",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({challenge,code})});
+   const r=await fetch("/api/auth/verify",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({code})});
    const d=await r.json();if(!r.ok||!d.ok)throw Error(d.error||"Код неверный или уже использован");
    gate.remove();location.reload();
   }catch(e){status.textContent=e.message||"Ошибка";verify.disabled=false}
