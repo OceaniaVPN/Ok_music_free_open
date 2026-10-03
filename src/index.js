@@ -3,6 +3,7 @@ import { handleMegaLocalMusic } from "./api/mega-local.js";
 import { handleApi } from "./api/index.js";
 import { handleTelegramWebhook } from "./bot/telegram.js";
 import { renderApp } from "./web/app.js";
+import { handleAuth } from "./auth/telegram.js";
 
 const MEGA_RUNTIME=String.raw`<script>
 window.__megaMetaReady=null;
