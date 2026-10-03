@@ -3,21 +3,190 @@ import { handleApi } from "./api/index.js";
 import { handleTelegramWebhook } from "./bot/telegram.js";
 import { renderApp } from "./web/app.js";
 
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-
-    if (url.pathname === "/api/local-music") return handleMegaLocalMusic(request, env);
-    if (url.pathname.startsWith("/api/")) return handleApi(request, env);
-    if (url.pathname.startsWith("/music/") && env.ASSETS) return env.ASSETS.fetch(request);
-    if (url.pathname === "/telegram/webhook" && request.method === "POST") {
-      return handleTelegramWebhook(request, env);
+const MEGA_RUNTIME=String.raw`<script>
+window.__megaMetaReady=null;
+window.__megaMegaReady=null;
+window.__megaMetaLoad=function(){
+  if(window.__megaMetaReady)return window.__megaMetaReady;
+  window.__megaMetaReady=import("https://esm.sh/music-metadata@11.16.1?bundle").catch(error=>{
+    console.warn("🔐 Ключник / metadata module:",error);
+    return null;
+  });
+  return window.__megaMetaReady;
+};
+window.__megaLoadMega=function(){
+  if(window.mega?.File)return Promise.resolve(window.mega);
+  if(window.__megaMegaReady)return window.__megaMegaReady;
+  window.__megaMegaReady=new Promise((resolve,reject)=>{
+    const existing=document.querySelector("script[data-okmusic-mega]");
+    if(existing){
+      existing.addEventListener("load",()=>window.mega?.File?resolve(window.mega):reject(Error("MEGAJS не создал window.mega")),{once:true});
+      existing.addEventListener("error",()=>reject(Error("MEGAJS не загрузился")),{once:true});
+      return;
     }
-    const response=renderApp(request, env);
+    const script=document.createElement("script");
+    script.src="https://unpkg.com/megajs@1.3.10/dist/main.browser-umd.js";
+    script.async=true;
+    script.dataset.okmusicMega="1";
+    script.onload=()=>window.mega?.File?resolve(window.mega):reject(Error("MEGAJS не создал window.mega"));
+    script.onerror=()=>reject(Error("MEGAJS не загрузился"));
+    document.head.appendChild(script);
+  });
+  return window.__megaMegaReady;
+};
+function __megaText(value,fallback=""){
+  if(Array.isArray(value))return value.filter(Boolean).join(", ").trim()||fallback;
+  return String(value??"").trim()||fallback;
+}
+function __megaDataUrl(blob){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(String(reader.result||""));
+    reader.onerror=reject;
+    reader.readAsDataURL(blob);
+  });
+}
+function __megaMime(name){
+  const ext=String(name||"").split(".").pop().toLowerCase();
+  return ({mp3:"audio/mpeg",m4a:"audio/mp4",ogg:"audio/ogg",opus:"audio/ogg",wav:"audio/wav",aac:"audio/aac",flac:"audio/flac"})[ext]||"audio/mpeg";
+}
+async function __megaFile(payload){
+  await window.__megaLoadMega();
+  const mainFile=window.mega.File.fromURL(payload.folder+"/file/"+payload.id);
+  if(mainFile.api)mainFile.api.userAgent=null;
+  const selected=await mainFile.loadAttributes();
+  const file=selected&&typeof selected.downloadBuffer==="function"?selected:mainFile;
+  if(!file?.downloadBuffer)throw Error("MEGAJS не вернул файл из общей папки");
+  return file;
+}
+window.__megaEnrichLocalTracks=async function(input,options={}){
+  const tracks=Array.isArray(input)?input:[],mega=tracks.filter(t=>String(t.audio||"").startsWith("mega://"));
+  if(!mega.length)return tracks;
+  const mm=await window.__megaMetaLoad();
+  if(!mm?.parseBlob){console.warn("🔐 Ключник: music-metadata не загрузился");return tracks}
+  const work=async t=>{
+    try{
+      const payload=JSON.parse(decodeURIComponent(String(t.audio).slice(7)));
+      const key=String(t?.id||payload?.id||"")+"|"+String(t?.fileSize||payload?.size||"")+"|"+String(payload?.name||"");
+      window.__megaMetaCache=window.__megaMetaCache||new Map();
+      window.__megaMetaStore=window.__megaMetaStore||(()=>{
+        try{return JSON.parse(localStorage.getItem("okmusic:mega-meta:v2")||"{}")}catch{return {}}
+      })();
+      window.__megaBlobCache=window.__megaBlobCache||new Map();
+      if(window.__megaMetaCache.has(key)){
+        Object.assign(t,window.__megaMetaCache.get(key));
+        options?.onTrack?.(t);
+        return t;
+      }
+      const stored=window.__megaMetaStore[key];
+      if(stored){
+        window.__megaMetaCache.set(key,stored);
+        Object.assign(t,stored);
+        if(stored.imageData)t.image=stored.imageData;
+        options?.onTrack?.(t);
+        return t;
+      }
+      const file=await __megaFile(payload);
+      const data=await file.downloadBuffer();
+      const meta=await mm.parseBlob(new Blob([data],{type:__megaMime(payload.name)}),{skipCovers:false,duration:true});
+      const common=meta?.common||{},format=meta?.format||{};
+      const patch={
+        title:__megaText(common.title,t.title||"Без названия"),
+        artist:__megaText(common.artist,common.albumartist||t.artist||"Ключник"),
+        album:__megaText(common.album,""),
+        year:Number(common.year||0)||0,
+        trackNumber:common.track?.no!=null?String(common.track.no):"",
+        discNumber:common.disk?.no!=null?String(common.disk.no):"",
+        genre:__megaText(common.genre,""),
+        composer:__megaText(common.composer,""),
+        duration:Number(format.duration||t.duration||0)||0,
+        bitrate:Number(format.bitrate||0)||0,
+        format:String(format.codec||format.container||"").trim(),
+        fileName:String(file.name||payload.name||t.fileName||""),
+        fileSize:Number(file.size||t.fileSize||0)||0
+      };
+      const picture=Array.isArray(common.picture)&&common.picture[0];
+      if(picture?.data?.length){
+        const imageBlob=new Blob([picture.data],{type:picture.format||"image/jpeg"});
+        patch.image=URL.createObjectURL(imageBlob);
+        if(imageBlob.size<=350000)patch.imageData=await __megaDataUrl(imageBlob);
+      }
+      window.__megaMetaCache.set(key,patch);
+      window.__megaMetaStore[key]=Object.fromEntries(Object.entries(patch).filter(([k])=>k!=="image"));
+      try{localStorage.setItem("okmusic:mega-meta:v2",JSON.stringify(window.__megaMetaStore))}catch{}
+      Object.assign(t,patch);
+      options?.onTrack?.(t);
+    }catch(error){
+      console.warn("🔐 Ключник / MEGA metadata:",t.fileName||t.title,error);
+    }
+    return t;
+  };
+  for(let i=0;i<mega.length;i+=2)await Promise.all(mega.slice(i,i+2).map(work));
+  return tracks;
+};
+const NativePlay=HTMLMediaElement.prototype.play;
+const NativeLoad=HTMLMediaElement.prototype.load;
+async function __megaResolve(src){
+  const payload=JSON.parse(decodeURIComponent(String(src).slice(7)));
+  window.__megaBlobCache=window.__megaBlobCache||new Map();
+  if(window.__megaBlobCache.has(payload.id))return window.__megaBlobCache.get(payload.id);
+  const pending=(async()=>{
+    const file=await __megaFile(payload);
+    const data=await file.downloadBuffer();
+    return URL.createObjectURL(new Blob([data],{type:__megaMime(payload.name)}));
+  })();
+  window.__megaBlobCache.set(payload.id,pending);
+  try{
+    const url=await pending;
+    window.__megaBlobCache.set(payload.id,url);
+    return url;
+  }catch(error){
+    window.__megaBlobCache.delete(payload.id);
+    throw error;
+  }
+}
+HTMLMediaElement.prototype.load=function(){
+  const src=this.getAttribute("src")||"";
+  if(src.startsWith("mega://"))return;
+  return NativeLoad.call(this);
+};
+HTMLMediaElement.prototype.play=function(){
+  const src=this.getAttribute("src")||this.src||"";
+  if(!src.startsWith("mega://"))return NativePlay.call(this);
+  const element=this;
+  return __megaResolve(src).then(blobUrl=>{
+    element.src=blobUrl;
+    NativeLoad.call(element);
+    return NativePlay.call(element);
+  }).catch(error=>{
+    console.error("🔐 Ключник / MEGA playback:",error);
+    throw error;
+  });
+};
+</script>`;
+
+export default {
+  async fetch(request,env,ctx) {
+    const url=new URL(request.url);
+
+    if (url.pathname==="/api/local-music") return handleMegaLocalMusic(request,env,ctx);
+    if (url.pathname.startsWith("/api/")) return handleApi(request,env);
+    if (url.pathname.startsWith("/music/") && env.ASSETS) return env.ASSETS.fetch(request);
+    if (url.pathname==="/telegram/webhook" && request.method==="POST") {
+      return handleTelegramWebhook(request,env);
+    }
+
+    const response=renderApp(request,env);
     const type=response.headers.get("content-type")||"";
     if(!type.includes("text/html"))return response;
+
     let html=await response.text();
-    html=html.replace("</head>","<script src=\"https://unpkg.com/megajs@1.3.10/dist/main.browser-umd.js\"></script><script>\nwindow.__megaMetaReady=import(\"https://esm.sh/music-metadata@11.16.1?bundle\").catch(error=>{console.warn(\"🔐 Ключник / metadata module:\",error);return null});\nwindow.__megaMetaCache=window.__megaMetaCache||new Map();\nwindow.__megaBlobCache=window.__megaBlobCache||new Map();\nwindow.__megaMetaStore=window.__megaMetaStore||(()=>{try{return JSON.parse(localStorage.getItem(\"okmusic:mega-meta:v2\")||\"{}\")}catch{return {}}})();\nfunction __megaSaveMeta(){try{localStorage.setItem(\"okmusic:mega-meta:v2\",JSON.stringify(window.__megaMetaStore))}catch{}}\nfunction __megaMetaKey(t,payload){return String(t?.id||payload?.id||\"\")+\"|\"+String(t?.fileSize||payload?.size||\"\")+\"|\"+String(payload?.name||\"\")}\nfunction __megaText(value,fallback=\"\"){if(Array.isArray(value))return value.filter(Boolean).join(\", \").trim()||fallback;return String(value??\"\").trim()||fallback}\nfunction __megaDataUrl(blob){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||\"\"));reader.onerror=reject;reader.readAsDataURL(blob)})}\nfunction __megaMime(name){const ext=String(name||\"\").split(\".\").pop().toLowerCase();return ({mp3:\"audio/mpeg\",m4a:\"audio/mp4\",ogg:\"audio/ogg\",opus:\"audio/ogg\",wav:\"audio/wav\",aac:\"audio/aac\",flac:\"audio/flac\"})[ext]||\"audio/mpeg\"}\nasync function __megaFile(payload){if(!window.mega?.File)throw Error(\"MEGAJS не загрузился\");const mainFile=window.mega.File.fromURL(payload.folder+\"/file/\"+payload.id);if(mainFile.api)mainFile.api.userAgent=null;const selected=await mainFile.loadAttributes();const file=selected&&typeof selected.downloadBuffer===\"function\"?selected:mainFile;if(!file?.downloadBuffer)throw Error(\"MEGAJS не вернул файл из общей папки\");return file}\nwindow.__megaEnrichLocalTracks=async function(input,options={}){\n const tracks=Array.isArray(input)?input:[],mega=tracks.filter(t=>String(t.audio||\"\").startsWith(\"mega://\"));\n if(!mega.length)return tracks;\n const mm=await window.__megaMetaReady;\n if(!mm?.parseBlob){console.warn(\"🔐 Ключник: music-metadata не загрузился\");return tracks}\n const work=async t=>{try{\n  const payload=JSON.parse(decodeURIComponent(String(t.audio).slice(7))),key=__megaMetaKey(t,payload);\n  if(window.__megaMetaCache.has(key)){Object.assign(t,window.__megaMetaCache.get(key));options?.onTrack?.(t);return t}\n  const stored=window.__megaMetaStore[key];\n  if(stored){window.__megaMetaCache.set(key,stored);Object.assign(t,stored);if(stored.imageData)t.image=stored.imageData;options?.onTrack?.(t);return t}\n  const file=await __megaFile(payload),data=await file.downloadBuffer();\n  const meta=await mm.parseBlob(new Blob([data],{type:__megaMime(payload.name)}),{skipCovers:false,duration:true}),common=meta?.common||{},format=meta?.format||{};\n  const patch={\n   title:__megaText(common.title,t.title||\"Без названия\"),\n   artist:__megaText(common.artist,common.albumartist||t.artist||\"Ключник\"),\n   album:__megaText(common.album,\"\"),\n   year:Number(common.year||0)||0,\n   trackNumber:common.track?.no!=null?String(common.track.no):\"\",\n   discNumber:common.disk?.no!=null?String(common.disk.no):\"\",\n   genre:__megaText(common.genre,\"\"),\n   composer:__megaText(common.composer,\"\"),\n   duration:Number(format.duration||t.duration||0)||0,\n   bitrate:Number(format.bitrate||0)||0,\n   format:String(format.codec||format.container||\"\").trim(),\n   fileName:String(file.name||payload.name||t.fileName||\"\"),\n   fileSize:Number(file.size||t.fileSize||0)||0\n  };\n  const picture=Array.isArray(common.picture)&&common.picture[0];\n  if(picture?.data?.length){const imageBlob=new Blob([picture.data],{type:picture.format||\"image/jpeg\"});patch.image=URL.createObjectURL(imageBlob);if(imageBlob.size<=350000)patch.imageData=await __megaDataUrl(imageBlob)}\n  window.__megaMetaCache.set(key,patch);\n  window.__megaMetaStore[key]=Object.fromEntries(Object.entries(patch).filter(([k])=>k!==\"image\"));\n  __megaSaveMeta();Object.assign(t,patch);options?.onTrack?.(t);\n }catch(error){console.warn(\"🔐 Ключник / MEGA metadata:\",t.fileName||t.title,error)}\n return t};\n for(let i=0;i<mega.length;i+=2)await Promise.all(mega.slice(i,i+2).map(work));\n return tracks;\n};\nconst NativePlay=HTMLMediaElement.prototype.play,NativeLoad=HTMLMediaElement.prototype.load;\nasync function __megaResolve(src){const payload=JSON.parse(decodeURIComponent(String(src).slice(7)));if(window.__megaBlobCache.has(payload.id))return window.__megaBlobCache.get(payload.id);const pending=(async()=>{const file=await __megaFile(payload),data=await file.downloadBuffer();return URL.createObjectURL(new Blob([data],{type:__megaMime(payload.name)}))})();window.__megaBlobCache.set(payload.id,pending);try{const url=await pending;window.__megaBlobCache.set(payload.id,url);return url}catch(error){window.__megaBlobCache.delete(payload.id);throw error}}\nHTMLMediaElement.prototype.load=function(){const src=this.getAttribute(\"src\")||\"\";if(src.startsWith(\"mega://\"))return;return NativeLoad.call(this)};\nHTMLMediaElement.prototype.play=function(){const src=this.getAttribute(\"src\")||this.src||\"\";if(!src.startsWith(\"mega://\"))return NativePlay.call(this);const element=this;return __megaResolve(src).then(blobUrl=>{element.src=blobUrl;NativeLoad.call(element);return NativePlay.call(element)}).catch(error=>{console.error(\"🔐 Ключник / MEGA playback:\",error);throw error})};\n</script>"+"</head>");
-    const headers=new Headers(response.headers); headers.set("content-type","text/html; charset=utf-8"); headers.set("Cache-Control","no-store, no-cache, must-revalidate, max-age=0"); headers.set("Pragma","no-cache"); headers.set("Expires","0"); return new Response(html,{status:response.status,headers});
+    html=html.replace("</head>",MEGA_RUNTIME+"</head>");
+
+    const headers=new Headers(response.headers);
+    headers.set("content-type","text/html; charset=utf-8");
+    headers.set("Cache-Control","public, max-age=300, stale-while-revalidate=86400");
+    headers.set("Vary","Accept-Encoding");
+    return new Response(html,{status:response.status,headers});
   }
 };
