@@ -248,7 +248,7 @@ export default {
 
     const headers=new Headers(response.headers);
     headers.set("content-type","text/html; charset=utf-8");
-    headers.set("Cache-Control","public, max-age=300, stale-while-revalidate=86400");
+    headers.set("Cache-Control","no-store, no-cache, must-revalidate");
     headers.set("Vary","Accept-Encoding");
     return new Response(html,{status:response.status,headers});
   }
