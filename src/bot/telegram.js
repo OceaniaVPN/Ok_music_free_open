@@ -27,8 +27,20 @@ export async function handleTelegramWebhook(request,env){
     const text=textOf(update);
     const authChallenge=startArg(text);
     if(authChallenge){
+      const activated=await activateTelegramChallenge(env,authChallenge,id);
+      await sendTelegram(env,id,activated
+        ? "🔐 Запрос авторизации получен. Теперь отправь /code — только эта команда выдаст одноразовый код."
+        : "❌ Запрос авторизации истёк. Вернись на сайт и нажми «Получить код в Telegram» ещё раз.");
+      return Response.json({ok:true});
+    }
+    if(/^\/code(?:@[^\\s]+)?(?:\\s|$)/i.test(text)){
+      const challenge=await getActiveTelegramChallenge(env,id);
+      if(!challenge){
+        await sendTelegram(env,id,"❌ Активного запроса авторизации нет. Сначала открой сайт и нажми «Получить код в Telegram».");
+        return Response.json({ok:true});
+      }
       const user=update.message.from;
-      const code=await createTelegramChallenge(env,authChallenge,{
+      const code=await createTelegramChallenge(env,challenge,{
         id:String(user?.id||""),
         first_name:String(user?.first_name||""),
         last_name:String(user?.last_name||""),
@@ -37,15 +49,22 @@ export async function handleTelegramWebhook(request,env){
       },id);
       await sendTelegram(env,id,code
         ? "🔐 Код входа в Ok Music\n\n"+code+"\n\nВведи этот код на сайте. Код одноразовый и действует 5 минут."
-        : "❌ Запрос авторизации истёк. Вернись на сайт и нажми «Получить код» ещё раз.");
+        : "❌ Запрос авторизации истёк. Вернись на сайт и нажми «Получить код в Telegram» ещё раз.");
       return Response.json({ok:true});
     }
-    if(/^\/start(?:@[^\s]+)?(?:\s|$)/i.test(text)){
-      await sendTelegram(env,id,"🎵 Ok Music\n\nЧтобы войти с браузера, сначала открой сайт и нажми «Получить код в Telegram». Я пришлю одноразовый код сюда.");
+    if(/^\/start(?:@[^\s]+)?(?:\s|$)/i.test(text)||/^\/app(?:@[^\s]+)?(?:\s|$)/i.test(text)){
+      const appUrl=String(env.TELEGRAM_WEBAPP_URL||"").replace(/\\/$/,"");
+      if(appUrl){
+        await sendTelegram(env,id,"🎵 Ok Music\n\nОткрывай приложение:",{
+          inline_keyboard:[[{text:"🎵 Открыть Ok Music",web_app:{url:appUrl}}]]
+        });
+      }else{
+        await sendTelegram(env,id,"❌ TELEGRAM_WEBAPP_URL не настроен.");
+      }
       return Response.json({ok:true});
     }
-    if(/^\/(?:help|app|music)(?:@[^\s]+)?(?:\s|$)/i.test(text)){
-      await sendTelegram(env,id,"🎵 Ok Music\n\nБраузер: открой сайт → «Получить код в Telegram» → вернись сюда → введи присланный код на сайте.");
+    if(/^\/(?:help|music)(?:@[^\s]+)?(?:\s|$)/i.test(text)){
+      await sendTelegram(env,id,"🎵 Ok Music\n\n/start или /app — открыть приложение.\n/code — выдать одноразовый код для активного запроса авторизации в браузере.");
       return Response.json({ok:true});
     }
     return Response.json({ok:true});
