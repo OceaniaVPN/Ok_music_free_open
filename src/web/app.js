@@ -1,3 +1,4 @@
+import { FON_IMAGES } from "../fon.js";
 export function renderApp(request, env) {
   const appName = env.APP_NAME || "Ok Music";
   const html = String.raw`<!doctype html>
@@ -227,7 +228,9 @@ html,body,.app,.top,.hero,.card,.wave-card,.taste-panel,.track-profile,.result,.
 <div id="toast" class="toast"></div><div id="tasteModal" class="modal"><div class="dialog"><h3>🎧 Мой музыкальный вкус</h3><p>Выбери любимые направления и настроение — Ok Music будет учитывать их в каждом миксе.</p><div class="taste-grid"><div class="taste-field"><label>Любимые жанры</label><div id="genreChips" class="chips"></div></div><div class="taste-field"><label>Настроение</label><div id="moodChips" class="chips"></div></div></div><div style="margin-top:14px"><label style="display:block;font-size:11px;color:var(--muted);margin-bottom:7px">Любимые исполнители</label><input id="tasteArtists" class="input" placeholder="Например: Miyagi, The Weeknd, Кино"></div><div style="margin-top:14px"><label style="display:block;font-size:11px;color:var(--muted);margin-bottom:7px">Что хочется сейчас</label><input id="tasteNow" class="input" placeholder="Например: спокойный русский рэп для дороги"></div><div class="taste-actions"><button id="tasteCancel">Отмена</button><button id="tasteSave" class="primary" style="flex:1">Сохранить вкус ✨</button></div></div></div>
 <script>
 const view=document.querySelector("#view"), playerEl=document.querySelector("#player"), modal=document.querySelector("#modal"), toastEl=document.querySelector("#toast");
-const KEY="okmusic:v2";\nconst bgToggle=document.querySelector("#bgToggle");if(bgToggle){try{const bg=JSON.parse(localStorage.getItem(BG_KEY)||"null");bgToggle.checked=Boolean(bg?.on&&FON_IMAGES.length)}catch{}bgToggle.onchange=()=>applyPhotoBackground(bgToggle.checked,bgIndex);}\n
+const KEY="okmusic:v2";
+const KEY_VERSION=2;
+
 let state;
 try{state=JSON.parse(localStorage.getItem(KEY)||"{}")}catch{state={}}
 state=state&&typeof state==="object"?state:{};
@@ -250,7 +253,29 @@ function applyMusicTheme(id){
  try{localStorage.setItem("okmusic:theme",t.id)}catch{}
  try{if(window.Telegram?.WebApp){window.Telegram.WebApp.setHeaderColor(t.telegram);window.Telegram.WebApp.setBackgroundColor(t.telegram)}}catch{}
 }
-try{applyMusicTheme(localStorage.getItem("okmusic:theme")||"default")}catch{applyMusicTheme("default")}\nconst BG_KEY="okmusic:bg";\nlet bgIndex=0;\nfunction applyPhotoBackground(enabled,index=0){const on=Boolean(enabled)&&FON_IMAGES.length>0;const safe=on?Math.max(0,Math.min(FON_IMAGES.length-1,Number(index)||0)):0;bgIndex=safe;document.documentElement.classList.toggle("photo-bg",on);if(on)document.documentElement.style.setProperty("--photo-bg-url",'url("'+FON_IMAGES[safe]+'")');else document.documentElement.style.removeProperty("--photo-bg-url");try{localStorage.setItem(BG_KEY,JSON.stringify({on,index:safe}))}catch{}}\ntry{const bg=JSON.parse(localStorage.getItem(BG_KEY)||"null");if(bg?.on&&FON_IMAGES.length)applyPhotoBackground(true,bg.index||0)}catch{}\n
+try{applyMusicTheme(localStorage.getItem("okmusic:theme")||"default")}catch{applyMusicTheme("default")}
+const BG_KEY="okmusic:bg";
+let bgIndex=0;
+function applyPhotoBackground(enabled,index=0){
+ const on=Boolean(enabled)&&FON_IMAGES.length>0;
+ const safe=on?Math.max(0,Math.min(FON_IMAGES.length-1,Number(index)||0)):0;
+ bgIndex=safe;
+ document.documentElement.classList.toggle("photo-bg",on);
+ if(on)document.documentElement.style.setProperty("--photo-bg-url",'url("'+FON_IMAGES[safe].replace(/"/g,'%22')+'")');
+ else document.documentElement.style.removeProperty("--photo-bg-url");
+ try{localStorage.setItem(BG_KEY,JSON.stringify({on,index:safe}))}catch{}
+}
+try{
+ const bg=JSON.parse(localStorage.getItem(BG_KEY)||"null");
+ if(bg?.on&&FON_IMAGES.length)applyPhotoBackground(true,bg.index||0);
+ const bgToggle=document.querySelector("#bgToggle");
+ if(bgToggle){
+   bgToggle.checked=Boolean(bg?.on&&FON_IMAGES.length);
+   bgToggle.disabled=!FON_IMAGES.length;
+   bgToggle.onchange=()=>applyPhotoBackground(bgToggle.checked,bgIndex);
+ }
+}catch{}
+
 const AUDIO_KEY="okmusic:audio";
 const eqBands=["60","250","1K","4K","12K"];
 let audioFx={eq:[0,0,0,0,0]};
@@ -648,19 +673,10 @@ document.querySelector("#closeModal").onclick=()=>modal.classList.remove("open")
 document.querySelector("#createPlaylist").onclick=()=>{const name=document.querySelector("#playlistName").value.trim();if(!name)return toast("Введи название");state.playlists.unshift({id:"pl-"+Date.now(),name,tracks:[]});save();document.querySelector("#playlistName").value="";modal.classList.remove("open");library();toast("Плейлист создан ✨")}
 function render(name){document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));({home,mood,search:searchView,library}[name]||home)()}
 document.querySelector("#nav").addEventListener("click",e=>{const b=e.target.closest("button[data-view]");if(b)render(b.dataset.view)});
+render("home");
 function initTelegram(){if(!window.Telegram?.WebApp)return;window.Telegram.WebApp.ready();window.Telegram.WebApp.expand();const id=document.documentElement.dataset.theme||"default",t=MUSIC_THEMES.find(x=>x.id===id)||MUSIC_THEMES[0];window.Telegram.WebApp.setHeaderColor(t.telegram);window.Telegram.WebApp.setBackgroundColor(t.telegram)}
 initTelegram();window.addEventListener("DOMContentLoaded",initTelegram,{once:true});
 if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js",{scope:"/"}).catch(e=>console.warn("Ok Music PWA:",e));
-
-async function browserAuth(){
- const gate=document.querySelector("#authGate"),status=document.querySelector("#authStatus");
- try{
-   const r=await fetch("/api/auth/me",{cache:"no-store",credentials:"same-origin"});
-   const d=await r.json();
-   if(d.authenticated){gate?.classList.remove("open");render("home");return}
- }catch{}
- if(status)status.textContent="Открой Telegram, отправь боту /code и введи полученный код.";
-}
 
 </script>
 </body></html>`;
