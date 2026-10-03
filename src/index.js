@@ -124,10 +124,22 @@ window.__megaEnrichLocalTracks=async function(input,options={}){
   for(let i=0;i<mega.length;i+=2)await Promise.all(mega.slice(i,i+2).map(work));
   return tracks;
 };
+const OFFLINE_CACHE_NAME="okmusic-audio-v1";
+window.__okOfflineKey=id=>new URL("/__okmusic_offline__/"+encodeURIComponent(String(id)),location.origin).href;
+window.__okOfflineUrls=window.__okOfflineUrls||new Map();
+async function __okOfflineCache(){return await caches.open(OFFLINE_CACHE_NAME)}
+window.__okOfflineHas=async id=>{const c=await __okOfflineCache();return !!(await c.match(window.__okOfflineKey(id)))};
+window.__okOfflineList=async()=>{const c=await __okOfflineCache(),keys=await c.keys();return keys.map(r=>decodeURIComponent(new URL(r.url).pathname.split("/").pop()||"")).filter(Boolean)};
+window.__okOfflineSave=async track=>{if(!track?.id)return;const key=window.__okOfflineKey(track.id),c=await __okOfflineCache();if(await c.match(key))return true;try{if(navigator.storage?.persist)await navigator.storage.persist().catch(()=>{})}catch{}const src=String(track.audio||track.src||"");if(!src)throw Error("У трека нет источника");let response,type="audio/mpeg";if(src.startsWith("mega://")){const payload=JSON.parse(decodeURIComponent(src.slice(7))),file=await __megaFile(payload),data=await file.downloadBuffer();type=__megaMime(payload.name);response=new Response(data,{headers:{"Content-Type":type,"Cache-Control":"public,max-age=31536000"}})}else{response=await fetch(src,{cache:"no-store"});if(!response.ok&&response.type!=="opaque")throw Error("HTTP "+response.status);type=response.headers.get("content-type")||type;if(response.type==="opaque")throw Error("Источник не разрешает офлайн-копирование")}await c.put(key,response.clone());return true};
+window.__okOfflineRemove=async id=>{const c=await __okOfflineCache();const key=window.__okOfflineKey(id);await c.delete(key);const u=window.__okOfflineUrls.get(String(id));if(u)try{URL.revokeObjectURL(u)}catch{}window.__okOfflineUrls.delete(String(id))};
+window.__okOfflineClear=async()=>{const c=await __okOfflineCache(),keys=await c.keys();for(const k of keys)await c.delete(k);for(const u of window.__okOfflineUrls.values())try{URL.revokeObjectURL(u)}catch{}window.__okOfflineUrls.clear()};
+window.__okOfflineResolve=async track=>{if(!track?.id)return null;const id=String(track.id),cachedUrl=window.__okOfflineUrls.get(id);if(cachedUrl)return cachedUrl;const c=await __okOfflineCache(),response=await c.match(window.__okOfflineKey(id));if(!response)return null;const url=URL.createObjectURL(await response.blob());window.__okOfflineUrls.set(id,url);return url};
 const NativePlay=HTMLMediaElement.prototype.play;
 const NativeLoad=HTMLMediaElement.prototype.load;
 async function __megaResolve(src){
   const payload=JSON.parse(decodeURIComponent(String(src).slice(7)));
+  const offline=await window.__okOfflineResolve?.({id:payload.id,audio:src});
+  if(offline)return offline;
   window.__megaBlobCache=window.__megaBlobCache||new Map();
   if(window.__megaBlobCache.has(payload.id))return window.__megaBlobCache.get(payload.id);
   const pending=(async()=>{
@@ -169,6 +181,8 @@ export default {
   async fetch(request,env,ctx) {
     const url=new URL(request.url);
 
+    if (url.pathname==="/sw.js") return new Response(SERVICE_WORKER,{headers:{"content-type":"application/javascript; charset=utf-8","Cache-Control":"no-cache"}});
+    if (url.pathname==="/manifest.webmanifest") return new Response(PWA_MANIFEST,{headers:{"content-type":"application/manifest+json; charset=utf-8","Cache-Control":"public, max-age=3600"}});
     if (url.pathname==="/api/local-music") return handleMegaLocalMusic(request,env,ctx);
     if (url.pathname.startsWith("/api/")) return handleApi(request,env);
     if (url.pathname.startsWith("/music/") && env.ASSETS) return env.ASSETS.fetch(request);
