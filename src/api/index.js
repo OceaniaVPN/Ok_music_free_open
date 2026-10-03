@@ -18,7 +18,7 @@ function normalizeJamendo(t) {
     artist: t.artist_name || "Неизвестный исполнитель",
     album: t.album_name || "",
     image: t.image || t.album_image || "",
-    audio: t.audio || "",
+    audio: t.audio ? "/api/audio?url=" + encodeURIComponent(t.audio) : "",
     duration: Number(t.duration || 0),
     license: t.license_ccurl || "",
     source: "Jamendo",
@@ -172,8 +172,57 @@ function providerErrors(youtubeResult, jamendoResult) {
   ].filter(Boolean);
 }
 
+async function proxyAudio(url, request) {
+  const target = new URL(url);
+  const host = target.hostname.toLowerCase();
+  const allowed =
+    host === "jamendo.com" ||
+    host.endsWith(".jamendo.com") ||
+    host === "storage.jamendo.com" ||
+    host.endsWith(".storage.jamendo.com") ||
+    host === "soundhelix.com" ||
+    host.endsWith(".soundhelix.com");
+  if (!allowed) {
+    return Response.json({ ok: false, error: "Audio host is not allowed" }, { status: 403 });
+  }
+
+  const headers = new Headers();
+  const range = request.headers.get("range");
+  if (range) headers.set("range", range);
+  const response = await fetch(target.toString(), {
+    method: "GET",
+    headers,
+    redirect: "follow"
+  });
+
+  if (!response.ok && response.status !== 206) {
+    return Response.json({ ok: false, error: "Audio upstream HTTP " + response.status }, { status: 502 });
+  }
+
+  const out = new Headers(response.headers);
+  out.set("access-control-allow-origin", "*");
+  out.set("access-control-expose-headers", "Accept-Ranges, Content-Length, Content-Range, Content-Type");
+  out.set("cache-control", "public, max-age=3600");
+  out.set("accept-ranges", response.headers.get("accept-ranges") || "bytes");
+
+  return new Response(response.body, {
+    status: response.status,
+    headers: out
+  });
+}
+
 export async function handleApi(request, env) {
   const url = new URL(request.url);
+
+  if (url.pathname === "/api/audio") {
+    const raw = url.searchParams.get("url") || "";
+    if (!raw) return Response.json({ ok: false, error: "Missing audio url" }, { status: 400 });
+    try {
+      return await proxyAudio(raw, request);
+    } catch (error) {
+      return Response.json({ ok: false, error: error?.message || "Audio proxy failed" }, { status: 502 });
+    }
+  }
 
   if (url.pathname === "/api/health") {
     return Response.json({
