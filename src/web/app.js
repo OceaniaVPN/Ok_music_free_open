@@ -31,7 +31,7 @@ button,input{font:inherit}button{border:1px solid var(--line);border-radius:16px
 <body>
 <div class="app">
   <header class="top"><div class="brand"><div class="logo">♫</div><div><h1>Ok Music</h1><span>Твоя музыка. Твоё настроение.</span></div></div><button class="avatar" id="tasteBtn" title="Мой музыкальный вкус">✦</button></header>
-  <main id="view"></main>
+  <main id="view"><section class="hero"><div style="position:relative;z-index:2;display:inline-flex;align-items:center;gap:7px;margin-bottom:14px;padding:7px 10px;border:1px solid rgba(189,255,224,.1);border-radius:999px;background:rgba(255,255,255,.04);font-size:9px;font-weight:800;letter-spacing:.7px;color:#c3d6cc">● OK MUSIC · LIVE CATALOG</div><h2>Музыка, которая звучит <em>как ты.</em></h2><p>Поиск, любимые треки, умные подборки и твоя библиотека — в одном музыкальном пространстве.</p><div class="searchbar"><input class="input" placeholder="Исполнитель, трек или настроение"><button class="primary">Найти музыку</button></div></section><div class="section"><div><h2>✨ Твой микс</h2><small>Готовим подборку…</small></div></div><div class="grid"><div class="empty" style="grid-column:1/-1">Загружаем музыку…</div></div></main>
 </div>
 <div id="player" class="player"></div>
 <nav class="nav" id="nav"><button data-view="home" class="active">⌂<span>Главная</span></button><button data-view="mood">◈<span>Настроение</span></button><button data-view="search">⌕<span>Поиск</span></button><button data-view="library">♫<span>Плейлисты</span></button></nav>
