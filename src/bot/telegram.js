@@ -1,4 +1,4 @@
-import { activateTelegramChallenge, checkTelegramCodeCooldown, createTelegramChallenge, getActiveTelegramChallenge } from "../auth/telegram.js";
+import { activateTelegramChallenge, checkTelegramCodeCooldown, createTelegramChallenge, createStandaloneTelegramCode, getActiveTelegramChallenge } from "../auth/telegram.js";
 
 async function sendTelegram(env,chatId,text,reply_markup){
 
@@ -35,10 +35,6 @@ export async function handleTelegramWebhook(request,env){
     }
     if(/^\/code(?:@[^\s]+)?(?:\s|$)/i.test(text)){
       const challenge=await getActiveTelegramChallenge(env,id);
-      if(!challenge){
-        await sendTelegram(env,id,"❌ Сначала открой Ok Music в браузере и нажми «Получить код в Telegram».");
-        return Response.json({ok:true});
-      }
       const limit=await checkTelegramCodeCooldown(env,id);
       if(!limit.allowed){
         const minutes=Math.ceil(Number(limit.wait||0)/60);
@@ -46,13 +42,21 @@ export async function handleTelegramWebhook(request,env){
         return Response.json({ok:true});
       }
       const user=update.message.from;
-      const code=await createTelegramChallenge(env,challenge,{
-        id:String(user?.id||""),
-        first_name:String(user?.first_name||""),
-        last_name:String(user?.last_name||""),
-        username:String(user?.username||""),
-        photo_url:""
-      },id);
+      const code=challenge
+        ? await createTelegramChallenge(env,challenge,{
+            id:String(user?.id||""),
+            first_name:String(user?.first_name||""),
+            last_name:String(user?.last_name||""),
+            username:String(user?.username||""),
+            photo_url:""
+          },id)
+        : await createStandaloneTelegramCode(env,{
+            id:String(user?.id||""),
+            first_name:String(user?.first_name||""),
+            last_name:String(user?.last_name||""),
+            username:String(user?.username||""),
+            photo_url:""
+          },id);
       await sendTelegram(env,id,code
         ? "🔐 Код входа в Ok Music\n\n"+code+"\n\nВведи его на сайте. Код одноразовый и действует 5 минут."
         : "❌ Запрос авторизации истёк. Открой сайт и создай новый запрос.");
