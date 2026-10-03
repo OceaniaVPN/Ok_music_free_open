@@ -258,7 +258,9 @@ let audioFx={eq:[0,0,0,0,0]};
 try{audioFx={...audioFx,...JSON.parse(localStorage.getItem(AUDIO_KEY)||"{}")}}catch{}
 function saveAudioFx(){localStorage.setItem(AUDIO_KEY,JSON.stringify(audioFx))}
 let audioCtx=null,audioSource=null,eqNodes=[],fxReady=false,showEq=false;
-let eqLimiter=null;
+let eqLimiter=null,spatial3dNode=null,spatial3dFrame=0;
+let spatial3d=0;
+try{spatial3d=Math.max(0,Math.min(1,Number(JSON.parse(localStorage.getItem(AUDIO_KEY)||"{}").spatial3d)||0))}catch{}
 function initAudioFx(){
  if(fxReady)return true;
  try{
@@ -282,9 +284,32 @@ function initAudioFx(){
   eqNodes.reduce((a,b)=>a.connect(b),audioSource);
   eqNodes[eqNodes.length-1].connect(eqLimiter);
   eqLimiter.connect(audioCtx.destination);
+  spatial3dNode=new PannerNode(audioCtx,{panningModel:"HRTF",distanceModel:"inverse",refDistance:1,maxDistance:8,rolloffFactor:0.35,coneInnerAngle:360,coneOuterAngle:360,coneOuterGain:0});
+  spatial3dNode.positionX.value=0;spatial3dNode.positionY.value=0;spatial3dNode.positionZ.value=0;
+  eqLimiter.disconnect();
+  eqLimiter.connect(spatial3dNode);
+  spatial3dNode.connect(audioCtx.destination);
   fxReady=true;
+  updateSpatial3d();
   return true;
  }catch(e){return false}
+}
+function updateSpatial3d(){
+ if(!spatial3dNode)return;
+ const amount=Math.max(0,Math.min(1,Number(spatial3d)||0));
+ if(!amount){spatial3dNode.positionX.value=0;spatial3dNode.positionZ.value=0;return}
+ const now=performance.now()/1000;
+ const x=Math.sin(now*0.72)*amount*2.2;
+ const z=-Math.cos(now*0.72)*amount*2.8;
+ spatial3dNode.positionX.value=x;
+ spatial3dNode.positionZ.value=z;
+ if(playing){spatial3dFrame=requestAnimationFrame(updateSpatial3d)}
+}
+function setSpatial3d(v){
+ spatial3d=Math.max(0,Math.min(1,Number(v)||0));
+ audioFx.spatial3d=spatial3d;
+ saveAudioFx();
+ updateSpatial3d();
 }
 function setEq(i,v){
  const value=Math.max(-12,Math.min(12,Number(v)||0));
@@ -306,7 +331,7 @@ function toggleEq(){
 }
 function eqPanel(){
  if(!showEq)return "";
- return '<div class="fx-panel"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><strong>🎚 Эквалайзер</strong><small style="color:var(--muted)">±12 дБ</small></div><div class="eq-grid">'+eqBands.map((b,i)=>'<label class="eq-band"><input data-eq="'+i+'" type="range" min="-12" max="12" step="1" value="'+Number(audioFx.eq[i]||0)+'"><small>'+b+' Hz</small></label>').join("")+'</div></div>';
+ return '<div class="fx-panel"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><strong>🎚 Эквалайзер</strong><small style="color:var(--muted)">±12 дБ</small></div><div class="eq-grid">'+eqBands.map((b,i)=>'<label class="eq-band"><input data-eq="'+i+'" type="range" min="-12" max="12" step="1" value="'+Number(audioFx.eq[i]||0)+'"><small>'+b+' Hz</small></label>').join("")+'</div><div class="spatial3d"><div class="spatial3d-head"><strong>🌀 3D звук</strong><span>'+Math.round(spatial3d*100)+'%</span></div><input data-spatial3d type="range" min="0" max="1" step="0.01" value="'+spatial3d+'"><small>HRTF · пространственное вращение</small></div></div>';
 }
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
 function save(){localStorage.setItem(KEY,JSON.stringify(state))}
@@ -584,10 +609,12 @@ function drawPlayer(){if(!current){playerEl.className="player";return}
  document.querySelector("[data-player-profile]").onclick=()=>openTrackProfile(current.id);
  document.querySelector("#seek").oninput=e=>{if(audio.duration)audio.currentTime=audio.duration*e.target.value/100};
  document.querySelectorAll("[data-eq]").forEach(s=>s.oninput=e=>setEq(Number(e.target.dataset.eq),e.target.value));
+ const spatial=document.querySelector("[data-spatial3d]");
+ if(spatial)spatial.oninput=e=>{setSpatial3d(e.target.value);const out=spatial.closest(".spatial3d")?.querySelector("span");if(out)out.textContent=Math.round(spatial3d*100)+"%"};
 }
 
-audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
-audio.onplay=()=>{playing=true;if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer();drawHomeWave()};audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer();drawHomeWave()};audio.onended=()=>{playing=false;if(autoNext)playNext();else{if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()}};audio.onerror=()=>{toast("Не удалось загрузить аудио");playing=false;drawPlayer()};
+audio.onplay=()=>{playing=true;if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});if(spatial3d)updateSpatial3d();if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer();drawHomeWave()};audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
+audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer();drawHomeWave()};audio.onended=()=>{playing=false;if(autoNext)playNext();else{if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()}};audio.onerror=()=>{toast("Не удалось загрузить аудио");playing=false;drawPlayer()};
 nextAudio.onerror=()=>{nextAudio.removeAttribute("src")};
 audio.addEventListener("canplay",preloadNext);
 document.querySelector("#closeModal").onclick=()=>modal.classList.remove("open");modal.onclick=e=>{if(e.target===modal)modal.classList.remove("open")};
