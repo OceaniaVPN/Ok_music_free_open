@@ -198,11 +198,12 @@ export default {
     if(!type.includes("text/html"))return response;
 
     let html=await response.text();
-    html=html.replace("</head>",MEGA_RUNTIME+"</head>");
+    html=html.replace("</body>",MEGA_RUNTIME+"</body>");
 
     const headers=new Headers(response.headers);
     headers.set("content-type","text/html; charset=utf-8");
-    headers.set("Cache-Control","public, max-age=300, stale-while-revalidate=86400");
+    headers.set("Cache-Control","no-store, no-cache, must-revalidate");
+    headers.set("Pragma","no-cache");
     headers.set("Vary","Accept-Encoding");
     return new Response(html,{status:response.status,headers});
   }
