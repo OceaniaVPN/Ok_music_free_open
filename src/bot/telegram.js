@@ -1,4 +1,3 @@
-import { createTelegramCode } from "../auth/telegram.js";
 
 async function sendTelegram(env,chatId,text,reply_markup){
   const token=String(env.TELEGRAM_BOT_TOKEN||"");
@@ -48,7 +47,7 @@ export async function handleTelegramWebhook(request,env){
     }
 
     if(/^\/(?:help|music)(?:@[^\s]+)?(?:\s|$)/i.test(text)){
-      await sendTelegram(env,id,"🎵 Ok Music\n\n/start или /app — открыть приложение.\n/code — выдать одноразовый код для входа в браузере.");
+      await sendTelegram(env,id,"🎵 Ok Music\n\n/start или /app — открыть приложение.\n");
       return Response.json({ok:true});
     }
 
