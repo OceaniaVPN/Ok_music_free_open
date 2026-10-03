@@ -80,9 +80,22 @@ export async function handleAuth(request,env){
   }
   return null;
 }
-export async function createTelegramChallenge(env,challenge,user){
+export async function activateTelegramChallenge(env,challenge,chatId){
+  if(!challenge||chatId===null)return false;
+  const r=await doCall(env,"/activate",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({challenge,chatId:String(chatId),ttl:CODE_TTL})});
+  return r.ok;
+}
+export async function getActiveTelegramChallenge(env,chatId){
+  if(chatId===null)return "";
+  const r=await doCall(env,"/active",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({chatId:String(chatId)})});
+  if(!r.ok)return "";
+  const d=await r.json().catch(()=>({}));
+  return String(d.challenge||"");
+}
+export async function createTelegramChallenge(env,challenge,user,chatId=""){
+
   if(!challenge||!user?.id)return false;
   const code=String(Math.floor(100000+Math.random()*900000));
-  const r=await doCall(env,"/bind",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({challenge,code,user,ttl:CODE_TTL})});
+  const r=await doCall(env,"/bind",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({challenge,code,user,chatId:String(chatId||""),ttl:CODE_TTL})});
   return r.ok?code:false;
 }
