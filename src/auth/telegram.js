@@ -69,7 +69,6 @@ async function readSession(request,botToken){
   const [payload,sig]=token.split(".");
   if(!payload||!sig)return null;
   const expected=await hmac(botToken,payload);
-  const actual=fromBase64url(sig);
   if(!constantTimeEqual(expected,actual))return null;
   try{
     const data=JSON.parse(new TextDecoder().decode(fromBase64url(payload)));
@@ -82,6 +81,26 @@ function cookie(token,maxAge=MAX_AGE){
 }
 export async function handleAuth(request,env){
   const url=new URL(request.url);
+  // Telegram LoginUrl appends the signed user fields to the browser URL.
+  if(request.method==="GET" && url.searchParams.has("hash") && url.searchParams.has("id") && url.searchParams.has("auth_date")){
+    try{
+      const data=Object.fromEntries(url.searchParams.entries());
+      const user=await verifyTelegramPayload(data,env.TELEGRAM_BOT_TOKEN);
+      if(user){
+        const session=await makeSession(user,env.TELEGRAM_BOT_TOKEN);
+        const clean=new URL(request.url);
+        for(const key of ["id","first_name","last_name","username","photo_url","auth_date","hash"])clean.searchParams.delete(key);
+        return new Response(null,{status:302,headers:{
+          "location":clean.href,
+          "cache-control":"no-store",
+          "set-cookie":cookie(session)
+        }});
+      }
+    }catch{}
+    const clean=new URL(request.url);
+    for(const key of ["id","first_name","last_name","username","photo_url","auth_date","hash"])clean.searchParams.delete(key);
+    return new Response("Telegram authorization failed",{status:401,headers:{"content-type":"text/plain; charset=utf-8","cache-control":"no-store"}});
+  }
   if(url.pathname==="/api/auth/me"){
     const user=await readSession(request,env.TELEGRAM_BOT_TOKEN);
     return Response.json({ok:true,authenticated:Boolean(user),user:user||null});
