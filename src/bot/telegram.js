@@ -1,12 +1,13 @@
-import { createTelegramChallenge } from "../auth/telegram.js";
+import { activateTelegramChallenge, createTelegramChallenge, getActiveTelegramChallenge } from "../auth/telegram.js";
 
-async function sendTelegram(env,chatId,text){
+async function sendTelegram(env,chatId,text,reply_markup){
+
   const token=String(env.TELEGRAM_BOT_TOKEN||"");
   if(!token)throw new Error("TELEGRAM_BOT_TOKEN is not configured");
   const r=await fetch("https://api.telegram.org/bot"+token+"/sendMessage",{
     method:"POST",
     headers:{"content-type":"application/json"},
-    body:JSON.stringify({chat_id:chatId,text})
+    body:JSON.stringify({chat_id:chatId,text,...(reply_markup?{reply_markup}: {})})
   });
   if(!r.ok)throw new Error("Telegram sendMessage failed: "+r.status);
   return r;
@@ -33,7 +34,7 @@ export async function handleTelegramWebhook(request,env){
         last_name:String(user?.last_name||""),
         username:String(user?.username||""),
         photo_url:""
-      });
+      },id);
       await sendTelegram(env,id,code
         ? "🔐 Код входа в Ok Music\n\n"+code+"\n\nВведи этот код на сайте. Код одноразовый и действует 5 минут."
         : "❌ Запрос авторизации истёк. Вернись на сайт и нажми «Получить код» ещё раз.");
