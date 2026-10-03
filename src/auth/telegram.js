@@ -62,7 +62,7 @@ export async function handleAuth(request,env){
   if(url.pathname==="/api/auth/verify"&&request.method==="POST"){
     try{
       const body=await request.json(),challenge=String(body.challenge||""),code=String(body.code||"").replace(/\D/g,"");
-      if(!challenge||code.length!==6)return Response.json({ok:false,error:"Нужен 6-значный код"},{status:400});
+      if(code.length!==6)return Response.json({ok:false,error:"Нужен 6-значный код"},{status:400});
       const r=await doCall(env,"/consume",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({challenge,code})});
       const result=await r.json();
       if(!result.ok)return Response.json({ok:false,error:result.error||"Код неверный или уже использован"},{status:401});
@@ -100,8 +100,13 @@ export async function checkTelegramCodeCooldown(env,chatId){
 }
 export async function createTelegramChallenge(env,challenge,user,chatId=""){
 
-  if(!challenge||!user?.id)return false;
-  const code=String(Math.floor(100000+Math.random()*900000));
+  if(!user?.id)return false;
+  const a=new Uint32Array(1);crypto.getRandomValues(a);
+  const code=String(100000+(a[0]%900000));
   const r=await doCall(env,"/bind",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({challenge,code,user,chatId:String(chatId||""),ttl:CODE_TTL})});
   return r.ok?code:false;
+}
+
+export async function createStandaloneTelegramCode(env,user,chatId=""){
+  return createTelegramChallenge(env,"",user,chatId);
 }
