@@ -61,7 +61,7 @@ function save(){localStorage.setItem(KEY,JSON.stringify(state))}
 function toast(s){toastEl.textContent=s;toastEl.classList.add("show");clearTimeout(window._toast);window._toast=setTimeout(()=>toastEl.classList.remove("show"),1800)}
 function fmt(n){return Number.isFinite(n)&&n>0?Math.floor(n/60)+":"+String(Math.floor(n%60)).padStart(2,"0"):"0:00"}
 function card(t){return '<article class="card"><div class="cover">'+(t.image?'<img src="'+esc(t.image)+'" loading="lazy">':"♫")+'<button class="play" data-play="'+esc(t.id)+'">▶</button></div><div class="title">'+esc(t.title)+'</div><div class="sub">'+esc(t.artist)+'</div></article>'}
-function result(t){const liked=state.liked.some(x=>x.id===t.id);return '<div class="result"><div class="mini">'+(t.image?'<img src="'+esc(t.image)+'" loading="lazy">':"♫")+'</div><div class="meta"><strong>'+esc(t.title)+'</strong><span>'+esc(t.artist)+(t.source?" · "+esc(t.source):"")+(t.album?" · "+esc(t.album):"")+'</span></div><div class="actions"><button class="icon" data-like="'+esc(t.id)+'">'+(liked?"♥":"♡")+'</button><button class="icon" data-add="'+esc(t.id)+'">＋</button><button class="icon" data-play="'+esc(t.id)+'">▶</button></div></div>'}
+function result(t){const liked=state.liked.some(x=>x.id===t.id);const external=t.source==="ZAYCEV.NET";return '<div class="result"><div class="mini">'+(t.image?'<img src="'+esc(t.image)+'" loading="lazy">':"♫")+'</div><div class="meta"><strong>'+esc(t.title)+'</strong><span>'+esc(t.artist)+(t.source?" · "+esc(t.source):"")+(t.album?" · "+esc(t.album):"")+'</span></div><div class="actions">'+(external?'<button class="icon" data-open="'+esc(t.sourceUrl||"")+'">↗</button>':'<button class="icon" data-like="'+esc(t.id)+'">'+(liked?"♥":"♡")+'</button><button class="icon" data-add="'+esc(t.id)+'">＋</button><button class="icon" data-play="'+esc(t.id)+'">▶</button>')+'</div></div>'}
 function bind(){
  if(view.dataset.bound==="1")return;
  view.dataset.bound="1";
@@ -69,7 +69,7 @@ function bind(){
   const b=e.target.closest("button");
   if(!b||!view.contains(b))return;
   const id=b.dataset.play||b.dataset.like||b.dataset.add;
-  if(!id)return;
+  if(b.dataset.open){window.open(b.dataset.open,"_blank","noopener,noreferrer");return;}const id=b.dataset.play||b.dataset.like||b.dataset.add;if(!id)return;
   const t=tracks.find(x=>String(x.id)===String(id))||state.liked.find(x=>String(x.id)===String(id));
   if(!t)return;
   e.preventDefault();e.stopPropagation();
@@ -114,7 +114,7 @@ function mood(){
  bind();view.querySelectorAll('[data-mood]').forEach(b=>b.onclick=()=>{toast('Подбираю: '+moodItems[Number(b.dataset.mood)][1]);tracks=[...demos];view.querySelector('.section h2').textContent=moodItems[Number(b.dataset.mood)][1];});
 }
 function searchView(){
- view.innerHTML='<div class="section"><h2>Поиск музыки</h2><small>YouTube Music · Jamendo</small></div><div class="searchbar"><input id="q" class="input" placeholder="Исполнитель, название, жанр…"><button id="go" class="primary">Искать</button></div><div id="results" class="results" style="margin-top:18px"><div class="empty">Начни с названия трека или исполнителя.</div></div>';
+ view.innerHTML='<div class="section"><h2>Поиск музыки</h2><small>Jamendo · ZAYCEV.NET</small></div><div class="searchbar"><input id="q" class="input" placeholder="Исполнитель, название, жанр…"><button id="go" class="primary">Искать</button></div><div id="results" class="results" style="margin-top:18px"><div class="empty">Начни с названия трека или исполнителя.</div></div>';
  document.querySelector("#go").onclick=()=>doSearch(document.querySelector("#q").value);document.querySelector("#q").onkeydown=e=>{if(e.key==="Enter")doSearch(e.target.value)}
 }
 async function doSearch(q){
@@ -179,48 +179,13 @@ function updateMediaSession(){
 }
 function drawPlayer(){if(!current){playerEl.className="player";return}
  playerEl.className="player on";
- if(current.youtubeId){
-   const ytOrigin=location.origin;
-   const ytReferrer=location.href.split("#")[0];
-   const ytUrl="https://www.youtube-nocookie.com/embed/"+encodeURIComponent(current.youtubeId)+"?autoplay=1&playsinline=1&controls=1&enablejsapi=1&origin="+encodeURIComponent(ytOrigin)+"&widget_referrer="+encodeURIComponent(ytReferrer)+"&rel=0&modestbranding=1";
-   playerEl.innerHTML='<div class="yt-frame"><iframe id="ytFrame" title="YouTube Music" src="'+ytUrl+'" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div><div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+' · YouTube Music</span><small id="ytStatus" style="display:block;color:var(--muted);font-size:10px;margin-top:4px">Загрузка YouTube…</small></div><div class="pc"><button id="closeYT" class="big">■</button></div>';
-   document.querySelector("#closeYT").onclick=()=>{current=null;playing=false;playerEl.className="player";};
-   const ytStatus=document.querySelector("#ytStatus");
-   const ytFallback=()=>{
-     if(!current?.youtubeId||!ytStatus)return;
-     ytStatus.innerHTML='YouTube ограничил воспроизведение в этом WebView. <button id="ytOpen" style="padding:4px 8px;border-radius:9px;font-size:10px">Открыть в Telegram</button>';
-     const open=document.querySelector("#ytOpen");
-     if(open)open.onclick=()=>{
-       const url="https://www.youtube.com/watch?v="+encodeURIComponent(current.youtubeId);
-       if(window.Telegram?.WebApp?.openLink) window.Telegram.WebApp.openLink(url,{try_instant_view:false});
-       else window.open(url,"_blank","noopener,noreferrer");
-     };
-   };
-   window.clearTimeout(window._ytFallbackTimer);
-   window._ytFallbackTimer=window.setTimeout(ytFallback,7000);
-   return;
- }
+ 
  playerEl.innerHTML='<div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>';
  document.querySelector("#pause").onclick=()=>{if(playing){audio.pause();playing=false;drawPlayer();return}const p=audio.play();if(p&&typeof p.then==="function")p.then(()=>{playing=true;drawPlayer()}).catch(()=>toast("Не удалось запустить аудио"))};document.querySelector("#seek").oninput=e=>{if(audio.duration)audio.currentTime=audio.duration*e.target.value/100}
 }
 
 window.addEventListener("message",e=>{
- if(!current?.youtubeId||!e.origin.includes("youtube"))return;
- let data=e.data;
- try{if(typeof data==="string")data=JSON.parse(data)}catch{return}
- if(data?.event==="onError"){
-  const code=Number(data.info);
-  const text=code===153?"YouTube не получил HTTP Referer / идентификацию клиента":code===101||code===150?"Видео запрещено для встраивания":code===100?"Видео удалено или приватное":"Ошибка YouTube "+code;
-  toast(text);
-  const s=document.querySelector("#ytStatus");if(s)s.textContent=text;
-  if(code===153||code===100||code===101||code===150) window.clearTimeout(window._ytFallbackTimer);
- }
- if(data?.event==="onAutoplayBlocked"){
-  toast("YouTube заблокировал автоматический запуск — нажми ▶ в плеере");
-  const s=document.querySelector("#ytStatus");if(s)s.textContent="Автозапуск заблокирован WebView — нажми ▶ в YouTube";
- }
-});
-audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
+ audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
 audio.onloadedmetadata=()=>{if(current)drawPlayer()};
 audio.oncanplay=()=>{if(current&&playing)drawPlayer()};
 audio.onplay=()=>{playing=true;if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer()};audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";if(current&&!current.youtubeId)drawPlayer()};audio.onended=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()};audio.onerror=()=>{console.warn("Ok Music audio error",audio.error);playing=false;drawPlayer();toast("Не удалось загрузить аудио")}
