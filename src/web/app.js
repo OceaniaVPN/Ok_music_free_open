@@ -173,7 +173,7 @@ img{max-width:100%}
 }
 .player.on{display:grid}.pcover{width:49px;height:49px;border-radius:13px;overflow:hidden;display:grid;place-items:center;background:#12311f}.pcover img{width:100%;height:100%;object-fit:cover}.pmeta{min-width:0;overflow:hidden}.pmeta strong,.pmeta span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pmeta strong{font-size:12px}.pmeta span{font-size:10px;color:var(--muted);margin-top:3px}
 .pc{display:flex;align-items:center;gap:6px}.pc .big{width:45px;height:45px;padding:0;border:0;border-radius:50%;background:#effff5;color:#06120a}.seek{grid-column:1/-1;width:100%;accent-color:var(--green)}.time{grid-column:1/-1;color:var(--muted);font-size:9px;margin-top:-5px}
-.fx-panel{grid-column:1/-1;border-top:1px solid rgba(166,255,205,.07);padding:11px 3px 2px}.eq-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.eq-band{text-align:center;min-width:0}.eq-band input{width:100%;accent-color:var(--green)}.eq-band small{display:block;color:var(--muted);font-size:8px;margin-top:3px}
+.fx-panel{grid-column:1/-1;border-top:1px solid rgba(166,255,205,.07);padding:11px 3px 2px}.eq-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.eq-band{text-align:center;min-width:0}.eq-band input{width:100%;accent-color:var(--green)}.eq-band small{display:block;color:var(--muted);font-size:8px;margin-top:3px}.spatial3d{margin-top:12px;padding:10px 11px;border:1px solid rgba(166,255,205,.08);border-radius:14px;background:rgba(78,228,143,.035)}.spatial3d-head{display:flex;align-items:center;justify-content:space-between;font-size:11px;margin-bottom:5px}.spatial3d-head span{color:var(--green);font-variant-numeric:tabular-nums}.spatial3d input{width:100%;accent-color:var(--green)}.spatial3d>small{display:block;color:var(--muted);font-size:8px;margin-top:3px}
 .nav{
  position:fixed;z-index:70;left:50%;bottom:max(9px,env(safe-area-inset-bottom));transform:translateX(-50%);
  width:min(620px,calc(100% - 18px));display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:6px;
@@ -284,7 +284,14 @@ function initAudioFx(){
   eqNodes.reduce((a,b)=>a.connect(b),audioSource);
   eqNodes[eqNodes.length-1].connect(eqLimiter);
   eqLimiter.connect(audioCtx.destination);
-  spatial3dNode=new PannerNode(audioCtx,{panningModel:"HRTF",distanceModel:"inverse",refDistance:1,maxDistance:8,rolloffFactor:0.35,coneInnerAngle:360,coneOuterAngle:360,coneOuterGain:0});
+  spatial3dNode=typeof PannerNode==="function"
+   ? new PannerNode(audioCtx,{panningModel:"HRTF",distanceModel:"inverse",refDistance:1,maxDistance:8,rolloffFactor:0.35,coneInnerAngle:360,coneOuterAngle:360,coneOuterGain:0})
+   : audioCtx.createPanner();
+  spatial3dNode.panningModel="HRTF";
+  spatial3dNode.distanceModel="inverse";
+  spatial3dNode.refDistance=1;
+  spatial3dNode.maxDistance=8;
+  spatial3dNode.rolloffFactor=0.35;
   spatial3dNode.positionX.value=0;spatial3dNode.positionY.value=0;spatial3dNode.positionZ.value=0;
   eqLimiter.disconnect();
   eqLimiter.connect(spatial3dNode);
