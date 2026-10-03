@@ -9,12 +9,19 @@ export function renderApp(request, env) {
 <title>${appName}</title>
 <style>
 :root{
- color-scheme:dark;
+ color-scheme:dark;view-transition-name:root;
  --bg:#06110b;--panel:#0b1c12;--panel2:#0f2518;--card:#10261a;
  --text:#f3fff7;--muted:#91aa9b;--line:rgba(166,255,205,.13);
  --green:#4ee48f;--green2:#24c978;--green3:#8af7b5;--danger:#ff7e8a;
- --shadow:0 24px 70px rgba(0,0,0,.42)
+ --glow:var(--glow);--shadow:0 24px 70px rgba(0,0,0,.42)
 }
+:root[data-theme="night"]{--bg:#080a18;--panel:#101126;--panel2:#171833;--card:#14152c;--green:#8d8bff;--green2:#706cf0;--green3:#c2c0ff;--muted:#a4a5c5;--line:rgba(175,174,255,.16);--glow:rgba(141,139,255,.20)}
+:root[data-theme="energy"]{--bg:#151005;--panel:#241a08;--panel2:#30200a;--card:#271b08;--green:#ffb33f;--green2:#ff8b21;--green3:#ffd27b;--muted:#cbb79a;--line:rgba(255,190,78,.16);--glow:rgba(255,166,48,.20)}
+:root[data-theme="chill"]{--bg:#041317;--panel:#082027;--panel2:#0b2932;--card:#0a252d;--green:#53d8e8;--green2:#2aaec3;--green3:#9af1f8;--muted:#9bbbc0;--line:rgba(83,216,232,.16);--glow:rgba(83,216,232,.18)}
+:root[data-theme="love"]{--bg:#16070f;--panel:#27101b;--panel2:#351522;--card:#2a111d;--green:#ff7fba;--green2:#ef4f98;--green3:#ffb1d5;--muted:#c8a4b5;--line:rgba(255,127,186,.16);--glow:rgba(255,93,164,.19)}
+:root[data-theme="road"]{--bg:#111006;--panel:#211d09;--panel2:#30290b;--card:#282209;--green:#e6d15a;--green2:#c6ad32;--green3:#fff09b;--muted:#c0b98e;--line:rgba(230,209,90,.16);--glow:rgba(230,209,90,.18)}
+:root[data-theme="party"]{--bg:#100719;--panel:#1e0d2c;--panel2:#28103a;--card:#21102e;--green:#d66cff;--green2:#a844ef;--green3:#efb3ff;--muted:#bda7c9;--line:rgba(214,108,255,.17);--glow:rgba(214,108,255,.20)}
+:root[data-theme="phonk"]{--bg:#0e0809;--panel:#1d0d0e;--panel2:#281113;--card:#211012;--green:#ff5b68;--green2:#dc303f;--green3:#ff9da5;--muted:#c5a4a8;--line:rgba(255,91,104,.16);--glow:rgba(255,73,88,.20)}
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-behavior:smooth}
@@ -22,7 +29,7 @@ body{
  font-family:Manrope,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
  overflow-x:hidden;overscroll-behavior-x:none;
  background:
- radial-gradient(850px 520px at -8% -10%,rgba(78,228,143,.17),transparent 62%),
+ radial-gradient(850px 520px at -8% -10%,var(--glow),transparent 62%),
  radial-gradient(700px 520px at 108% 8%,rgba(36,201,120,.10),transparent 60%),
  radial-gradient(700px 520px at 50% 115%,rgba(138,247,181,.07),transparent 64%),
  linear-gradient(160deg,#04100a 0%,#07170e 52%,#051009 100%);
@@ -55,14 +62,14 @@ img{max-width:100%}
 .brand h1{margin:0;font:700 23px/1 Space Grotesk,sans-serif;letter-spacing:-.7px}
 .brand span{display:block;color:var(--muted);font-size:10px;margin-top:6px}
 .brand span:before{content:"●";color:var(--green);font-size:8px;margin-right:6px}
-.avatar{width:46px;height:46px;border-radius:50%;padding:0;background:rgba(13,35,22,.78);border-color:rgba(78,228,143,.18)}
+.avatar{width:46px;height:46px;border-radius:50%;padding:0;background:rgba(13,35,22,.78);border-color:var(--glow)}
 .hero{
  position:relative;overflow:hidden;isolation:isolate;margin-bottom:22px;padding:38px;
  border:1px solid rgba(166,255,205,.11);border-radius:31px;
  background:linear-gradient(145deg,rgba(16,38,25,.92),rgba(7,20,12,.82));
  box-shadow:var(--shadow),inset 0 1px rgba(255,255,255,.07)
 }
-.hero:before{content:"";position:absolute;width:360px;height:360px;right:-170px;top:-170px;border-radius:50%;background:radial-gradient(circle,rgba(78,228,143,.22),transparent 70%);filter:blur(8px);pointer-events:none}
+.hero:before{content:"";position:absolute;width:360px;height:360px;right:-170px;top:-170px;border-radius:50%;background:radial-gradient(circle,var(--glow),transparent 70%);filter:blur(8px);pointer-events:none}
 .hero:after{content:"";position:absolute;width:360px;height:260px;left:35%;bottom:-210px;border-radius:50%;background:radial-gradient(ellipse,rgba(36,201,120,.12),transparent 70%);pointer-events:none}
 .hero-main,.hero-bottom,.hero-kicker,.hero-quick{position:relative;z-index:2}
 .hero-kicker{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:16px}
@@ -149,7 +156,7 @@ img{max-width:100%}
 .offline-panel strong{display:block;font-size:12px}.offline-panel span{display:block;color:var(--muted);font-size:10px;margin-top:4px}.offline-panel button{white-space:nowrap;font-size:10px}
 .moods{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 .mood-card{min-height:155px;position:relative;overflow:hidden;text-align:left;padding:17px;display:flex;flex-direction:column;justify-content:flex-end;border-radius:21px;background:linear-gradient(145deg,rgba(16,38,24,.88),rgba(6,16,10,.78));border:1px solid rgba(166,255,205,.08);box-shadow:0 17px 50px rgba(0,0,0,.25)}
-.mood-card:before{content:"";position:absolute;width:135px;height:135px;right:-50px;top:-50px;border-radius:50%;background:radial-gradient(circle,rgba(78,228,143,.18),transparent 72%)}
+.mood-card:before{content:"";position:absolute;width:135px;height:135px;right:-50px;top:-50px;border-radius:50%;background:radial-gradient(circle,var(--glow),transparent 72%)}
 .mood-card b,.mood-card strong,.mood-card span{position:relative}.mood-card b{font-size:34px;margin-bottom:auto}.mood-card strong{font-size:15px}.mood-card span{margin-top:4px;font-size:10px;color:var(--muted)}
 .results{display:grid;gap:7px}.result{display:flex;align-items:center;gap:10px;min-width:0;padding:9px;border-radius:18px;background:rgba(7,18,11,.5);border:1px solid transparent}.result:hover{background:rgba(78,228,143,.045);border-color:rgba(166,255,205,.10)}
 .mini{width:60px;height:60px;flex:0 0 60px;display:grid;place-items:center;overflow:hidden;border-radius:14px;background:linear-gradient(135deg,#163b28,#0a1710);font-size:22px}.mini img{width:100%;height:100%;object-fit:cover}
@@ -207,7 +214,8 @@ img{max-width:100%}
 }
 @media(max-width:360px){.grid{gap:7px}.card{padding:7px}.title{font-size:10px}.actions{max-width:130px}.icon,.actions .offline-btn,.track-actions .offline-btn{width:32px;height:32px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.001ms!important;transition-duration:.001ms!important;scroll-behavior:auto!important}}
-</style></head>
+html,body,.app,.top,.hero,.card,.wave-card,.taste-panel,.track-profile,.result,.playlist,.player,.nav,.dialog,.mood-card,.offline-panel,.input,.logo,.primary,.nav button.active,.home-play{transition:background-color .65s ease,background .65s ease,border-color .65s ease,color .65s ease,box-shadow .65s ease,filter .65s ease}
+::view-transition-old(root),::view-transition-new(root){animation-duration:.7s;animation-timing-function:cubic-bezier(.22,.61,.36,1)}</style></head>
 <body>
 <div class="app">
   <header class="top"><div class="brand"><div class="logo">♫</div><div><h1>Ok Music</h1><span>Твоя музыка. Твоё настроение.</span></div></div><button class="avatar" id="tasteBtn" title="Мой музыкальный вкус">✦</button></header>
@@ -235,6 +243,27 @@ audio.preload="auto";
 audio.crossOrigin="anonymous";
 nextAudio.preload="auto";
 nextAudio.setAttribute("aria-hidden","true");
+const THEME_KEY="okmusic:theme";
+const MUSIC_THEMES=[{id:"default",telegram:"#07140d"},{id:"night",telegram:"#080a18"},{id:"energy",telegram:"#151005"},{id:"chill",telegram:"#041317"},{id:"love",telegram:"#16070f"},{id:"road",telegram:"#111006"},{id:"party",telegram:"#100719"},{id:"phonk",telegram:"#0e0809"}];
+function applyTheme(themeId,animate=true){
+ const theme=MUSIC_THEMES.some(x=>x.id===themeId)?themeId:"default";
+ const change=()=>{
+  document.documentElement.dataset.theme=theme;
+  try{localStorage.setItem(THEME_KEY,theme)}catch{}
+  const t=MUSIC_THEMES.find(x=>x.id===theme),meta=document.querySelector('meta[name="theme-color"]');
+  if(meta)meta.content=t.telegram;
+  try{if(window.Telegram?.WebApp){window.Telegram.WebApp.setHeaderColor(t.telegram);window.Telegram.WebApp.setBackgroundColor(t.telegram)}}catch{}
+ };
+ if(animate&&document.startViewTransition)document.startViewTransition(change);
+ else if(animate){
+  const fade=document.createElement("div");
+  fade.style.cssText="position:fixed;inset:0;z-index:9999;pointer-events:none;background:var(--bg);opacity:0;transition:opacity .7s ease";
+  document.body.appendChild(fade);
+  requestAnimationFrame(()=>{fade.style.opacity="1";change();requestAnimationFrame(()=>{fade.style.opacity="0";setTimeout(()=>fade.remove(),750)})});
+ }else change();
+}
+let savedTheme="default";try{savedTheme=localStorage.getItem(THEME_KEY)||"default"}catch{}
+applyTheme(savedTheme,false);
 const AUDIO_KEY="okmusic:audio";
 const eqBands=["60","250","1K","4K","12K"];
 let audioFx={eq:[0,0,0,0,0]};
@@ -445,7 +474,10 @@ async function loadMix(force=false){
 function mood(){
  const moodItems=[["🌙","Ночной вайб","Спокойное и атмосферное"],["⚡","Энергия","Больше ритма и движения"],["☁️","Chill","Расслабиться и выдохнуть"],["💜","Любовь","Мягкие и тёплые треки"],["🚗","В дорогу","Музыка для долгой поездки"],["🔥","Вечеринка","Ритм, который не отпускает"],["🖤","Фонк","Бас, дрифт и ночной вайб"]];
  view.innerHTML='<div class="section"><h2>Какое настроение?</h2><small>Выбери атмосферу</small></div><div class="moods">'+moodItems.map((x,i)=>'<button class="mood-card" data-mood="'+i+'"><b>'+x[0]+'</b><strong>'+x[1]+'</strong><span>'+x[2]+'</span></button>').join('')+'</div><div class="section"><h2>Популярное</h2><small>Для хорошего настроения</small></div><div class="grid">'+demos.map(card).join('')+'</div>';
- bind();view.querySelectorAll('[data-mood]').forEach(b=>b.onclick=()=>{toast('Подбираю: '+moodItems[Number(b.dataset.mood)][1]);tracks=[...demos];view.querySelector('.section h2').textContent=moodItems[Number(b.dataset.mood)][1];});
+ bind();view.querySelectorAll('[data-mood]').forEach(b=>b.onclick=()=>{
+ const i=Number(b.dataset.mood),item=moodItems[i],theme=["night","energy","chill","love","road","party","phonk"][i]||"default";
+ applyTheme(theme,true);toast("Подбираю: "+item[1]);tracks=[...demos];view.querySelector(".section h2").textContent=item[1];
+});
 }
 function searchView(){
  view.innerHTML='<div class="section"><h2>Поиск музыки</h2><small>Zaycev.net · Jamendo · 🔐 Ключник</small></div><div class="searchbar"><input id="q" class="input" placeholder="Исполнитель, название, жанр…"><button id="go" class="primary">Искать</button></div><div id="results" class="results" style="margin-top:18px"><div class="empty">Начни с названия трека или исполнителя.</div></div>';
