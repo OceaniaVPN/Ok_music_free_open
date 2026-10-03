@@ -205,9 +205,10 @@ export async function handleApi(request,env){
       Promise.allSettled(uniqueQueries.slice(0,3).map(q=>searchJamendo(q,8,env)))
     ]);
     const zaycev=zr.flatMap(r=>r.status==="fulfilled"?r.value:[]),
-      jam=jr.flatMap(r=>r.status==="fulfilled"?r.value:[]);
+      jam=jr.flatMap(r=>r.status==="fulfilled"?r.value:[]),
+      local=Array.isArray(LOCAL_MUSIC)?LOCAL_MUSIC.filter(t=>t?.audio):[];
     const pool=[],seen=new Set();
-    for(const list of [zaycev,jam]) for(const t of list){
+    for(const list of [zaycev,jam,local]) for(const t of list){
       if(!t||!t.id||seen.has(t.id))continue;
       seen.add(t.id);pool.push(t);
     }
@@ -240,6 +241,8 @@ export async function handleApi(request,env){
     const ranked=pool.filter(t=>score(t)>-100000).map(t=>({t,s:score(t)+jitter(t)})).sort((a,b)=>b.s-a.s);
     const preferred=ranked.filter(x=>wanted.some(a=>a&&String(x.t.artist||"").toLowerCase().includes(a)));
     const zaycevRanked=ranked.filter(x=>x.t.source==="Zaycev.net");
+    const jamRanked=ranked.filter(x=>x.t.source==="Jamendo");
+    const localRanked=ranked.filter(x=>x.t.source==="🔐 Ключник");
     const rest=ranked.filter(x=>!wanted.some(a=>a&&String(x.t.artist||"").toLowerCase().includes(a)));
     const final=[];
     const used=new Set();
@@ -247,11 +250,20 @@ export async function handleApi(request,env){
       if(!t||used.has(t.id))return false;
       used.add(t.id);final.push(t);return true;
     };
-    // If there are enough favorite-artist candidates, reserve roughly half the mix for them.
+    // The wave is a cross-source mix: seed it with one track from every working provider.
+    for(const sourceList of [preferred,zaycevRanked,jamRanked,localRanked]){
+      const candidate=sourceList.find(x=>!used.has(x.t.id));
+      if(candidate)add(candidate.t);
+    }
     const preferredTarget=Math.min(Math.ceil(limit/2),preferred.length);
-    for(const x of preferred.slice(0,preferredTarget))add(x.t);
-    const zaycevTarget=Math.min(zaycevRanked.length,Math.max(2,Math.floor(limit/4)));
-    for(const x of zaycevRanked)if(final.length<limit&&final.filter(t=>t.source==="Zaycev.net").length<zaycevTarget)add(x.t);
+    for(const x of preferred.slice(0,preferredTarget))if(final.length<limit)add(x.t);
+    const sourceBuckets=[zaycevRanked,jamRanked,localRanked];
+    let sourceCursor=0;
+    while(final.length<limit&&sourceBuckets.some(list=>list.some(x=>!used.has(x.t.id)))){
+      const list=sourceBuckets[sourceCursor%sourceBuckets.length];sourceCursor++;
+      const candidate=list.find(x=>!used.has(x.t.id));
+      if(candidate)add(candidate.t);
+    }
     const buckets=new Map();
     for(const x of [...preferred.slice(preferredTarget),...rest]){
       const key=String(x.t.artist||"Неизвестный").toLowerCase();
@@ -267,7 +279,7 @@ export async function handleApi(request,env){
       if(!added)break;
     }
     const errors=[...zr.filter(r=>r.status==="rejected").map(r=>"Zaycev.net: "+(r.reason?.message||"ошибка")),...jr.filter(r=>r.status==="rejected").map(r=>"Jamendo: "+(r.reason?.message||"ошибка"))];
-    return Response.json({ok:true,mode:base?"personalized":"discovery",profile:{genres,moods,artists:preferredArtists.join(", "),now},providers:[...(zaycev.length?["Zaycev.net"]:[]),...(jam.length?["Jamendo"]:[])],tracks:final,errors});
+    return Response.json({ok:true,mode:base?"personalized":"discovery",profile:{genres,moods,artists:preferredArtists.join(", "),now},providers:[...(zaycev.length?["Zaycev.net"]:[]),...(jam.length?["Jamendo"]:[]),...(local.length?["🔐 Ключник"]:[])],tracks:final,errors});
   }
   return Response.json({ok:false,error:"Not found"},{status:404});
 }
