@@ -212,7 +212,7 @@ export class AuthCodesV2 extends DurableObject {
     }
     if(request.method==="POST"&&url.pathname==="/bind"){
       const challenge=String(body.challenge||"");
-      const ch=await get("challenge:"+challenge);
+      const ch=challenge?await get("challenge:"+challenge):true;
       if(!ch||!body.code||!body.user?.id)return Response.json({ok:false},{status:400});
       await put("code:"+String(body.code),{
         challenge,
