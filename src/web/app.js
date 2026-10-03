@@ -51,17 +51,43 @@ state.taste.artists=typeof state.taste.artists==="string"?state.taste.artists:""
 state.taste.now=typeof state.taste.now==="string"?state.taste.now:"";
 let tracks=[], current=null, audio=new Audio(), playing=false;
 audio.preload="auto";
+const AUDIO_KEY="okmusic:audio";
+let audioFx={eq:[0,0,0,0,0],spatial:0.45};
+try{audioFx={...audioFx,...JSON.parse(localStorage.getItem(AUDIO_KEY)||"{}")}}catch{}
+let audioCtx=null,audioSource=null,eqNodes=[],spatialNode=null,fxReady=false;
+function saveAudioFx(){localStorage.setItem(AUDIO_KEY,JSON.stringify(audioFx))}
+function initAudioFx(){
+ if(fxReady)return true;
+ try{
+  audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  audioSource=audioCtx.createMediaElementSource(audio);
+  const freqs=[60,250,1000,4000,12000];
+  eqNodes=freqs.map((f,i)=>{const n=audioCtx.createBiquadFilter();n.type=i===0?"lowshelf":i===4?"highshelf":"peaking";n.frequency.value=f;n.Q.value=i===0||i===4?0.7:1.1;n.gain.value=Number(audioFx.eq[i]||0);return n});
+  eqNodes.reduce((a,b)=>a.connect(b),audioSource);
+  spatialNode=audioCtx.createStereoPanner();
+  eqNodes[4].connect(spatialNode).connect(audioCtx.destination);
+  spatialNode.pan.value=0;
+  fxReady=true;
+  return true;
+ }catch(e){console.warn("Ok Music effects:",e);return false}
+}
+function setEq(i,v){audioFx.eq[i]=Number(v);if(eqNodes[i])eqNodes[i].gain.value=Number(v);saveAudioFx()}
+function setSpatial(v){audioFx.spatial=Number(v);saveAudioFx()}
+function applySpatial(){
+ if(!spatialNode||!audioFx.spatial)return;
+ const t=audioCtx.currentTime,sweep=Math.sin(performance.now()/1800)*Number(audioFx.spatial||0);
+ spatialNode.pan.cancelScheduledValues(t);spatialNode.pan.setTargetAtTime(sweep,t,0.06);
+}
+function audioFxLoop(){if(fxReady&&playing)applySpatial();requestAnimationFrame(audioFxLoop)}
+requestAnimationFrame(audioFxLoop);
 const demos=[
-{id:"demo-1",title:"Midnight Waves",artist:"Ok Music",image:"",audio:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",source:"Demo"},
-{id:"demo-2",title:"Neon Drive",artist:"Ok Music",image:"",audio:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",source:"Demo"},
-{id:"demo-3",title:"Afterglow",artist:"Ok Music",image:"",audio:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",source:"Demo"},
-{id:"demo-4",title:"Ocean Lights",artist:"Ok Music",image:"",audio:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",source:"Demo"}];
+{id:"demo-1",title:"Local Demo",artist:"Ok Music",image:"",audio:"/music/demo-1.mp3",source:"Local"}];
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
 function save(){localStorage.setItem(KEY,JSON.stringify(state))}
 function toast(s){toastEl.textContent=s;toastEl.classList.add("show");clearTimeout(window._toast);window._toast=setTimeout(()=>toastEl.classList.remove("show"),1800)}
 function fmt(n){return Number.isFinite(n)&&n>0?Math.floor(n/60)+":"+String(Math.floor(n%60)).padStart(2,"0"):"0:00"}
 function card(t){return '<article class="card"><div class="cover">'+(t.image?'<img src="'+esc(t.image)+'" loading="lazy">':"♫")+'<button class="play" data-play="'+esc(t.id)+'">▶</button></div><div class="title">'+esc(t.title)+'</div><div class="sub">'+esc(t.artist)+'</div></article>'}
-function result(t){const liked=state.liked.some(x=>x.id===t.id);const external=t.source==="ZAYCEV.NET";return '<div class="result"><div class="mini">'+(t.image?'<img src="'+esc(t.image)+'" loading="lazy">':"♫")+'</div><div class="meta"><strong>'+esc(t.title)+'</strong><span>'+esc(t.artist)+(t.source?" · "+esc(t.source):"")+(t.album?" · "+esc(t.album):"")+'</span></div><div class="actions">'+(external?'<button class="icon" data-open="'+esc(t.sourceUrl||"")+'">↗</button>':'<button class="icon" data-like="'+esc(t.id)+'">'+(liked?"♥":"♡")+'</button><button class="icon" data-add="'+esc(t.id)+'">＋</button><button class="icon" data-play="'+esc(t.id)+'">▶</button>')+'</div></div>'}
+function result(t){const liked=state.liked.some(x=>x.id===t.id);const external=t.source==="ZAYCEV.NET" && !t.zaycevId;return '<div class="result"><div class="mini">'+(t.image?'<img src="'+esc(t.image)+'" loading="lazy">':"♫")+'</div><div class="meta"><strong>'+esc(t.title)+'</strong><span>'+esc(t.artist)+(t.source?" · "+esc(t.source):"")+(t.album?" · "+esc(t.album):"")+'</span></div><div class="actions">'+(external?'<button class="icon" data-open="'+esc(t.sourceUrl||"")+'">↗</button>':'<button class="icon" data-like="'+esc(t.id)+'">'+(liked?"♥":"♡")+'</button><button class="icon" data-add="'+esc(t.id)+'">＋</button><button class="icon" data-play="'+esc(t.id)+'">▶</button>')+'</div></div>'}
 function bind(){
  if(view.dataset.bound==="1")return;
  view.dataset.bound="1";
@@ -139,7 +165,7 @@ function playableAudio(src){
   const u=new URL(raw,location.href);
   if(u.origin===location.origin)return u.href;
   const h=u.hostname.toLowerCase();
-  if(h==="jamendo.com"||h.endsWith(".jamendo.com")||h==="storage.jamendo.com"||h.endsWith(".storage.jamendo.com")||h==="soundhelix.com"||h.endsWith(".soundhelix.com")){
+  if(h==="jamendo.com"||h.endsWith(".jamendo.com")||h==="storage.jamendo.com"||h.endsWith(".storage.jamendo.com")){
    return location.origin+"/api/audio?url="+encodeURIComponent(u.href);
   }
   return u.href;
@@ -153,9 +179,11 @@ function play(t){
  audio.pause();
  drawPlayer();
 
- const src=playableAudio(t.audio||t.src);
+ const src=current?.source==="ZAYCEV.NET"&&current?.zaycevId?"/api/zaycev/play?track="+encodeURIComponent(current.zaycevId):playableAudio(t.audio||t.src);
  if(!src){toast("У этого трека нет прямого воспроизведения");return}
  audio.src=src;
+ initAudioFx();
+ if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});
  audio.load();
  const p=audio.play();
  if(p&&typeof p.then==="function"){
@@ -179,9 +207,12 @@ function updateMediaSession(){
 }
 function drawPlayer(){if(!current){playerEl.className="player";return}
  playerEl.className="player on";
- 
- playerEl.innerHTML='<div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>';
- document.querySelector("#pause").onclick=()=>{if(playing){audio.pause();playing=false;drawPlayer();return}const p=audio.play();if(p&&typeof p.then==="function")p.then(()=>{playing=true;drawPlayer()}).catch(()=>toast("Не удалось запустить аудио"))};document.querySelector("#seek").oninput=e=>{if(audio.duration)audio.currentTime=audio.duration*e.target.value/100}
+ playerEl.innerHTML='<div class="pcover">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button><button id="fxBtn" class="big" title="Эквалайзер и 3D">🎚</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span><div id="fxPanel" style="display:none;grid-column:1/-1;padding:10px;border-top:1px solid var(--line)"><div style="font-size:11px;color:var(--muted);margin-bottom:7px">Эквалайзер · 60 / 250 / 1K / 4K / 12K Гц</div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">'+audioFx.eq.map((v,i)=>'<input class="eq" data-eq="'+i+'" type="range" min="-9" max="9" step="1" value="'+v+'" title="'+[60,250,1000,4000,12000][i]+' Гц">').join("")+'</div><label style="display:flex;align-items:center;gap:8px;font-size:11px;margin-top:10px">🌐 3D <input id="spatial" type="range" min="0" max="1" step="0.05" value="'+audioFx.spatial+'" style="flex:1"><span>ширина</span></label></div>';
+ document.querySelector("#pause").onclick=()=>{if(playing){audio.pause();return}initAudioFx();if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});audio.play().catch(()=>toast("Не удалось запустить аудио"))};
+ document.querySelector("#seek").oninput=e=>{if(audio.duration)audio.currentTime=audio.duration*e.target.value/100};
+ document.querySelector("#fxBtn").onclick=()=>{const p=document.querySelector("#fxPanel");p.style.display=p.style.display==="none"?"block":"none"};
+ document.querySelectorAll("[data-eq]").forEach(b=>b.oninput=e=>setEq(Number(e.target.dataset.eq),e.target.value));
+ document.querySelector("#spatial").oninput=e=>setSpatial(e.target.value);
 }
 
  audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}

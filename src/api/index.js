@@ -1,3 +1,4 @@
+import { searchZaycev, getZaycevPlayback } from "../sources/zaycev.js";
 function uniqueTracks(tracks, limit) {
   const seen = new Set();
   return tracks.filter(track => {
@@ -43,27 +44,10 @@ async function searchJamendo(q, limit, env) {
   return uniqueTracks((data.results || []).map(normalizeJamendo).filter(t => t.audio), limit);
 }
 
-function zaycevResult(q) {
-  const sourceUrl = "https://zaycev.net/search.html?query_search=" + encodeURIComponent(q);
-  return {
-    id: "zaycev-search-" + encodeURIComponent(q),
-    title: "Открыть результаты ZAYCEV.NET",
-    artist: q,
-    album: "",
-    image: "",
-    audio: "",
-    duration: 0,
-    license: "",
-    source: "ZAYCEV.NET",
-    sourceUrl,
-    genre: ""
-  };
-}
-
 async function proxyAudio(url, request) {
   const target = new URL(url);
   const host = target.hostname.toLowerCase();
-  const allowed = host === "api.jamendo.com" || host === "jamendo.com" || host.endsWith(".jamendo.com") || host === "storage.jamendo.com" || host.endsWith(".storage.jamendo.com") || host === "soundhelix.com" || host.endsWith(".soundhelix.com");
+  const allowed = host === "api.jamendo.com" || host === "jamendo.com" || host.endsWith(".jamendo.com") || host === "storage.jamendo.com" || host.endsWith(".storage.jamendo.com") || false;
   if (!allowed) return Response.json({ ok: false, error: "Audio host is not allowed" }, { status: 403 });
   const headers = new Headers();
   const range = request.headers.get("range");
@@ -81,6 +65,17 @@ async function proxyAudio(url, request) {
 export async function handleApi(request, env) {
   const url = new URL(request.url);
 
+  if (url.pathname === "/api/zaycev/play") {
+    const track = url.searchParams.get("track") || "";
+    if (!track) return Response.json({ ok: false, error: "Missing ZAYCEV.NET track id" }, { status: 400 });
+    try {
+      const playbackUrl = await getZaycevPlayback(track, env);
+      return Response.redirect(playbackUrl, 302);
+    } catch (e) {
+      return Response.json({ ok: false, error: e?.message || "ZAYCEV.NET playback failed" }, { status: 502 });
+    }
+  }
+
   if (url.pathname === "/api/audio") {
     const raw = url.searchParams.get("url") || "";
     if (!raw) return Response.json({ ok: false, error: "Missing audio url" }, { status: 400 });
@@ -89,18 +84,26 @@ export async function handleApi(request, env) {
   }
 
   if (url.pathname === "/api/health") {
-    return Response.json({ ok: true, service: env.APP_NAME || "Ok Music", version: "7.0", providers: ["Jamendo", "ZAYCEV.NET"], jamendo: { configured: Boolean(String(env.JAMENDO_CLIENT_ID || "").trim()) } });
+    return Response.json({ ok: true, service: env.APP_NAME || "Ok Music", version: "7.0", providers: ["Jamendo", "ZAYCEV.NET"], jamendo: { configured: Boolean(String(env.JAMENDO_CLIENT_ID || "").trim()) }, zaycev: { configured: Boolean(String(env.ZAYCEV_STATIC_KEY || "").trim()) } });
   }
 
   if (url.pathname === "/api/search") {
     const q = (url.searchParams.get("q") || "").trim();
     if (!q) return Response.json({ ok: true, query: "", providers: [], tracks: [] });
-    const result = await Promise.allSettled([searchJamendo(q, 24, env)]);
+    const result = await Promise.allSettled([searchJamendo(q, 24, env), searchZaycev(q, 24, env)]);
     const jamendoTracks = result[0].status === "fulfilled" ? result[0].value : [];
-    const zaycev = zaycevResult(q);
-    const tracks = [...jamendoTracks, zaycev];
-    const errors = result[0].status === "rejected" ? ["Jamendo: " + (result[0].reason?.message || "ошибка")] : [];
-    return Response.json({ ok: tracks.length > 0, query: q, providers: [...(jamendoTracks.length ? ["Jamendo"] : []), "ZAYCEV.NET"], tracks, errors });
+    const zaycevTracks = result[1].status === "fulfilled" ? result[1].value : [];
+    const tracks = uniqueTracks([...jamendoTracks, ...zaycevTracks], 40);
+    const errors = [];
+    if (result[0].status === "rejected") errors.push("Jamendo: " + (result[0].reason?.message || "ошибка"));
+    if (result[1].status === "rejected") errors.push("ZAYCEV.NET: " + (result[1].reason?.message || "ошибка"));
+    return Response.json({
+      ok: tracks.length > 0,
+      query: q,
+      providers: [...(jamendoTracks.length ? ["Jamendo"] : []), ...(zaycevTracks.length ? ["ZAYCEV.NET"] : [])],
+      tracks,
+      errors
+    });
   }
 
   if (url.pathname === "/api/recommendations") {

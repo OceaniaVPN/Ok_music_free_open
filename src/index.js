@@ -20,6 +20,12 @@ export default {
     if (url.pathname === "/telegram/webhook" && request.method === "POST") {
       return handleTelegramWebhook(request, env);
     }
+
+    if (env.ASSETS && url.pathname !== "/") {
+      const asset = await env.ASSETS.fetch(request);
+      if (asset.status !== 404) return asset;
+    }
+
     return renderApp(request, env);
   }
 };
