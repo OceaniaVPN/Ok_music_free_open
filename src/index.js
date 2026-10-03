@@ -3,6 +3,9 @@ import { handleApi } from "./api/index.js";
 import { handleTelegramWebhook } from "./bot/telegram.js";
 import { renderApp } from "./web/app.js";
 
+const PWA_MANIFEST=JSON.stringify({name:"Ok Music",short_name:"Ok Music",start_url:"/",scope:"/",display:"standalone",background_color:"#050c09",theme_color:"#07140f",description:"Музыкальный веб-плеер с офлайн-треками."});
+const SERVICE_WORKER="const CACHE=\"okmusic-shell-v2\";self.addEventListener(\"install\",event=>event.waitUntil(caches.open(CACHE).then(c=>c.addAll([\"/\",\"/manifest.webmanifest\"])).then(()=>self.skipWaiting())));self.addEventListener(\"activate\",event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));self.addEventListener(\"fetch\",event=>{const r=event.request;if(r.method!==\"GET\")return;const u=new URL(r.url);if(u.origin!==self.location.origin||u.pathname.startsWith(\"/api/\")||u.pathname.startsWith(\"/music/\")||u.pathname===\"/sw.js\"||u.pathname.startsWith(\"/__okmusic_offline__/\"))return;if(r.mode===\"navigate\"){event.respondWith((async()=>{try{const n=await fetch(r);const c=await caches.open(CACHE);await c.put(\"/\",n.clone());return n}catch{return (await caches.match(\"/\"))||Response.error()}})());return}event.respondWith((async()=>{const c=await caches.open(CACHE),hit=await c.match(r);if(hit)return hit;try{const n=await fetch(r);if(n.ok)await c.put(r,n.clone());return n}catch{return hit||Response.error()}})())});";
+
 const MEGA_RUNTIME=String.raw`<script>
 window.__megaMetaReady=null;
 window.__megaMegaReady=null;
