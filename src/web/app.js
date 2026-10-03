@@ -5,7 +5,7 @@ export function renderApp(request, env) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#06100d"><meta name="referrer" content="strict-origin-when-cross-origin"><script defer src="https://telegram.org/js/telegram-web-app.js?63"></script>
+<meta name="theme-color" content="#06100d"><meta name="referrer" content="strict-origin-when-cross-origin"><meta name="telegram-bot" content="${String(env.TELEGRAM_BOT_USERNAME||"").replace(/"/g,"&quot;")}"><script defer src="https://telegram.org/js/telegram-web-app.js?63"></script>
 <title>${appName}</title>
 <style>
 :root{
@@ -173,7 +173,7 @@ img{max-width:100%}
 }
 .player.on{display:grid}.pcover{width:49px;height:49px;border-radius:13px;overflow:hidden;display:grid;place-items:center;background:#12311f}.pcover img{width:100%;height:100%;object-fit:cover}.pmeta{min-width:0;overflow:hidden}.pmeta strong,.pmeta span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pmeta strong{font-size:12px}.pmeta span{font-size:10px;color:var(--muted);margin-top:3px}
 .pc{display:flex;align-items:center;gap:6px}.pc .big{width:45px;height:45px;padding:0;border:0;border-radius:50%;background:#effff5;color:#06120a}.seek{grid-column:1/-1;width:100%;accent-color:var(--green)}.time{grid-column:1/-1;color:var(--muted);font-size:9px;margin-top:-5px}
-.fx-panel{grid-column:1/-1;border-top:1px solid rgba(166,255,205,.07);padding:11px 3px 2px}.eq-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.eq-band{text-align:center;min-width:0}.eq-band input{width:100%;accent-color:var(--green)}.eq-band small{display:block;color:var(--muted);font-size:8px;margin-top:3px}.spatial3d{margin-top:12px;padding:10px 11px;border:1px solid rgba(166,255,205,.08);border-radius:14px;background:rgba(78,228,143,.035)}.spatial3d-head{display:flex;align-items:center;justify-content:space-between;font-size:11px;margin-bottom:5px}.spatial3d-head span{color:var(--green);font-variant-numeric:tabular-nums}.spatial3d input{width:100%;accent-color:var(--green)}.spatial3d>small{display:block;color:var(--muted);font-size:8px;margin-top:3px}
+.fx-panel{grid-column:1/-1;border-top:1px solid rgba(166,255,205,.07);padding:11px 3px 2px}.eq-switch{display:inline-flex;align-items:center;gap:7px;font-size:9px;color:var(--muted);cursor:pointer}.eq-switch input{width:34px;height:18px;margin:0;accent-color:var(--green)}.eq-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.eq-band{text-align:center;min-width:0}.eq-band input{width:100%;accent-color:var(--green)}.eq-band small{display:block;color:var(--muted);font-size:8px;margin-top:3px}.spatial3d{margin-top:12px;padding:10px 11px;border:1px solid rgba(166,255,205,.08);border-radius:14px;background:rgba(78,228,143,.035)}.spatial3d-head{display:flex;align-items:center;justify-content:space-between;font-size:11px;margin-bottom:5px}.spatial3d-head span{color:var(--green);font-variant-numeric:tabular-nums}.spatial3d input{width:100%;accent-color:var(--green)}.spatial3d>small{display:block;color:var(--muted);font-size:8px;margin-top:3px}
 .nav{
  position:fixed;z-index:70;left:50%;bottom:max(9px,env(safe-area-inset-bottom));transform:translateX(-50%);
  width:min(620px,calc(100% - 18px));display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:6px;
@@ -217,8 +217,8 @@ img{max-width:100%}
 :root[data-theme="phonk"]{--bg:#0e0809;--panel:#1d0d0e;--panel2:#281113;--card:#211012;--green:#ff5b68;--green2:#dc303f;--green3:#ff9da5;--muted:#c5a4a8;--line:rgba(255,91,104,.16)}
 html,body,.app,.top,.hero,.card,.wave-card,.taste-panel,.track-profile,.result,.playlist,.player,.nav,.dialog,.mood-card,.offline-panel,.input,.logo,.primary,.nav button.active,.home-play{transition:background-color .65s ease,background .65s ease,border-color .65s ease,color .65s ease,box-shadow .65s ease,filter .65s ease}
 </style></head>
-<body>
-<div class="app">
+<body><script>document.documentElement.dataset.telegramBot="${String(env.TELEGRAM_BOT_USERNAME||"").replace(/"/g,"&quot;")}";</script>
+<div id="authGate" class="modal open" style="z-index:500"><div class="dialog" style="text-align:center"><div style="font-size:38px;margin-bottom:10px">🎵</div><h3>Вход в Ok Music</h3><p>Для обычного браузера вход выполняется через нашего Telegram-бота. В Telegram Mini App этот вход не нужен.</p><div id="telegramLogin" style="display:flex;justify-content:center;margin:18px 0"></div><div id="authStatus" style="font-size:10px;color:var(--muted)">Ожидаю авторизацию…</div></div></div><div class="app">
   <header class="top"><div class="brand"><div class="logo">♫</div><div><h1>Ok Music</h1><span>Твоя музыка. Твоё настроение.</span></div></div><button class="avatar" id="tasteBtn" title="Мой музыкальный вкус">✦</button></header>
   <main id="view"></main>
 </div>
@@ -255,35 +255,52 @@ try{applyMusicTheme(localStorage.getItem("okmusic:theme")||"default")}catch{appl
 const AUDIO_KEY="okmusic:audio";
 const eqBands=["60","250","1K","4K","12K"];
 let audioFx={eq:[0,0,0,0,0]};
-try{audioFx={...audioFx,...JSON.parse(localStorage.getItem(AUDIO_KEY)||"{}")}}catch{}
+try{audioFx={...audioFx,...JSON.parse(localStorage.getItem(AUDIO_KEY)||"{}")}}catch{}\neqEnabled=audioFx.eqEnabled!==false;
 function saveAudioFx(){localStorage.setItem(AUDIO_KEY,JSON.stringify(audioFx))}
-let audioCtx=null,audioSource=null,eqNodes=[],fxReady=false,showEq=false;
+let audioCtx=null,audioSource=null,eqPreGain=null,eqNodes=[],fxReady=false,showEq=false,eqEnabled=true;
 let eqLimiter=null,spatial3dNode=null,spatial3dFrame=0;
 let spatial3d=0;
 try{spatial3d=Math.max(0,Math.min(1,Number(JSON.parse(localStorage.getItem(AUDIO_KEY)||"{}").spatial3d)||0))}catch{}
+function updateEqHeadroom(){
+ if(!eqPreGain)return;
+ const positive=audioFx.eq.map(v=>Math.max(0,Number(v)||0));
+ const maxBoost=Math.max(0,...positive);
+ const target=eqEnabled?Math.pow(10,-(maxBoost+3)/20):1;
+ const now=audioCtx.currentTime;
+ eqPreGain.gain.cancelScheduledValues(now);
+ eqPreGain.gain.setTargetAtTime(target,now,0.035);
+ eqNodes.forEach((node,i)=>{
+   const value=eqEnabled?Number(audioFx.eq[i]||0):0;
+   node.gain.cancelScheduledValues(now);
+   node.gain.setTargetAtTime(value,now,0.035);
+ });
+}
 function initAudioFx(){
- if(fxReady)return true;
+ if(fxReady){updateEqHeadroom();return true}
  try{
   audioCtx=new (window.AudioContext||window.webkitAudioContext)();
   audioSource=audioCtx.createMediaElementSource(audio);
+  eqPreGain=audioCtx.createGain();
+  eqPreGain.gain.value=1;
   const freqs=[60,250,1000,4000,12000];
   eqNodes=freqs.map((f,i)=>{
    const n=audioCtx.createBiquadFilter();
    n.type=i===0?"lowshelf":i===4?"highshelf":"peaking";
    n.frequency.value=f;
    n.Q.value=i===0||i===4?0.7:1.0;
-   n.gain.value=Number(audioFx.eq[i]||0);
+   n.gain.value=0;
    return n;
   });
   eqLimiter=audioCtx.createDynamicsCompressor();
-  eqLimiter.threshold.value=-6;
-  eqLimiter.knee.value=12;
-  eqLimiter.ratio.value=4;
-  eqLimiter.attack.value=0.003;
-  eqLimiter.release.value=0.12;
-  eqNodes.reduce((a,b)=>a.connect(b),audioSource);
+  eqLimiter.threshold.value=-10;
+  eqLimiter.knee.value=18;
+  eqLimiter.ratio.value=8;
+  eqLimiter.attack.value=0.005;
+  eqLimiter.release.value=0.18;
+  audioSource.connect(eqPreGain);
+  eqPreGain.connect(eqNodes[0]);
+  eqNodes.reduce((a,b)=>a.connect(b));
   eqNodes[eqNodes.length-1].connect(eqLimiter);
-  eqLimiter.connect(audioCtx.destination);
   spatial3dNode=typeof PannerNode==="function"
    ? new PannerNode(audioCtx,{panningModel:"HRTF",distanceModel:"inverse",refDistance:1,maxDistance:8,rolloffFactor:0.35,coneInnerAngle:360,coneOuterAngle:360,coneOuterGain:0})
    : audioCtx.createPanner();
@@ -293,13 +310,13 @@ function initAudioFx(){
   spatial3dNode.maxDistance=8;
   spatial3dNode.rolloffFactor=0.35;
   spatial3dNode.positionX.value=0;spatial3dNode.positionY.value=0;spatial3dNode.positionZ.value=0;
-  eqLimiter.disconnect();
   eqLimiter.connect(spatial3dNode);
   spatial3dNode.connect(audioCtx.destination);
   fxReady=true;
+  updateEqHeadroom();
   updateSpatial3d();
   return true;
- }catch(e){return false}
+ }catch(e){console.warn("Ok Music audio FX:",e);return false}
 }
 function updateSpatial3d(){
  if(!spatial3dNode)return;
@@ -321,24 +338,26 @@ function setSpatial3d(v){
 function setEq(i,v){
  const value=Math.max(-12,Math.min(12,Number(v)||0));
  audioFx.eq[i]=value;
- if(eqNodes[i]&&audioCtx){
-  const now=audioCtx.currentTime;
-  eqNodes[i].gain.cancelScheduledValues(now);
-  eqNodes[i].gain.setTargetAtTime(value,now,0.025);
- }
+ if(fxReady)updateEqHeadroom();
  saveAudioFx();
+}
+function setEqEnabled(value){
+ eqEnabled=Boolean(value);
+ audioFx.eqEnabled=eqEnabled;
+ if(eqEnabled&&!fxReady&&!initAudioFx()){eqEnabled=false;audioFx.eqEnabled=false;toast("Эквалайзер недоступен в этом браузере")}
+ if(fxReady)updateEqHeadroom();
+ saveAudioFx();
+ drawPlayer();
 }
 function toggleEq(){
  showEq=!showEq;
- if(showEq){
-   if(!initAudioFx()){toast("Эквалайзер недоступен в этом браузере");showEq=false;return}
-   if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});
- }
+ if(showEq&&!initAudioFx()){toast("Эквалайзер недоступен в этом браузере");showEq=false;return}
+ if(showEq&&audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});
  drawPlayer();
 }
 function eqPanel(){
  if(!showEq)return "";
- return '<div class="fx-panel"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><strong>🎚 Эквалайзер</strong><small style="color:var(--muted)">±12 дБ</small></div><div class="eq-grid">'+eqBands.map((b,i)=>'<label class="eq-band"><input data-eq="'+i+'" type="range" min="-12" max="12" step="1" value="'+Number(audioFx.eq[i]||0)+'"><small>'+b+' Hz</small></label>').join("")+'</div><div class="spatial3d"><div class="spatial3d-head"><strong>🌀 3D звук</strong><span>'+Math.round(spatial3d*100)+'%</span></div><input data-spatial3d type="range" min="0" max="1" step="0.01" value="'+spatial3d+'"><small>HRTF · пространственное вращение</small></div></div>';
+ return '<div class="fx-panel"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><strong>🎚 Эквалайзер</strong><label class="eq-switch"><input data-eq-enabled type="checkbox" '+(eqEnabled?"checked":"")+'><span>'+(eqEnabled?"ВКЛ":"ВЫКЛ")+'</span></label></div><div class="eq-grid">'+eqBands.map((b,i)=>'<label class="eq-band"><input data-eq="'+i+'" type="range" min="-12" max="12" step="1" value="'+Number(audioFx.eq[i]||0)+'" '+(eqEnabled?"":"disabled")+'><small>'+b+' Hz</small></label>').join("")+'</div><div class="spatial3d"><div class="spatial3d-head"><strong>🌀 3D звук</strong><span>'+Math.round(spatial3d*100)+'%</span></div><input data-spatial3d type="range" min="0" max="1" step="0.01" value="'+spatial3d+'"><small>HRTF · пространственное вращение</small></div></div>';
 }
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
 function save(){localStorage.setItem(KEY,JSON.stringify(state))}
@@ -616,6 +635,8 @@ function drawPlayer(){if(!current){playerEl.className="player";return}
  document.querySelector("[data-player-profile]").onclick=()=>openTrackProfile(current.id);
  document.querySelector("#seek").oninput=e=>{if(audio.duration)audio.currentTime=audio.duration*e.target.value/100};
  document.querySelectorAll("[data-eq]").forEach(s=>s.oninput=e=>setEq(Number(e.target.dataset.eq),e.target.value));
+ const eqSwitch=document.querySelector("[data-eq-enabled]");
+ if(eqSwitch)eqSwitch.onchange=e=>setEqEnabled(e.target.checked);
  const spatial=document.querySelector("[data-spatial3d]");
  if(spatial)spatial.oninput=e=>{setSpatial3d(e.target.value);const out=spatial.closest(".spatial3d")?.querySelector("span");if(out)out.textContent=Math.round(spatial3d*100)+"%"};
 }
@@ -631,7 +652,43 @@ document.querySelector("#nav").addEventListener("click",e=>{const b=e.target.clo
 function initTelegram(){if(!window.Telegram?.WebApp)return;window.Telegram.WebApp.ready();window.Telegram.WebApp.expand();const id=document.documentElement.dataset.theme||"default",t=MUSIC_THEMES.find(x=>x.id===id)||MUSIC_THEMES[0];window.Telegram.WebApp.setHeaderColor(t.telegram);window.Telegram.WebApp.setBackgroundColor(t.telegram)}
 initTelegram();window.addEventListener("DOMContentLoaded",initTelegram,{once:true});
 if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js",{scope:"/"}).catch(e=>console.warn("Ok Music PWA:",e));
-render("home");
+
+async function browserAuth(){
+ const gate=document.querySelector("#authGate"),status=document.querySelector("#authStatus"),host=document.querySelector("#telegramLogin");
+ const inTelegram=Boolean(window.Telegram?.WebApp?.initData);
+ if(inTelegram){gate?.classList.remove("open");render("home");return}
+ try{
+   const r=await fetch("/api/auth/me",{cache:"no-store",credentials:"same-origin"});
+   const d=await r.json();
+   if(d.authenticated){gate?.classList.remove("open");render("home");return}
+ }catch{}
+ if(!host)return;
+ const bot=String(document.documentElement.dataset.telegramBot||"").replace(/^@/,"");
+ if(!bot){status.textContent="Telegram-бот для входа ещё не настроен.";return}
+ window.onTelegramAuth=async user=>{
+   status.textContent="Проверяю авторизацию…";
+   try{
+     const r=await fetch("/api/auth/telegram",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify(user)});
+     const d=await r.json();
+     if(!r.ok||!d.ok)throw Error(d.error||"Telegram не подтвердил вход");
+     gate.classList.remove("open");
+     toast("Вход выполнен 👋");
+     render("home");
+   }catch(error){status.textContent=error.message||"Не удалось войти через Telegram"}
+ };
+ const script=document.createElement("script");
+ script.src="https://telegram.org/js/telegram-widget.js?22";
+ script.async=true;
+ script.setAttribute("data-telegram-login",bot);
+ script.setAttribute("data-size","large");
+ script.setAttribute("data-userpic","false");
+ script.setAttribute("data-request-access","write");
+ script.setAttribute("data-onauth","onTelegramAuth(user)");
+ script.onload=()=>{status.textContent="Нажми кнопку Telegram для входа."};
+ script.onerror=()=>{status.textContent="Не удалось загрузить Telegram Login."};
+ host.appendChild(script);
+}
+browserAuth();
 </script>
 </body></html>`;
   return new Response(html,{headers:{"content-type":"text/html; charset=utf-8","Referrer-Policy":"origin"}});
