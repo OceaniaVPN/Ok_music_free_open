@@ -565,33 +565,17 @@ function normalizeRecommendationTrack(track){
   const artist=String(track.artist||"").trim();
   let title=String(track.title||"").trim();
   if(artist&&title){
-    const escaped=artist.replace(/[.*+?^\${}()|[\]\\]/g,"\\$&");
-    const prefix=new RegExp("^\\s*"+escaped+"\\s*[-–—:|]\\s*","i");
-    title=title.replace(prefix,"").trim();
+    const titleLower=title.toLowerCase();
+    const artistLower=artist.toLowerCase();
+    for(const sep of [" - "," — "," – ",": "," | "]){
+      const prefix=artistLower+sep;
+      if(titleLower.startsWith(prefix)){title=title.slice(prefix.length).trim();break}
+    }
   }
   if(artist&&title&&recommendationText(artist)===recommendationText(title)&&track.source==="Hitmotop"&&track.downloadUrl){
     try{
       let filename=decodeURIComponent(new URL(track.downloadUrl).pathname.split("/").pop()||"")
         .replace(/\.mp3$/i,"").replace(/_\d{6,}$/i,"");
-      const parts=filename.split(/_-_| - |—/).map(x=>x.replace(/_/g," ").trim()).filter(Boolean);
-      if(parts.length>=2)title=parts.slice(1).join(" - ").trim();
-    }catch{}
-  }
-  if(title)track.title=title;
-  return track;
-}
-function isLikelyTrackTitleAsArtist(artist,title){
-  const a=normalizeArtistName(artist), t=recommendationText(title);
-  return Boolean(a&&t&&a===t);
-}
-
-function recommendationTerms");
-    const prefix=new RegExp("^\\\\s*"+escaped+"\\\\s*[-–—:|]\\\\s*","i");
-    title=title.replace(prefix,"").trim();
-  }
-  if(artist&&title&&recommendationText(artist)===recommendationText(title)&&track.source==="Hitmotop"&&track.downloadUrl){
-    try{
-      let filename=decodeURIComponent(new URL(track.downloadUrl).pathname.split("/").pop()||"").replace(/\\.mp3$/i,"").replace(/_\\d{6,}$/i,"");
       const parts=filename.split(/_-_| - |—/).map(x=>x.replace(/_/g," ").trim()).filter(Boolean);
       if(parts.length>=2)title=parts.slice(1).join(" - ").trim();
     }catch{}
