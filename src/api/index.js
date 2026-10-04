@@ -404,6 +404,9 @@ function uniqueTracks(tracks, limit) {
   }).slice(0, limit);
 }
 
+function hasPlayableTrackAudio(track){
+  return Boolean(track?.zaycevId||String(track?.audio||"").trim()||String(track?.src||"").trim());
+}
 function mergeProviderTracks(providerLists, limit) {
   const out = [];
   const seenIds = new Set();
@@ -428,7 +431,7 @@ function mergeProviderTracks(providerLists, limit) {
     cursor++;
 
     const track = list.find(item => {
-      if (!item?.id || seenIds.has(item.id)) return false;
+      if (!item?.id || seenIds.has(item.id) || !hasPlayableTrackAudio(item)) return false;
       const key = trackDedupeKey(item);
       return !key || !seenSongs.has(key);
     });
@@ -511,6 +514,53 @@ const RECOMMENDATION_VOCAB={
   "вечеринка":["party","dance"],
   "фонк":["phonk","drift"]
 };
+const RECOMMENDATION_ARTIST_POOLS={
+  "рок":["Александр Пушной","План Ломоносова","Влом","Кино","Король и Шут"],
+  "метал":["Slipknot","Metallica","Rammstein","System of a Down","Linkin Park"],
+  "поп":["Taylor Swift","The Weeknd","Dua Lipa","Lady Gaga","Adele"],
+  "русский рэп":["Oxxxymiron","Баста","Noize MC","Miyagi","ЕГОР КРИД"],
+  "хип-хоп":["Eminem","Kendrick Lamar","Dr. Dre","2Pac","Snoop Dogg"],
+  "электроника":["The Prodigy","Daft Punk","The Chemical Brothers","Skrillex","deadmau5"],
+  "инди":["Arctic Monkeys","Tame Impala","The Strokes","The 1975","Florence + The Machine"],
+  "джаз":["Miles Davis","John Coltrane","Ella Fitzgerald","Louis Armstrong","Nina Simone"],
+  "классика":["Ludovico Einaudi","Yiruma","Max Richter","Ólafur Arnalds","Hans Zimmer"],
+  "k-pop":["BTS","BLACKPINK","TWICE","Stray Kids","NewJeans"],
+  "фонк":["Kordhell","INTERWORLD","DVRST","LXST CXNTURY","Ghostface Playa"],
+  "r&b":["The Weeknd","SZA","Alicia Keys","Frank Ocean","Bruno Mars"],
+  "lo-fi":["L'indécis","Jinsang","eevee","idealism","Nymano"],
+  "альтернатива":["Linkin Park","Nirvana","Foo Fighters","Muse","Twenty One Pilots"]
+};
+function recommendationGenreKey(value){
+  const text=recommendationText(value);
+  if(!text)return "";
+  if(RECOMMENDATION_ARTIST_POOLS[text])return text;
+  for(const key of Object.keys(RECOMMENDATION_ARTIST_POOLS)){
+    if((RECOMMENDATION_VOCAB[key]||[]).some(alias=>recommendationText(alias)===text))return key;
+  }
+  return "";
+}
+function recommendationGenreKeys(values){
+  return recommendationUnique(values.map(recommendationGenreKey).filter(Boolean));
+}
+function recommendationKnownArtists(keys,salt,count=2){
+  const pool=keys.flatMap(key=>RECOMMENDATION_ARTIST_POOLS[key]||[]);
+  const unique=recommendationUnique(pool);
+  return unique.sort((a,b)=>{
+    const sa=recommendationHash(String(salt)+"|known|"+a);
+    const sb=recommendationHash(String(salt)+"|known|"+b);
+    return sa-sb;
+  }).slice(0,Math.max(0,count));
+}
+function recommendationArtistMatches(value,set){
+  const text=recommendationText(value);
+  if(!text)return false;
+  for(const artist of set){
+    const known=recommendationText(artist);
+    if(text===known||text.includes(known)||known.includes(text))return true;
+  }
+  return false;
+}
+
 function recommendationTerms(value){
   return String(value||"").split(/[,;]+/).map(recommendationText).filter(Boolean).flatMap(x=>{
     const mapped=RECOMMENDATION_VOCAB[x];
@@ -559,27 +609,50 @@ function searchLocalTracks(q,limit=10){
 
 function chooseRecommendations(pool,limit,context){
   const selected=[],used=new Set(),artistCounts=new Map(),sourceCounts=new Map();
+  const knownArtists=new Set((context.knownArtists||[]).map(recommendationText).filter(Boolean));
+  const knownQuota=knownArtists.size?Math.min(limit,Math.max(1,Math.round(limit*0.4))):0;
+  let knownSelected=0;
   const scoreTrack=t=>{
     const artist=recommendationText(t.artist),title=recommendationText(t.title),source=String(t.source||"");
+    const isKnown=recommendationArtistMatches(t.artist,knownArtists);
     let score=Number(t.__score||0);
     const ac=artistCounts.get(artist)||0,sc=sourceCounts.get(source)||0;
-    // Catalog diversity is only a tie-breaker. Never force one track from
-    // every provider into a personalized queue.
     score-=ac*24+sc*3;
     if(ac>=2)score-=70;
     if(selected.length&&recommendationText(selected[selected.length-1]?.artist)===artist)score-=28;
     if(context.currentArtist&&artist===context.currentArtist)score+=4;
     if(context.currentTitle&&title===context.currentTitle)score-=1000;
+    if(isKnown){
+      if(knownSelected<knownQuota)score+=90;
+      else score-=50;
+    }
     score+=(recommendationHash(context.salt+"|"+t.id)%1000)/1000;
     return score;
   };
-  while(selected.length<limit){
+  const pickBest=(filter)=>{
     let best=null,bestScore=-Infinity;
     for(const t of pool){
-      if(!t?.id||used.has(t.id))continue;
+      if(!t?.id||used.has(t.id)||!filter(t))continue;
       const score=scoreTrack(t);
       if(score>bestScore){bestScore=score;best=t}
     }
+    return best;
+  };
+  while(selected.length<knownQuota){
+    const best=pickBest(t=>recommendationArtistMatches(t.artist,knownArtists));
+    if(!best)break;
+    used.add(best.id);
+    const artist=recommendationText(best.artist),source=String(best.source||"");
+    artistCounts.set(artist,(artistCounts.get(artist)||0)+1);
+    sourceCounts.set(source,(sourceCounts.get(source)||0)+1);
+    knownSelected++;
+    delete best.__score;
+    delete best.__queryScore;
+    selected.push(best);
+  }
+  while(selected.length<limit){
+    const nonKnownAvailable=pool.some(t=>t?.id&&!used.has(t.id)&&!recommendationArtistMatches(t.artist,knownArtists));
+    const best=pickBest(t=>!nonKnownAvailable||!recommendationArtistMatches(t.artist,knownArtists));
     if(!best)break;
     used.add(best.id);
     const artist=recommendationText(best.artist),source=String(best.source||"");
@@ -614,7 +687,7 @@ export async function handleApi(request,env){
   if(url.pathname==="/api/search"){
     const q=(url.searchParams.get("q")||"").trim(),limit=Math.min(Math.max(Number(url.searchParams.get("limit")||24),1),50);
     if(!q)return Response.json({ok:true,query:"",tracks:[],providers:[]});
-    const providerLimit=Math.max(5,Math.min(12,limit));
+    const providerLimit=Math.min(20,Math.max(8,Math.ceil(limit/3)+4));
     const [z,j,h]=await Promise.allSettled([
       cachedProviderSearch("zaycev",q,providerLimit,()=>fetchZaycevSearch(q,providerLimit)),
       cachedProviderSearch("jamendo",q,providerLimit,()=>searchJamendo(q,providerLimit,env)),
@@ -831,20 +904,23 @@ export async function handleApi(request,env){
     const moodQueries=rawMoods.map(x=>(RECOMMENDATION_VOCAB[x]||[x]).slice(0,2).join(" "));
     const primaryArtist=preferredArtists[0]||currentArtist;
     const contextQuery=[currentArtist,currentTitle].filter(Boolean).join(" ");
+    const genreKeys=recommendationGenreKeys(rawGenres);
+    const knownArtists=recommendationKnownArtists(genreKeys,String(url.searchParams.get("refresh")||Date.now()),2);
+    const knownArtistQueries=knownArtists.map(artist=>artist);
     const discoveryQueries=["rock metal","electronic","party energetic"];
-    // Search the current artist+title first so autoplay can recover a
-    // concrete local/remote track instead of only searching by artist.
+    // Two known-artist queries reserve roughly 40% of a five-track batch
+    // for recognizable genre anchors; the remaining queries stay mixed.
     const queries=recommendationUnique([
+      ...knownArtistQueries,
       contextQuery,
-      ...genreQueries.slice(0,3),
-      ...moodQueries.slice(0,2),
-      mappedNow.slice(0,3).join(" "),
+      ...genreQueries.slice(0,1),
+      ...moodQueries.slice(0,1),
       primaryArtist
     ]).filter(q=>q.length>1).slice(0,5);
 
     const errors=[],providerHits={z:0,j:0,h:0,l:0};
     const pool=[],seenIds=new Set(),seenSongs=new Set();
-    const context={currentArtist,currentTitle,preferredArtists,genres,moods,now,likedText,salt:String(url.searchParams.get("refresh")||Date.now())};
+    const context={currentArtist,currentTitle,preferredArtists,genres,moods,now,likedText,knownArtists,salt:String(url.searchParams.get("refresh")||Date.now())};
 
     const addList=(list,key,query)=>{
       if(!Array.isArray(list))return;
@@ -855,13 +931,18 @@ export async function handleApi(request,env){
         const songKey=trackDedupeKey(t);
         if(songKey&&seenSongs.has(songKey))continue;
         const artist=recommendationText(t.artist),title=recommendationText(t.title);
+        const trackGenre=recommendationText(t.genre);
+        const genreMismatch=genres.length&&trackGenre&&!recommendationOverlap(trackGenre,genres);
+        if(genreMismatch)continue;
         if(currentArtist&&currentTitle&&artist===currentArtist&&title===currentTitle)continue;
         seenIds.add(t.id);if(songKey)seenSongs.add(songKey);
         let score=0;
         const searchable=title+" "+artist+" "+recommendationText(t.genre);
         const queryTerms=recommendationText(query).split(/\s+/).filter(x=>x.length>2);
         const queryScore=recommendationOverlap(searchable,queryTerms);
+        const knownArtist=recommendationArtistMatches(t.artist,knownArtists);
         score+=queryScore*20;
+        if(knownArtist)score+=75;
         if(artist&&preferredArtists.includes(artist))score+=70;
         else if(artist&&preferredArtists.some(a=>artist.includes(a)||a.includes(artist)))score+=40;
         if(currentArtist&&artist===currentArtist)score+=18;
@@ -933,7 +1014,7 @@ export async function handleApi(request,env){
      }
      if(pool.length<Math.max(limit,5)){
        const fallback=LOCAL_MUSIC_CATALOG
-         .filter(t=>t?.id&&String(t.audio||t.src||"").trim())
+         .filter(t=>t?.id&&hasPlayableTrackAudio(t))
          .slice()
          .sort((a,b)=>(recommendationHash(context.salt+"|"+a.id)-recommendationHash(context.salt+"|"+b.id)));
        addList(fallback.slice(0,Math.max(10,limit*3)),"l",contextQuery||primaryArtist||"");
