@@ -81,6 +81,9 @@ async function zaycevPlay(id){
 }
 
 const HITMOTOP_BASES=["https://eu.hitmoz.com","https://ru.hitmoz.org","https://rus.hitmoz.org","https://hitmos.fm","https://hitmos.me"];
+// Public deployment of the open-source Shukurov777/hitmoz-parser project.
+// It runs the original Python + BeautifulSoup parser outside the Cloudflare Worker.
+const HITMOZ_PARSER_API_BASE="https://bakha.me/";
 const HITMOTOP_HEADERS={
   "accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
   "accept-language":"ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3",
@@ -204,8 +207,65 @@ async function hitmotopSearchRequest(searchUrl,headers,limit){
   return tracks;
 }
 
+async function fetchHitmozParserApi(q,limit){
+  const api=new URL(HITMOZ_PARSER_API_BASE);
+  api.searchParams.set("search",q);
+  const response=await fetch(api.href,{headers:{
+    accept:"application/json",
+    "accept-language":"ru-RU,ru;q=0.9,en;q=0.7",
+    "user-agent":HITMOTOP_HEADERS["user-agent"]
+  },redirect:"follow"});
+  const body=await response.text();
+  if(!response.ok)throw Error("HitMoz parser API HTTP "+response.status);
+  let data;
+  try{data=JSON.parse(body)}catch{throw Error("HitMoz parser API returned invalid JSON")}
+  if(data?.success!==true||!Array.isArray(data.songs))throw Error(data?.error||"HitMoz parser API returned no songs");
+
+  const out=[],seen=new Set();
+  for(const song of data.songs.slice(0,limit)){
+    const downloadUrl=hitmotopAbsoluteUrl(song?.download,"https://eu.hitmoz.com");
+    const sourceUrl=hitmotopAbsoluteUrl(song?.link,"https://eu.hitmoz.com");
+    if(!downloadUrl||seen.has(downloadUrl))continue;
+    const host=new URL(downloadUrl).hostname.toLowerCase();
+    const audioAllowed=host==="eu.hitmoz.com"||host.endsWith(".eu.hitmoz.com")||host==="ru.hitmoz.org"||host.endsWith(".ru.hitmoz.org")||host==="rus.hitmoz.org"||host.endsWith(".rus.hitmoz.org")||host==="hitmos.me"||host.endsWith(".hitmos.me")||host==="hitmos.fm"||host.endsWith(".hitmos.fm");
+    if(!audioAllowed||!/\/get\/music\/[^/?#]+\.mp3(?:[?#].*)?$/i.test(new URL(downloadUrl).pathname+new URL(downloadUrl).search+new URL(downloadUrl).hash))continue;
+    seen.add(downloadUrl);
+    let idMatch=sourceUrl.match(/\/song\/(\d+)/i),id=idMatch?.[1]||downloadUrl.match(/_(\d{6,})\.mp3(?:$|[?#])/i)?.[1]||String(out.length+1);
+    const cover=String(song?.cover||"").trim();
+    let image="";
+    if(cover){
+      try{
+        const u=new URL(cover,downloadUrl),h=u.hostname.toLowerCase();
+        if(h==="eu.hitmoz.com"||h.endsWith(".eu.hitmoz.com")||h==="statcore.hitmcdn.com"||h.endsWith(".hitmcdn.com"))image=u.href;
+      }catch{}
+    }
+    const title=stripHtml(song?.title)||"Без названия";
+    const artist=stripHtml(song?.artist)||"Неизвестный исполнитель";
+    const duration=parseDuration(String(song?.duration||""));
+    out.push({
+      id:"hitmotop-"+id,
+      title,
+      artist,
+      album:"",
+      image,
+      audio:"/api/hitmotop/play?url="+encodeURIComponent(downloadUrl),
+      duration,
+      license:"",
+      source:"Hitmotop",
+      sourceUrl:sourceUrl||downloadUrl,
+      genre:"",
+      downloadUrl
+    });
+  }
+  if(!out.length)throw Error("HitMoz parser API returned no usable tracks");
+  return out;
+}
+
 async function fetchHitmotopSearch(q,limit){
   let lastError=null;
+  // Prefer the independently working deployment of the open-source parser.
+  // The Worker then keeps the native HTML parser as a fallback.
+  try{return await fetchHitmozParserApi(q,limit)}catch(error){lastError=error}
   for(const configuredBase of HITMOTOP_BASES){
     try{
       // Follow the current pars-hitmotop flow: establish the Hitmo session
@@ -301,7 +361,7 @@ async function searchJamendo(q, limit, env) {
 export async function handleApi(request,env){
   const url=new URL(request.url);
   if(url.pathname==="/api/local-music")return Response.json({ok:true,source:"🔐 Ключник",tracks:LOCAL_MUSIC});
-  if(url.pathname==="/api/health")return Response.json({ok:true,service:env.APP_NAME||"Ok Music",version:"7.0",providers:["Zaycev.net","Jamendo","Hitmotop","🔐 Ключник"],zaycev:{configured:true,mode:"current-web-api"},jamendo:{configured:Boolean(String(env.JAMENDO_CLIENT_ID||"").trim())},hitmotop:{configured:true,mode:"HTML parser"}});
+  if(url.pathname==="/api/health")return Response.json({ok:true,service:env.APP_NAME||"Ok Music",version:"7.0",providers:["Zaycev.net","Jamendo","Hitmotop","🔐 Ключник"],zaycev:{configured:true,mode:"current-web-api"},jamendo:{configured:Boolean(String(env.JAMENDO_CLIENT_ID||"").trim())},hitmotop:{configured:true,mode:"open-source HitMoz parser API + HTML fallback"}});
   if(url.pathname==="/api/hitmotop/test"){
     const q=(url.searchParams.get("q")||"Linkin Park").trim().slice(0,160);
     try{
@@ -332,7 +392,7 @@ export async function handleApi(request,env){
     let target;
     try{target=new URL(raw)}catch{return Response.json({ok:false,error:"Invalid artwork URL"},{status:400})}
     const host=target.hostname.toLowerCase();
-    const allowed=host==="zaycev.net"||host.endsWith(".zaycev.net")||host==="jamendo.com"||host.endsWith(".jamendo.com")||host==="eu.hitmoz.com"||host.endsWith(".eu.hitmoz.com")||host==="ru.hitmoz.org"||host.endsWith(".ru.hitmoz.org")||host==="rus.hitmoz.org"||host.endsWith(".rus.hitmoz.org")||host==="hitmos.me"||host.endsWith(".hitmos.me")||host==="static.hitmos.fm"||host==="hitmos.fm"||host.endsWith(".hitmos.fm");
+    const allowed=host==="zaycev.net"||host.endsWith(".zaycev.net")||host==="jamendo.com"||host.endsWith(".jamendo.com")||host==="eu.hitmoz.com"||host.endsWith(".eu.hitmoz.com")||host==="ru.hitmoz.org"||host.endsWith(".ru.hitmoz.org")||host==="rus.hitmoz.org"||host.endsWith(".rus.hitmoz.org")||host==="hitmos.me"||host.endsWith(".hitmos.me")||host==="static.hitmos.fm"||host==="hitmos.fm"||host.endsWith(".hitmos.fm")||host==="statcore.hitmcdn.com"||host.endsWith(".hitmcdn.com");
     if(!allowed||!/^https?:$/.test(target.protocol))return Response.json({ok:false,error:"Artwork host is not allowed"},{status:403});
     try{
       const upstream=await fetch(target,{headers:{
