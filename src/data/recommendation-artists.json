@@ -1,16 +1,62 @@
 {
-  "rock": [],
-  "metal": [],
-  "pop": [],
-  "русский рэп": [],
-  "хип-хоп": [],
-  "электроника": [],
-  "инди": [],
-  "джаз": [],
-  "классика": [],
-  "k-pop": [],
-  "фонк": [],
-  "r&b": [],
-  "lo-fi": [],
-  "альтернатива": []
+  "rock": {
+    "artists": [
+      "Кино", "Король и Шут", "Ария", "Влом!", "Александр Пушной", "План Ломоносова", "ДДТ", "Наутилус Помпилиус", "Аквариум", "Алиса", "Сплин", "Би-2", "Земфира", "Мумий Тролль", "Чайф", "Машина Времени", "Воскресение", "Пикник", "Гражданская Оборона", "Сектор Газа", "Тараканы!", "Lumen", "Slot", "Amatory", "Stigmata", "Tracktor Bowling", "Radio Tapok", "Нейромонах Феофан", "Элизиум", "F.P.G.", "Disturbed", "Linkin Park", "Nirvana", "Queen", "Pink Floyd", "The Beatles", "Led Zeppelin", "AC/DC", "Guns N' Roses", "Red Hot Chili Peppers", "Foo Fighters", "Green Day", "The Offspring", "Blink-182", "Arctic Monkeys", "The Strokes", "Radiohead", "Muse", "Coldplay", "Imagine Dragons", "Twenty One Pilots", "The Prodigy", "Rammstein", "System of a Down", "Oasis"
+    ]
+  },
+  "phonk": {
+    "artists": [
+      "Kordhell", "DVRST", "INTERWORLD", "Hensonn", "Pharmacist", "LXST CXNTURY", "Ghostface Playa", "SXMPRA", "Freddie Dredd", "DJ Smokey", "Soudiere", "Ronin", "DJ Yung Vamp", "PlayaPhonk", "MoonDeity", "MUPP", "KURA", "NITERR", "DROID", "AUTOFICTION", "OAKLAND", "SWANKY TUNE", "MC ORSEN", "PONY", "ROLAND", "TWRK", "PRXSXNT", "TEKE", "XAVI", "ZWE1HVNDX", "VVN", "Mc Gw", "slxughter", "LONOWN", "MXZI", "Dj Samir", "Ariis", "ATLXS", "Scythermane", "DJ Asul", "MC MN", "Rubikdice", "MC PR", "Ogryzek", "Yb Wasg'ood", "DJ FKU", "Mc Delux", "SXID", "LUNxdiE", "Mc Denny", "Nulteex", "ovg!", "RJ Pasin", "LXNGVX", "Rameses B"
+    ]
+  },
+  "hip-hop": {
+    "artists": [
+      "Eminem", "2Pac", "The Notorious B.I.G.", "Jay-Z", "Nas", "Kanye West", "Snoop Dogg", "Dr. Dre", "50 Cent", "Kendrick Lamar", "J. Cole", "Drake", "Lil Wayne", "Nicki Minaj", "Cardi B", "Travis Scott", "Post Malone", "Tyler, The Creator", "A$AP Rocky", "Mac Miller", "XXXTENTACION", "Juice WRLD", "Lil Baby", "Future", "Migos", "Баста", "Oxxxymiron", "Скриптонит", "Face", "Morgenshtern", "Guf", "Каста", "Лигалайз", "Децл", "Noize MC", "Слава КПСС", "Хаски", "Pharaoh", "Markul", "ATL", "Птаха", "Бледный", "Смоки Мо", "ЛСП", "Рем Дигга", "Джиган", "Тимати", "Big Baby Tape", "Kizaru", "Scally Milano", "Macan", "Toxi$", "Jakone", "NAVAI", "Платина"
+    ]
+  },
+  "pop": {
+    "artists": [
+      "Michael Jackson", "Madonna", "Britney Spears", "Justin Bieber", "Taylor Swift", "Ariana Grande", "Lady Gaga", "Rihanna", "Beyoncé", "Katy Perry", "Bruno Mars", "Ed Sheeran", "The Weeknd", "Dua Lipa", "Billie Eilish", "Olivia Rodrigo", "Harry Styles", "Shakira", "Jennifer Lopez", "Mariah Carey", "Whitney Houston", "Celine Dion", "Elton John", "ABBA", "Backstreet Boys", "NSYNC", "Spice Girls", "One Direction", "BTS", "BLACKPINK", "Алла Пугачёва", "Филипп Киркоров", "Валерий Леонтьев", "Олег Газманов", "Юрий Шатунов", "Григорий Лепс", "Валерия", "Нюша", "Полина Гагарина", "Егор Крид", "Zivert", "Клава Кока", "Artik & Asti", "Anna Asti", "Иванушки International", "Руки Вверх!", "Татьяна Буланова", "Ирина Аллегрова", "Лолита", "Вера Брежнева", "Светлана Лобода", "Тина Кароль", "Ани Лорак", "Дан Балан", "Дима Билан"
+    ]
+  },
+  "electronic": {
+    "artists": [
+      "Daft Punk", "Deadmau5", "Calvin Harris", "Martin Garrix", "David Guetta", "Dimitri Vegas & Like Mike", "Armin van Buuren", "Tiësto", "Afrojack", "Hardwell", "Don Diablo", "Marshmello", "Skrillex", "Diplo", "The Chainsmokers", "Steve Aoki", "Zedd", "Avicii", "Swedish House Mafia", "Alok", "FISHER", "KSHMR", "Oliver Heldens", "Tchami", "Malaa", "Rezz", "Porter Robinson", "Madeon", "Flume", "ODESZA", "Disclosure", "Justice", "Kraftwerk", "Jean-Michel Jarre", "Vangelis", "Aphex Twin", "Boards of Canada", "Fatboy Slim", "The Chemical Brothers", "The Prodigy", "Pendulum", "Noisia", "Sub Focus", "Chase & Status", "DJ Fresh", "Netsky", "Wilkinson", "Metrik", "Macky Gee", "DJ VADIMSKEE", "WALKMAN", "Никита Соболь", "DJ KOROLOVA", "DJ Nastia", "ARTBAT"
+    ]
+  },
+  "metal": {
+    "artists": [
+      "Metallica", "Iron Maiden", "Black Sabbath", "Judas Priest", "Slayer", "Megadeth", "Anthrax", "Pantera", "Slipknot", "Korn", "System of a Down", "Disturbed", "Rammstein", "Ghost", "Gojira", "Mastodon", "Lamb of God", "Trivium", "Avenged Sevenfold", "Bullet for My Valentine", "Bring Me The Horizon", "Architects", "Parkway Drive", "As I Lay Dying", "Killswitch Engage", "In Flames", "Children of Bodom", "Nightwish", "Epica", "Within Temptation", "Arch Enemy", "Amon Amarth", "Behemoth", "Cradle of Filth", "Dimmu Borgir", "Mayhem", "Burzum", "Emperor", "Opeth", "Tool", "Meshuggah", "Deftones", "Alice in Chains", "Soundgarden", "Sepultura", "Testament", "Exodus", "Death", "Cannibal Corpse", "Morbid Angel", "Dio", "Motörhead", "Accept", "Saxon", "Helloween"
+    ]
+  },
+  "jazz": {
+    "artists": [
+      "Miles Davis", "John Coltrane", "Louis Armstrong", "Duke Ellington", "Charlie Parker", "Dizzy Gillespie", "Thelonious Monk", "Bill Evans", "Ella Fitzgerald", "Billie Holiday", "Sarah Vaughan", "Nina Simone", "Chet Baker", "Stan Getz", "Wes Montgomery", "Oscar Peterson", "Art Tatum", "Count Basie", "Benny Goodman", "Glenn Miller", "Dave Brubeck", "Charles Mingus", "Max Roach", "Art Blakey", "Cannonball Adderley", "Sonny Rollins", "Herbie Hancock", "Chick Corea", "Keith Jarrett", "Pat Metheny", "Weather Report", "Return to Forever", "Mahavishnu Orchestra", "Diana Krall", "Norah Jones", "Amy Winehouse", "Gregory Porter", "Kamasi Washington", "Robert Glasper", "Snarky Puppy", "Esperanza Spalding", "Brad Mehldau", "Tigran Hamasyan", "Igor Butman", "Алексей Козлов", "Герман Лукьянов", "Даниил Крамер", "Яков Окунь", "Андрей Кондаков", "Сергей Головин", "Игорь Бриль", "Леонид Чижик", "Аркадий Шилклопер", "Сергей Манукян", "Олег Лундстрем"
+    ]
+  },
+  "classical": {
+    "artists": [
+      "Ludwig van Beethoven", "Wolfgang Amadeus Mozart", "Johann Sebastian Bach", "Pyotr Ilyich Tchaikovsky", "Frédéric Chopin", "Johannes Brahms", "Richard Wagner", "Giuseppe Verdi", "Antonio Vivaldi", "George Frideric Handel", "Franz Schubert", "Robert Schumann", "Felix Mendelssohn", "Hector Berlioz", "Claude Debussy", "Maurice Ravel", "Igor Stravinsky", "Sergei Rachmaninoff", "Dmitri Shostakovich", "Sergei Prokofiev", "Alexander Scriabin", "Modest Mussorgsky", "Nikolai Rimsky-Korsakov", "Giacomo Puccini", "Georges Bizet", "Camille Saint-Saëns", "Antonín Dvořák", "Bedřich Smetana", "Jean Sibelius", "Edvard Grieg", "Carl Maria von Weber", "Carl Philipp Emanuel Bach", "Domenico Scarlatti", "Arcangelo Corelli", "Henry Purcell", "Claudio Monteverdi", "Giovanni Pierluigi da Palestrina", "Josquin des Prez", "Guillaume de Machaut", "Hildegard von Bingen", "Arvo Pärt", "Philip Glass", "Steve Reich", "John Cage", "Karlheinz Stockhausen", "Pierre Boulez", "Alban Berg", "Arnold Schoenberg", "Anton Webern", "Gustav Mahler", "Richard Strauss", "Benjamin Britten", "Ralph Vaughan Williams", "Edward Elgar", "Aaron Copland"
+    ]
+  },
+  "indie": {
+    "artists": [
+      "Arctic Monkeys", "The Strokes", "Vampire Weekend", "Tame Impala", "Mac DeMarco", "King Krule", "Clairo", "Boy Pablo", "Rex Orange County", "Beach House", "Fleet Foxes", "Bon Iver", "Sufjan Stevens", "The National", "Interpol", "Yeah Yeah Yeahs", "The xx", "Alt-J", "Foals", "Two Door Cinema Club", "Phoenix", "MGMT", "Foster the People", "Passion Pit", "Grizzly Bear", "Animal Collective", "Neutral Milk Hotel", "Pavement", "Sonic Youth", "Pixies", "Dinosaur Jr.", "My Bloody Valentine", "Slowdive", "Ride", "Lush", "Cocteau Twins", "The Cure", "Joy Division", "New Order", "The Smiths", "Morrissey", "Radiohead", "Elliott Smith", "Bright Eyes", "Phoebe Bridgers", "Lucy Dacus", "Julien Baker", "boygenius", "Mitski", "Japanese Breakfast", "Snail Mail", "Soccer Mommy", "Wet Leg", "Fontaines D.C.", "Молчат Дома"
+    ]
+  },
+  "drum_and_bass": {
+    "artists": [
+      "Pendulum", "Noisia", "Sub Focus", "Chase & Status", "DJ Fresh", "Netsky", "Wilkinson", "Metrik", "Macky Gee", "Camo & Krooked", "Mefjus", "Culture Shock", "Dimension", "Friction", "Andy C", "Grooverider", "Goldie", "Roni Size", "LTJ Bukem", "Calibre", "High Contrast", "London Elektricity", "Fred V", "Grafix", "Nu:Tone", "Logistics", "S.P.Y", "Technimatic", "Keeno", "Etherwood", "Hybrid Minds", "Pola & Bryson", "Urbandawn", "Makoto", "Alix Perez", "Eprom", "Icicle", "Ivy Lab", "Halogenix", "Phace", "Misanthrop", "Current Value", "Black Sun Empire", "State of Mind", "The Upbeats", "Dawn Wall", "A.M.C", "Break", "Emperor", "Maztek", "Pythius", "Villem", "McLeod", "SpectraSoul", "Klute"
+    ]
+  },
+  "synthwave": {
+    "artists": [
+      "Kavinsky", "The Midnight", "Gunship", "Carpenter Brut", "Perturbator", "Dance With The Dead", "FM-84", "Timecop1983", "Mitch Murder", "Lazerhawk", "Magic Sword", "Gost", "Mega Drive", "Waveshaper", "Scandroid", "LeBrock", "Lost Years", "Com Truise", "Miami Nights 1984", "Sunset Neon", "Robert Parker", "Nina", "Dynatron", "HOME", "Chromatics", "Kalax", "Miami Horror", "Neon Indian", "Washed Out", "Toro y Moi", "Tycho", "Lorn", "Dan Terminus", "Aeronexus", "Brendon", "Wayfloe", "The Bad Dreamers", "SPF50", "Spirit of the Beach", "Splash Wave", "Sprinter", "Power Trip", "Dance With The Dead", "Gost", "Mega Drive", "Waveshaper", "Scandroid", "LeBrock", "Lost Years", "Com Truise", "Miami Nights 1984", "Sunset Neon", "Robert Parker", "Nina", "Dynatron"
+    ]
+  },
+  "lo-fi": {
+    "artists": [
+      "Nujabes", "J Dilla", "DJ Okawari", "Tomppabeats", "L'Indécis", "Chillhop Music", "ChilledCow", "Fat Jon", "Birocratic", "Rujay", "Wun Two", "The Deli", "mt. fujitive", "Jinsang", "eevee", "Idealism", "potsu", "Elijah Who", "Kupla", "Purrple Cat", "Mondo Loops", "Prithvi", "Late Night Tones", "Pandrezz", "CORBAL", "Philanthrope", "SwuM", "Sleepy Fish", "Aso", "Nymano", "Psalm Trees", "Knowmadic", "Misha", "Tender Spring", "Flitz&Suppe", "Kudasai", "Aviino", "Brock Berrigan", "C Y G N", "Dontcry", "Elijah Nang", "Fantompower", "G Mills", "Hanz", "Invention_", "Jhove", "Kendall Miles", "Lack", "Nokiaa", "Oatmello", "Pandrezz", "Quickly, Quickly", "Raimu", "Saib", "Taro"
+    ]
+  }
 }
