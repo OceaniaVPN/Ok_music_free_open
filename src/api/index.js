@@ -54,7 +54,7 @@ function parseZaycevSearch(html,limit){
 }
 async function fetchZaycevSearch(q,limit){
   const u=new URL(ZAYCEV_SEARCH);u.searchParams.set("query_search",q);u.searchParams.set("type","track");
-  const r=await fetch(u,{headers:{"accept":"text/html,application/xhtml+xml","accept-language":"ru-RU,ru;q=0.9,en;q=0.7","referer":ZAYCEV_BASE+"/","user-agent":ZAYCEV_HEADERS["user-agent"]},signal:AbortSignal.timeout(8000)});
+  const r=await fetch(u,{headers:{"accept":"text/html,application/xhtml+xml","accept-language":"ru-RU,ru;q=0.9,en;q=0.7","referer":ZAYCEV_BASE+"/","user-agent":ZAYCEV_HEADERS["user-agent"]},signal:AbortSignal.timeout(5_500)});
   const html=await r.text();if(!r.ok)throw Error("Zaycev search HTTP "+r.status);
   const found=parseZaycevSearch(html,limit);if(!found.length)throw Error("Zaycev search returned no parsable tracks");
   return found.map(t=>({id:"zaycev-"+t.id,zaycevId:Number(t.id),title:t.title,artist:t.artist,album:"",image:t.image?(new URL(t.image,ZAYCEV_BASE).href):"",audio:"/api/zaycev/play?id="+encodeURIComponent(t.id),duration:t.duration||0,license:"",source:"Zaycev.net",sourceUrl:t.sourceUrl,genre:""}));
@@ -86,14 +86,26 @@ const HITMOTOP_BASES=["https://eu.hitmoz.com","https://ru.hitmoz.org","https://r
 const HITMOZ_PARSER_API_BASE="https://bakha.me/";
 const PROVIDER_CACHE=new Map();
 const PROVIDER_CACHE_TTL=45_000;
+const PROVIDER_TIMEOUT_MS=6_500;
 function providerCacheKey(provider,q,limit){return provider+"|"+String(q||"").trim().toLowerCase()+"|"+String(limit||0)}
-async function cachedProviderSearch(provider,q,limit,loader){
+function withTimeout(promise,ms,label){
+  return new Promise((resolve,reject)=>{
+    let settled=false;
+    const timer=setTimeout(()=>{if(settled)return;settled=true;reject(Error(label+" timeout"))},ms);
+    Promise.resolve(promise).then(value=>{
+      if(settled)return;settled=true;clearTimeout(timer);resolve(value);
+    },error=>{
+      if(settled)return;settled=true;clearTimeout(timer);reject(error);
+    });
+  });
+}
+async function cachedProviderSearch(provider,q,limit,loader,timeoutMs=PROVIDER_TIMEOUT_MS){
   const key=providerCacheKey(provider,q,limit),now=Date.now(),hit=PROVIDER_CACHE.get(key);
-  if(hit&&now-hit.time<PROVIDER_CACHE_TTL)return hit.value;
+  if(hit&&now-hit.time<PROVIDER_CACHE_TTL&&"value" in hit)return hit.value;
   if(hit?.promise)return hit.promise;
   const promise=(async()=>{
     try{
-      const value=await loader();
+      const value=await withTimeout(loader(),timeoutMs,provider);
       PROVIDER_CACHE.set(key,{time:Date.now(),value});
       if(PROVIDER_CACHE.size>48){
         const oldest=[...PROVIDER_CACHE.entries()].sort((a,b)=>a[1].time-b[1].time)[0];
@@ -274,14 +286,14 @@ function normalizeHitmozParserSongs(data,limit){
 async function fetchHitmozPython(q,limit,env){
   const rpc=env?.HITMOZ_PYTHON;
   if(!rpc||typeof rpc.search!=="function")throw Error("HitMoz Python service is not configured");
-  const data=await Promise.race([rpc.search(q,limit),new Promise((_,reject)=>setTimeout(()=>reject(Error("HitMoz Python service timeout")),8000))]);
+  const data=await withTimeout(rpc.search(q,limit),5_500,"HitMoz Python service");
   return normalizeHitmozParserSongs(data,limit);
 }
 
 async function fetchHitmozParserApi(q,limit){
   const api=new URL(HITMOZ_PARSER_API_BASE);
   api.searchParams.set("search",q);
-  const response=await fetch(api.href,{signal:AbortSignal.timeout(8000),headers:{
+  const response=await fetch(api.href,{signal:AbortSignal.timeout(5_500),headers:{
     accept:"application/json",
     "accept-language":"ru-RU,ru;q=0.9,en;q=0.7",
     "user-agent":HITMOTOP_HEADERS["user-agent"]
@@ -295,46 +307,30 @@ async function fetchHitmozParserApi(q,limit){
 
 async function fetchHitmotopSearch(q,limit,env){
   let lastError=null;
-  // Prefer the independently working deployment of the open-source parser.
-  // The Worker then keeps the native HTML parser as a fallback.
-  // Prefer the native Python port when its Service Binding is configured.
   try{return await fetchHitmozPython(q,limit,env)}catch(error){lastError=error}
-  // Proven public deployment of the original parser as the next fallback.
   try{return await fetchHitmozParserApi(q,limit)}catch(error){lastError=error}
-  for(const configuredBase of HITMOTOP_BASES){
-    try{
-      // Follow the current pars-hitmotop flow: establish the Hitmo session
-      // first, persist the returned sid cookie, then call /search?q=...
-      const home=await fetch(configuredBase+"/",{headers:HITMOTOP_HEADERS,redirect:"follow"});
-      const base=new URL(home.url||configuredBase).origin;
-      let cookie=hitmotopCookieHeader(home);
-
-      // pars-hitmotop explicitly performs a second GET after a successful
-      // landing-page response. This is important for Hitmo's session cookie.
-      const sessionHeaders={...HITMOTOP_HEADERS,referer:base+"/"};
-      if(cookie)sessionHeaders.cookie=cookie;
-      const warm=await fetch(base+"/",{headers:sessionHeaders,redirect:"follow"});
-      const warmCookie=hitmotopCookieHeader(warm);
-      if(warmCookie)cookie=warmCookie;
-
-      const headers={...HITMOTOP_HEADERS,referer:base+"/"};
-      if(cookie)headers.cookie=cookie;
-
-      const search=new URL("/search",base);
-      search.searchParams.set("q",q);
-
-      // Keep the browser-like navigation headers used by the package's
-      // requests session. We do not attempt to bypass a 403.
-      headers["sec-fetch-dest"]="document";
-      headers["sec-fetch-mode"]="navigate";
-      headers["sec-fetch-site"]="same-origin";
-      headers["upgrade-insecure-requests"]="1";
-
-      return await hitmotopSearchRequest(search.href,headers,limit);
-    }catch(error){
-      lastError=error;
-    }
-  }
+  // One lightweight HTML fallback only. Do not fan out over five mirrors
+  // during autoplay; a slow mirror must not hold the whole Worker request.
+  const configuredBase=HITMOTOP_BASES[0];
+  try{
+    const home=await fetch(configuredBase+"/",{headers:HITMOTOP_HEADERS,redirect:"follow",signal:AbortSignal.timeout(4_500)});
+    const base=new URL(home.url||configuredBase).origin;
+    let cookie=hitmotopCookieHeader(home);
+    const sessionHeaders={...HITMOTOP_HEADERS,referer:base+"/"};
+    if(cookie)sessionHeaders.cookie=cookie;
+    const warm=await fetch(base+"/",{headers:sessionHeaders,redirect:"follow",signal:AbortSignal.timeout(4_500)});
+    const warmCookie=hitmotopCookieHeader(warm);
+    if(warmCookie)cookie=warmCookie;
+    const headers={...HITMOTOP_HEADERS,referer:base+"/"};
+    if(cookie)headers.cookie=cookie;
+    headers["sec-fetch-dest"]="document";
+    headers["sec-fetch-mode"]="navigate";
+    headers["sec-fetch-site"]="same-origin";
+    headers["upgrade-insecure-requests"]="1";
+    const search=new URL("/search",base);
+    search.searchParams.set("q",q);
+    return await hitmotopSearchRequest(search.href,headers,limit);
+  }catch(error){lastError=error}
   throw lastError||Error("Hitmo unavailable");
 }
 
@@ -467,19 +463,41 @@ function recommendationOverlap(text,terms){
 }
 function chooseRecommendations(pool,limit,context){
   const selected=[],used=new Set(),artistCounts=new Map(),sourceCounts=new Map();
+  const scoreTrack=t=>{
+    const artist=recommendationText(t.artist),title=recommendationText(t.title),source=String(t.source||"");
+    let score=Number(t.__score||0);
+    const ac=artistCounts.get(artist)||0,sc=sourceCounts.get(source)||0;
+    score-=ac*24+sc*5;
+    if(ac>=2)score-=80;
+    if(selected.length&&recommendationText(selected[selected.length-1]?.artist)===artist)score-=28;
+    if(context.currentArtist&&artist===context.currentArtist)score+=4;
+    if(context.currentTitle&&title===context.currentTitle)score-=1000;
+    score+=(recommendationHash(context.salt+"|"+t.id)%1000)/1000;
+    return score;
+  };
+  // Prefer one playable track from every available catalog first, then fill
+  // the remaining slots by recommendation score.
+  for(const source of ["Zaycev.net","Jamendo","Hitmotop"]){
+    if(selected.length>=limit)break;
+    let best=null,bestScore=-Infinity;
+    for(const t of pool){
+      if(!t?.id||used.has(t.id)||String(t.source||"")!==source)continue;
+      const score=scoreTrack(t);
+      if(score>bestScore){bestScore=score;best=t}
+    }
+    if(!best)continue;
+    used.add(best.id);
+    const artist=recommendationText(best.artist),src=String(best.source||"");
+    artistCounts.set(artist,(artistCounts.get(artist)||0)+1);
+    sourceCounts.set(src,(sourceCounts.get(src)||0)+1);
+    delete best.__score;
+    selected.push(best);
+  }
   while(selected.length<limit){
     let best=null,bestScore=-Infinity;
     for(const t of pool){
       if(!t?.id||used.has(t.id))continue;
-      const artist=recommendationText(t.artist),title=recommendationText(t.title),source=String(t.source||"");
-      let score=Number(t.__score||0);
-      const ac=artistCounts.get(artist)||0,sc=sourceCounts.get(source)||0;
-      score-=ac*24+sc*5;
-      if(ac>=2)score-=80;
-      if(selected.length&&recommendationText(selected[selected.length-1]?.artist)===artist)score-=28;
-      if(context.currentArtist&&artist===context.currentArtist)score+=4;
-      if(context.currentTitle&&title===context.currentTitle)score-=1000;
-      score+=(recommendationHash(context.salt+"|"+t.id)%1000)/1000;
+      const score=scoreTrack(t);
       if(score>bestScore){bestScore=score;best=t}
     }
     if(!best)break;
@@ -516,20 +534,30 @@ export async function handleApi(request,env){
   if(url.pathname==="/api/search"){
     const q=(url.searchParams.get("q")||"").trim(),limit=Math.min(Math.max(Number(url.searchParams.get("limit")||24),1),50);
     if(!q)return Response.json({ok:true,query:"",tracks:[],providers:[]});
-    const jamLimit=Math.min(10,Math.max(6,Math.ceil(limit/3)));
-    const [z,j]=await Promise.allSettled([
-      cachedProviderSearch("zaycev",q,limit,()=>fetchZaycevSearch(q,limit)),
-      cachedProviderSearch("jamendo",q,jamLimit,()=>searchJamendo(q,jamLimit,env))
+    const providerLimit=Math.max(5,Math.min(12,limit));
+    const [z,j,h]=await Promise.allSettled([
+      cachedProviderSearch("zaycev",q,providerLimit,()=>fetchZaycevSearch(q,providerLimit)),
+      cachedProviderSearch("jamendo",q,providerLimit,()=>searchJamendo(q,providerLimit,env)),
+      cachedProviderSearch("hitmotop",q,providerLimit,()=>fetchHitmotopSearch(q,providerLimit,env))
     ]);
-    let h={status:"skipped"};
-    const zTracks=z.status==="fulfilled"?z.value:[],jTracks=j.status==="fulfilled"?j.value:[];
-    if(zTracks.length+jTracks.length<Math.min(limit,6)){
-      try{h={status:"fulfilled",value:await cachedProviderSearch("hitmotop",q,limit,()=>fetchHitmotopSearch(q,limit,env))}}catch(error){h={status:"rejected",reason:error}}
-    }
-    const hTracks=h.status==="fulfilled"?h.value:[],tracks=mergeProviderTracks([zTracks,jTracks,hTracks],limit);
-    const errors=[...(z.status==="rejected"?["Zaycev.net: "+(z.reason?.message||"ошибка")]:[]),...(j.status==="rejected"?["Jamendo: "+(j.reason?.message||"ошибка")]:[]),...(h.status==="rejected"?["Hitmotop: "+(h.reason?.message||"ошибка")]:[])];
-    if(!tracks.length)return Response.json({ok:false,error:errors.length?"Музыкальные каталоги недоступны":"Ничего не найдено",details:errors,query:q,tracks:[],diagnostics:{zaycevConfigured:true,jamendoConfigured:Boolean(String(env.JAMENDO_CLIENT_ID||"").trim()),hitmotopConfigured:true,errors}},{status:errors.length?502:200});
-    return Response.json({ok:true,query:q,providers:[...(zTracks.length?["Zaycev.net"]:[]),...(jTracks.length?["Jamendo"]:[]),...(hTracks.length?["Hitmotop"]:[])],tracks});
+    const zTracks=z.status==="fulfilled"?z.value:[],jTracks=j.status==="fulfilled"?j.value:[],hTracks=h.status==="fulfilled"?h.value:[];
+    const tracks=mergeProviderTracks([zTracks,jTracks,hTracks],limit);
+    const errors=[
+      ...(z.status==="rejected"?["Zaycev.net: "+(z.reason?.message||"ошибка")]:[]),
+      ...(j.status==="rejected"?["Jamendo: "+(j.reason?.message||"ошибка")]:[]),
+      ...(h.status==="rejected"?["Hitmotop: "+(h.reason?.message||"ошибка")]:[])
+    ];
+    if(!tracks.length)return Response.json({
+      ok:false,
+      error:errors.length?"Музыкальные каталоги временно недоступны":"Ничего не найдено",
+      details:errors,query:q,tracks:[],
+      diagnostics:{zaycevConfigured:true,jamendoConfigured:Boolean(String(env.JAMENDO_CLIENT_ID||"").trim()),hitmotopConfigured:true,errors}
+    },{status:errors.length?502:200});
+    return Response.json({
+      ok:true,query:q,
+      providers:[...(zTracks.length?["Zaycev.net"]:[]),...(jTracks.length?["Jamendo"]:[]),...(hTracks.length?["Hitmotop"]:[])],
+      tracks,errors:[...new Set(errors)].slice(0,6)
+    });
   }
   if(url.pathname==="/api/artwork"){
     const raw=(url.searchParams.get("url")||"").trim();
@@ -706,25 +734,20 @@ export async function handleApi(request,env){
       }
     };
 
-    for(let round=0;round<queries.length;round++){
+    for(let round=0;round<Math.min(2,queries.length);round++){
       const q=queries[round];
       if(!q)continue;
-      const providerLimit=Math.min(7,Math.max(5,limit+1));
-      const [z,j]=await Promise.allSettled([
+      const providerLimit=Math.max(5,Math.min(10,limit+1));
+      // Always ask all three catalogs in the same round. Each provider is
+      // independently time-bounded so one slow source cannot freeze Play.
+      const [z,j,h]=await Promise.allSettled([
         cachedProviderSearch("zaycev",q,providerLimit,()=>fetchZaycevSearch(q,providerLimit)),
-        cachedProviderSearch("jamendo",q,providerLimit,()=>searchJamendo(q,providerLimit,env))
+        cachedProviderSearch("jamendo",q,providerLimit,()=>searchJamendo(q,providerLimit,env)),
+        cachedProviderSearch("hitmotop",q,providerLimit,()=>fetchHitmotopSearch(q,providerLimit,env))
       ]);
       if(z.status==="fulfilled")addList(z.value,"z");else errors.push("Zaycev.net: "+(z.reason?.message||"ошибка"));
       if(j.status==="fulfilled")addList(j.value,"j");else errors.push("Jamendo: "+(j.reason?.message||"ошибка"));
-      // Hitmotop is deliberately a fallback: it is much more expensive because
-      // it may establish sessions and try several mirrors. Only call it when
-      // the two fast providers did not produce enough playable tracks.
-      if(pool.length<Math.max(3,Math.min(limit,5))){
-        try{
-          const h=await cachedProviderSearch("hitmotop",q,providerLimit,()=>fetchHitmotopSearch(q,providerLimit,env));
-          addList(h,"h");
-        }catch(error){errors.push("Hitmotop: "+(error?.message||"ошибка"))}
-      }
+      if(h.status==="fulfilled")addList(h.value,"h");else errors.push("Hitmotop: "+(h.reason?.message||"ошибка"));
       if(pool.length>=Math.max(limit,5))break;
     }
 
