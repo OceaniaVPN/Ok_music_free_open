@@ -242,8 +242,9 @@ state.taste.now=typeof state.taste.now==="string"?state.taste.now:"";
 let tracks=[], localTracks=[], current=null, currentIndex=-1, audio=new Audio(), nextAudio=new Audio(), playing=false, autoNext=true, nextPreloadToken=0;
 let playbackQueue=[], queueIndex=-1, recommendationLoading=false, recommendationSeen=new Set(), recommendationContextKey="", recommendationLastPrefetchIndex=-1;
 audio.preload="auto";
-audio.crossOrigin="anonymous";
+audio.removeAttribute("crossorigin");
 nextAudio.preload="auto";
+nextAudio.removeAttribute("crossorigin");
 nextAudio.setAttribute("aria-hidden","true");
 const MUSIC_THEMES=[{id:"default",telegram:"#07140d"},{id:"night",telegram:"#080a18"},{id:"energy",telegram:"#151005"},{id:"chill",telegram:"#041317"},{id:"love",telegram:"#16070f"},{id:"road",telegram:"#111006"},{id:"party",telegram:"#100719"},{id:"phonk",telegram:"#0e0809"}];
 function applyMusicTheme(id){
@@ -826,7 +827,20 @@ function drawPlayer(){if(!current){
  if(spatial)spatial.oninput=e=>{setSpatial3d(e.target.value);const out=spatial.closest(".spatial3d")?.querySelector("span");if(out)out.textContent=Math.round(spatial3d*100)+"%"};
 }
 audio.onplay=()=>{playing=true;if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});if(spatial3d)updateSpatial3d();if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer()};audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
-audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer()};audio.onended=()=>{playing=false;if(autoNext)playNext();else{if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()}};audio.onerror=()=>{toast("Не удалось загрузить аудио");playing=false;drawPlayer()};
+audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer()};audio.onended=()=>{playing=false;if(autoNext)playNext();else{if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()}};audio.onerror=()=>{
+ const code=audio.error?.code||0;
+ console.warn("Ok Music audio error",{code,src:audio.src,current:current?.id,source:current?.source});
+ playing=false;
+ if(homeBootstrapBusy&&playbackQueue.length>1){
+  const failedIndex=playbackQueue.findIndex(x=>x?.id===current?.id);
+  if(failedIndex>=0)playbackQueue.splice(failedIndex,1);
+  const next=playbackQueue[Math.max(0,Math.min(failedIndex,playbackQueue.length-1))];
+  current=null;
+  if(next){toast("Поток не ответил — пробую следующий");setTimeout(()=>play(next,{keepQueue:true,fromBootstrap:true}),50);return}
+ }
+ toast("Не удалось загрузить аудио");
+ drawPlayer();
+};
 nextAudio.onerror=()=>{nextAudio.removeAttribute("src")};
 audio.addEventListener("canplay",()=>{preloadNext();const remaining=playbackQueue.length-queueIndex-1;if(remaining<=1)void fetchRecommendationBatch()});
 document.querySelector("#closeModal").onclick=()=>modal.classList.remove("open");modal.onclick=e=>{if(e.target===modal)modal.classList.remove("open")};
