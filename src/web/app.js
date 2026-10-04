@@ -172,8 +172,8 @@ img{max-width:100%}
 @keyframes playerGlow{from{transform:scale(.96);opacity:.55}to{transform:scale(1.04);opacity:.95}}
 .player-visual{position:absolute;inset:0;z-index:-1;width:100%;height:100%;border-radius:21px;opacity:.82;mix-blend-mode:screen;pointer-events:none}
 .player-visual-hint{position:absolute;left:78px;right:78px;top:-7px;height:3px;border-radius:99px;background:linear-gradient(90deg,transparent,var(--green3),transparent);filter:blur(1px);opacity:.7;pointer-events:none}
-.player.on{display:grid}.pcover{cursor:pointer}.pcover img{width:100%;height:100%;object-fit:cover}
-.fullscreen-player{position:fixed;inset:0;z-index:9999;display:none;overflow:hidden;background:#050806;color:#f4fff8}.fullscreen-player.open{display:grid}.fullscreen-player:before{content:"";position:absolute;inset:-8%;background-image:var(--fs-art);background-position:center;background-size:cover;filter:blur(45px) saturate(1.2);opacity:.28;transform:scale(1.08)}.fs-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(3,7,5,.18),rgba(3,7,5,.72) 72%,rgba(3,7,5,.94))}.fs-inner{position:relative;z-index:1;width:min(760px,100%);height:100%;margin:auto;padding:clamp(18px,4vw,42px) clamp(18px,5vw,48px) max(22px,env(safe-area-inset-bottom));display:grid;grid-template-rows:auto 1fr auto;gap:16px}.fs-top{display:flex;justify-content:space-between;align-items:center}.fs-top strong{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:rgba(240,255,247,.72)}.fs-close{width:42px;height:42px;border-radius:50%;padding:0}.fs-art-wrap{min-height:0;display:grid;place-items:center;padding:8px}.fs-art{display:block;width:auto;height:auto;max-width:100%;max-height:min(68vh,680px);aspect-ratio:1/1;object-fit:contain;border-radius:clamp(18px,3vw,30px);box-shadow:0 30px 90px rgba(0,0,0,.5)}.fs-art-fallback{width:min(72vw,500px);height:min(72vw,500px);display:grid;place-items:center;border-radius:28px;background:rgba(255,255,255,.06);font-size:80px}.fs-bottom{display:grid;gap:14px}.fs-title{font:700 clamp(24px,5vw,42px)/1.04 Space Grotesk,sans-serif;letter-spacing:-1px}.fs-artist{margin-top:5px;color:rgba(240,255,247,.68);font-size:13px}.fs-seek{width:100%;accent-color:var(--green3)}.fs-time{display:flex;justify-content:space-between;color:rgba(240,255,247,.58);font-size:10px}.fs-controls{display:flex;justify-content:center;align-items:center;gap:18px}.fs-controls button{width:48px;height:48px;border-radius:50%;padding:0}.fs-controls .fs-play{width:68px;height:68px;background:linear-gradient(135deg,var(--green3),var(--green2));color:#06120a;border:0;font-size:21px}@media(max-width:600px){.fs-inner{padding-top:max(16px,env(safe-area-inset-top));gap:8px}.fs-art{max-height:54vh;width:100%;height:auto}.fs-art-wrap{padding:0}.fs-controls{gap:10px}.fs-controls .fs-play{width:62px;height:62px}}width:49px;height:49px;border-radius:13px;overflow:hidden;display:grid;place-items:center;background:#12311f}.pcover img{width:100%;height:100%;object-fit:cover}.pmeta{min-width:0;overflow:hidden}.pmeta strong,.pmeta span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pmeta strong{font-size:12px}.pmeta span{font-size:10px;color:var(--muted);margin-top:3px}
+.player.on{display:grid}.pcover{width:49px;height:49px;border-radius:13px;overflow:hidden;display:grid;place-items:center;background:#12311f;cursor:pointer}.pcover img{width:100%;height:100%;object-fit:cover}
+.fullscreen-player{position:fixed;inset:0;z-index:9999;display:none;overflow:hidden;background:#050806;color:#f4fff8}.fullscreen-player.open{display:grid}.fullscreen-player:before{content:"";position:absolute;inset:-8%;background-image:var(--fs-art);background-position:center;background-size:cover;filter:blur(45px) saturate(1.2);opacity:.28;transform:scale(1.08)}.fs-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(3,7,5,.18),rgba(3,7,5,.72) 72%,rgba(3,7,5,.94))}.fs-inner{position:relative;z-index:1;width:min(760px,100%);height:100%;margin:auto;padding:clamp(18px,4vw,42px) clamp(18px,5vw,48px) max(22px,env(safe-area-inset-bottom));display:grid;grid-template-rows:auto 1fr auto;gap:16px}.fs-top{display:flex;justify-content:space-between;align-items:center}.fs-top strong{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:rgba(240,255,247,.72)}.fs-close{width:42px;height:42px;border-radius:50%;padding:0}.fs-art-wrap{min-height:0;display:grid;place-items:center;padding:8px}.fs-art{display:block;width:auto;height:auto;max-width:100%;max-height:min(68vh,680px);aspect-ratio:1/1;object-fit:contain;border-radius:clamp(18px,3vw,30px);box-shadow:0 30px 90px rgba(0,0,0,.5)}.fs-art-fallback{width:min(72vw,500px);height:min(72vw,500px);display:grid;place-items:center;border-radius:28px;background:rgba(255,255,255,.06);font-size:80px}.fs-bottom{display:grid;gap:14px}.fs-title{font:700 clamp(24px,5vw,42px)/1.04 Space Grotesk,sans-serif;letter-spacing:-1px}.fs-artist{margin-top:5px;color:rgba(240,255,247,.68);font-size:13px}.fs-seek{width:100%;accent-color:var(--green3)}.fs-time{display:flex;justify-content:space-between;color:rgba(240,255,247,.58);font-size:10px}.fs-controls{display:flex;justify-content:center;align-items:center;gap:18px}.fs-controls button{width:48px;height:48px;border-radius:50%;padding:0}.fs-controls .fs-play{width:68px;height:68px;background:linear-gradient(135deg,var(--green3),var(--green2));color:#06120a;border:0;font-size:21px}@media(max-width:600px){.fs-inner{padding-top:max(16px,env(safe-area-inset-top));gap:8px}.fs-art{max-height:54vh;width:100%;height:auto}.fs-art-wrap{padding:0}.fs-controls{gap:10px}.fs-controls .fs-play{width:62px;height:62px}}
 .pc{display:flex;align-items:center;gap:6px}.pc .big{width:45px;height:45px;padding:0;border:0;border-radius:50%;background:#effff5;color:#06120a}.seek{grid-column:1/-1;width:100%;accent-color:var(--green)}.time{grid-column:1/-1;color:var(--muted);font-size:9px;margin-top:-5px}
 .fx-panel{grid-column:1/-1;border-top:1px solid rgba(166,255,205,.07);padding:11px 3px 2px}.eq-switch{display:inline-flex;align-items:center;gap:7px;font-size:9px;color:var(--muted);cursor:pointer}.eq-switch input{width:34px;height:18px;margin:0;accent-color:var(--green)}.eq-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.eq-band{text-align:center;min-width:0}.eq-band input{width:100%;accent-color:var(--green)}.eq-band small{display:block;color:var(--muted);font-size:8px;margin-top:3px}.spatial3d{margin-top:12px;padding:10px 11px;border:1px solid rgba(166,255,205,.08);border-radius:14px;background:rgba(78,228,143,.035)}.spatial3d-head{display:flex;align-items:center;justify-content:space-between;font-size:11px;margin-bottom:5px}.spatial3d-head span{color:var(--green);font-variant-numeric:tabular-nums}.spatial3d input{width:100%;accent-color:var(--green)}.spatial3d>small{display:block;color:var(--muted);font-size:8px;margin-top:3px}
 .nav{
@@ -290,7 +290,7 @@ const AUDIO_KEY="okmusic:audio";
 const eqBands=["60","250","1K","4K","12K"];
 let audioFx={eq:[0,0,0,0,0]};
 try{audioFx={...audioFx,...JSON.parse(localStorage.getItem(AUDIO_KEY)||"{}")}}catch{}
-let audioCtx=null,audioSource=null,eqPreGain=null,eqNodes=[],fxReady=false,showEq=false,eqEnabled=audioFx.eqEnabled!==false,visualAnalyser=null,visualData=null,visualFrame=0;
+let audioCtx=null,audioSource=null,eqPreGain=null,eqNodes=[],fxReady=false,showEq=false,eqEnabled=audioFx.eqEnabled!==false,visualAnalyser=null,visualData=null,visualFrame=0;\nlet playAttemptActive=false;
 function saveAudioFx(){localStorage.setItem(AUDIO_KEY,JSON.stringify(audioFx))}
 let eqLimiter=null,spatial3dNode=null,spatial3dFrame=0;
 let spatial3d=0;
@@ -808,6 +808,7 @@ function play(t,{fromEnded=false,keepQueue=false,fromBootstrap=false}={}){
  let candidateIndex=0;
  const tryCandidate=()=>{
   if(token!==window.__okPlayToken||current?.id!==t.id)return;
+  playAttemptActive=true;
   const src=candidates[candidateIndex];
   try{
    const absolute=new URL(src,location.href).href;
@@ -827,6 +828,7 @@ function play(t,{fromEnded=false,keepQueue=false,fromBootstrap=false}={}){
     cleanup();
     if(token!==window.__okPlayToken)return;
     if(error?.name==="NotAllowedError"){
+     playAttemptActive=false;
      toast("Браузер запретил автозапуск — нажми ▶");
      return;
     }
@@ -837,6 +839,7 @@ function play(t,{fromEnded=false,keepQueue=false,fromBootstrap=false}={}){
      tryCandidate();
      return;
     }
+    playAttemptActive=false;
     console.warn("Ok Music playback:",{error,current:t,candidates});
     const failedIndex=playbackQueue.findIndex(x=>String(x?.id||"")===String(t.id||""));
     if(failedIndex>=0){
@@ -857,6 +860,7 @@ function play(t,{fromEnded=false,keepQueue=false,fromBootstrap=false}={}){
     if(settled)return;
     settled=true;
     cleanup();
+    playAttemptActive=false;
     if(token!==window.__okPlayToken||current?.id!==t.id)return;
     playing=true;
     updateMediaSession();
@@ -866,6 +870,7 @@ function play(t,{fromEnded=false,keepQueue=false,fromBootstrap=false}={}){
    }).catch(fail);
   }catch(error){
    if(candidateIndex<candidates.length-1){candidateIndex++;tryCandidate();return;}
+   playAttemptActive=false;
    console.warn("Ok Music playback:",error);
    current=null;
    playing=false;
@@ -1005,6 +1010,7 @@ function drawPlayer(){if(!current){
 }
 audio.onplay=()=>{playing=true;if(!fxReady)initAudioFx();if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});if(spatial3d)updateSpatial3d();if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer();cancelAnimationFrame(visualFrame);visualFrame=requestAnimationFrame(drawPlayerVisual)};audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime"),fsSeek=document.querySelector("#fsSeek"),fsCur=document.querySelector("#fsCur"),fsDur=document.querySelector("#fsDur");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(fsSeek)fsSeek.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if(fsCur)fsCur.textContent=fmt(audio.currentTime);if(fsDur)fsDur.textContent=fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
 audio.onpause=()=>{playing=false;cancelAnimationFrame(visualFrame);visualFrame=0;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer()};audio.onended=()=>{playing=false;if(autoNext)void playNext();else{if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()}};audio.onerror=()=>{
+ if(playAttemptActive)return;
  const code=audio.error?.code||0;
  console.warn("Ok Music audio error",{code,src:audio.src,current:current?.id,source:current?.source});
  playing=false;
