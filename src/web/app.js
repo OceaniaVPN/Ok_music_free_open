@@ -693,7 +693,7 @@ function preloadNext(){
  if(nextAudio.src===absolute)return;
  nextAudio.src=src;nextAudio.load();void token;
 }
-function play(t,{fromEnded=false,keepQueue=false}){
+function play(t,{fromEnded=false,keepQueue=false,fromBootstrap=false}={}){
  if(!t)return;
  let idx=playbackQueue.findIndex(x=>x?.id===t.id);
  if(!keepQueue||idx<0){
@@ -712,8 +712,24 @@ function play(t,{fromEnded=false,keepQueue=false}){
    if(token===window.__okPlayToken&&current?.id===t.id){
     playing=true;updateMediaSession();drawPlayer();preloadNext();void ensureRecommendationWindow();
    }
-  }).catch(error=>{console.warn("Ok Music playback:",error);toast(error?.name==="NotAllowedError"?"Нажми ▶ ещё раз для запуска":"Не удалось воспроизвести трек")});
- }catch(error){console.warn("Ok Music playback:",error);toast("Не удалось воспроизвести трек")}
+  }).catch(error=>{
+   console.warn("Ok Music playback:",error);
+   if(fromBootstrap&&token===window.__okPlayToken&&playbackQueue.length>1){
+    const failedIndex=playbackQueue.findIndex(x=>x?.id===t.id);
+    if(failedIndex>=0)playbackQueue.splice(failedIndex,1);
+    queueIndex=Math.max(0,Math.min(failedIndex,playbackQueue.length-1));
+    current=null;playing=false;
+    toast("Этот поток не ответил — включаю следующий");
+    const next=playbackQueue[queueIndex];
+    if(next)setTimeout(()=>play(next,{keepQueue:true,fromBootstrap:true}),80);
+    return;
+   }
+   toast(error?.name==="NotAllowedError"?"Нажми ▶ ещё раз для запуска":"Не удалось воспроизвести трек");
+  });
+ }catch(error){
+  console.warn("Ok Music playback:",error);
+  toast("Не удалось воспроизвести трек");
+ }
 }
 async function playNext(){
  let next=playbackQueue[queueIndex+1];
