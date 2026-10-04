@@ -153,8 +153,29 @@ async function fetchHitmotopSearch(q,limit){
   let lastError=null;
   for(const configuredBase of HITMOTOP_BASES){
     try{
+      const base=new URL(configuredBase).origin;
+      const search=new URL("/search",base);
+      search.searchParams.set("q",q);
+      const response=await fetch(search,{headers:{...HITMOTOP_HEADERS,referer:base+"/"},redirect:"follow"});
+      if(response.ok){
+        const html=await response.text();
+        const finalBase=new URL(response.url||base).origin;
+        const tracks=parseHitmotopSearch(html,finalBase,limit);
+        if(tracks.length)return tracks;
+        lastError=Error("Hitmo search returned no parsable tracks");
+        continue;
+      }
+      lastError=Error("Hitmo search HTTP "+response.status);
+    }catch(error){
+      lastError=error;
+    }
+  }
+
+  // Some deployments issue a session cookie on the home page before allowing search.
+  for(const configuredBase of HITMOTOP_BASES){
+    try{
       const home=await fetch(configuredBase,{headers:HITMOTOP_HEADERS,redirect:"follow"});
-      if(!home.ok)throw Error("Hitmotop home HTTP "+home.status);
+      if(!home.ok)continue;
       const base=new URL(home.url||configuredBase).origin;
       const sid=hitmotopExtractSid(home);
       const search=new URL("/search",base);
@@ -162,22 +183,26 @@ async function fetchHitmotopSearch(q,limit){
       const headers={...HITMOTOP_HEADERS,referer:base+"/"};
       if(sid)headers.cookie="sid="+sid;
       const response=await fetch(search,{headers,redirect:"follow"});
-      if(!response.ok)throw Error("Hitmotop search HTTP "+response.status);
+      if(!response.ok){
+        lastError=Error("Hitmo search HTTP "+response.status);
+        continue;
+      }
       const html=await response.text();
-      const tracks=parseHitmotopSearch(html,base,limit);
+      const tracks=parseHitmotopSearch(html,new URL(response.url||base).origin,limit);
       if(tracks.length)return tracks;
-      throw Error("Hitmotop search returned no parsable tracks");
+      lastError=Error("Hitmo search returned no parsable tracks");
     }catch(error){
       lastError=error;
     }
   }
-  throw lastError||Error("Hitmotop unavailable");
+  throw lastError||Error("Hitmo unavailable");
 }
+
 async function hitmotopPlaybackUrl(rawUrl){
   let target;
   try{target=new URL(rawUrl)}catch{throw Error("Invalid Hitmotop audio URL")}
   const host=target.hostname.toLowerCase();
-  const allowed=host==="hitmos.fm"||host.endsWith(".hitmos.fm")||host==="hitmotop.com"||host.endsWith(".hitmotop.com");
+  const allowed=host==="hitmos.fm"||host.endsWith(".hitmos.fm");
   if(!allowed||!/^https?:$/.test(target.protocol))throw Error("Hitmotop audio host is not allowed");
   return target.href;
 }
@@ -232,6 +257,22 @@ export async function handleApi(request,env){
   const url=new URL(request.url);
   if(url.pathname==="/api/local-music")return Response.json({ok:true,source:"🔐 Ключник",tracks:LOCAL_MUSIC});
   if(url.pathname==="/api/health")return Response.json({ok:true,service:env.APP_NAME||"Ok Music",version:"7.0",providers:["Zaycev.net","Jamendo","Hitmotop","🔐 Ключник"],zaycev:{configured:true,mode:"current-web-api"},jamendo:{configured:Boolean(String(env.JAMENDO_CLIENT_ID||"").trim())},hitmotop:{configured:true,mode:"HTML parser"}});
+  if(url.pathname==="/api/hitmotop/test"){
+    const q=(url.searchParams.get("q")||"Linkin Park").trim().slice(0,160);
+    try{
+      const tracks=await fetchHitmotopSearch(q,5);
+      return Response.json({
+        ok:true,
+        provider:"Hitmotop",
+        query:q,
+        count:tracks.length,
+        tracks:tracks.map(t=>({id:t.id,title:t.title,artist:t.artist,duration:t.duration,sourceUrl:t.sourceUrl,hasAudio:Boolean(t.audio),hasImage:Boolean(t.image)}))
+      });
+    }catch(error){
+      return Response.json({ok:false,provider:"Hitmotop",query:q,error:error?.message||"unknown error"},{status:502});
+    }
+  }
+
   if(url.pathname==="/api/search"){
     const q=(url.searchParams.get("q")||"").trim(),limit=Math.min(Math.max(Number(url.searchParams.get("limit")||24),1),50);
     if(!q)return Response.json({ok:true,query:"",tracks:[],providers:[]});
@@ -246,7 +287,7 @@ export async function handleApi(request,env){
     let target;
     try{target=new URL(raw)}catch{return Response.json({ok:false,error:"Invalid artwork URL"},{status:400})}
     const host=target.hostname.toLowerCase();
-    const allowed=host==="zaycev.net"||host.endsWith(".zaycev.net")||host==="jamendo.com"||host.endsWith(".jamendo.com")||host==="hitmos.fm"||host.endsWith(".hitmos.fm")||host==="hitmotop.com"||host.endsWith(".hitmotop.com");
+    const allowed=host==="zaycev.net"||host.endsWith(".zaycev.net")||host==="jamendo.com"||host.endsWith(".jamendo.com")||host==="hitmos.fm"||host.endsWith(".hitmos.fm");
     if(!allowed||!/^https?:$/.test(target.protocol))return Response.json({ok:false,error:"Artwork host is not allowed"},{status:403});
     try{
       const upstream=await fetch(target,{headers:{
