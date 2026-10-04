@@ -523,8 +523,36 @@ const TASTE_GENRES=["Русский рэп","Поп","Рок","Электрон�
  const clear=document.querySelector("#clearOffline");if(clear)clear.onclick=clearOffline;
  void refreshOfflineButtons(view);
 }
-let homeBootstrapPromise=null,homeBootstrapController=null,homeBootstrapBusy=false;
+let homeBootstrapPromise=null,homeBootstrapController=null,homeBootstrapBusy=false,homePrefetchPromise=null;
+function prepareHomeQueue(){
+ if(current||playbackQueue.length||homePrefetchPromise)return homePrefetchPromise;
+ homePrefetchPromise=(async()=>{
+  try{
+   await fetchRecommendationBatch({refresh:String(Date.now())});
+   if(!current&&queueIndex<0&&playbackQueue.length){
+    const first=playbackQueue[0],src=playableAudio(first);
+    if(src){
+     const absolute=new URL(src,location.href).href;
+     if(audio.src!==absolute){audio.src=src;audio.load()}
+    }
+    drawPlayer();
+   }
+  }catch(error){
+   if(error?.name!=="AbortError")console.warn("Ok Music home prefetch:",error);
+  }finally{homePrefetchPromise=null}
+ })();
+ return homePrefetchPromise;
+}
 async function initializeHomePlayer({force=false}={}){
+ if(current)return;
+ // When the hidden background prefetch is already ready, start the first
+ // prepared track directly from the user's click. No async network wait occurs.
+ if(playbackQueue.length&&queueIndex<0){
+  queueIndex=0;
+  recommendationSeen=new Set(playbackQueue.map(t=>String(t.id)));
+  play(playbackQueue[0],{keepQueue:true,fromBootstrap:true});
+  return;
+ }
  if(current)return;
  if(force){
   homeBootstrapController?.abort();
@@ -826,6 +854,10 @@ function drawPlayer(){if(!current){
  if(start)start.onclick=()=>{
   if(homeBootstrapBusy)return;
   clearTimeout(window.__okHomeRetry);
+  if(playbackQueue.length&&queueIndex<0){
+   void initializeHomePlayer({force:true});
+   return;
+  }
   void unlockMediaFromGesture().then(()=>initializeHomePlayer({force:true}));
  };
  return}
@@ -865,9 +897,14 @@ document.querySelector("#createPlaylist").onclick=()=>{const name=document.query
 function render(name){document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));({home,mood,search:searchView,library}[name]||home)()}
 document.querySelector("#nav").addEventListener("click",e=>{const b=e.target.closest("button[data-view]");if(b)render(b.dataset.view)});
 render("home");
+void prepareHomeQueue();
 const initialPlay=document.querySelector("#initialPlay");
 if(initialPlay)initialPlay.onclick=()=>{
  clearTimeout(window.__okHomeRetry);
+ if(playbackQueue.length&&queueIndex<0){
+  void initializeHomePlayer({force:true});
+  return;
+ }
  void unlockMediaFromGesture().then(()=>initializeHomePlayer({force:true}));
 };
 function initTelegram(){if(!window.Telegram?.WebApp)return;window.Telegram.WebApp.ready();window.Telegram.WebApp.expand();const id=document.documentElement.dataset.theme||"default",t=MUSIC_THEMES.find(x=>x.id===id)||MUSIC_THEMES[0];window.Telegram.WebApp.setHeaderColor(t.telegram);window.Telegram.WebApp.setBackgroundColor(t.telegram)}
