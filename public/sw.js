@@ -21,8 +21,7 @@ self.addEventListener("message",event=>{
 function isAudio(request){
   const url=new URL(request.url);
   return request.method==="GET" &&
-    (url.pathname.startsWith("/music/") ||
-     /\.(mp3|m4a|ogg|opus|wav|aac|flac)(?:$|\?)/i.test(url.pathname));
+    /\.(mp3|m4a|ogg|opus|wav|aac|flac)(?:$|\?)/i.test(url.pathname);
 }
 
 self.addEventListener("fetch",event=>{
