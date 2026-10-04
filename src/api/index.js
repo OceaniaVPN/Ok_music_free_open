@@ -521,7 +521,7 @@ export async function handleApi(request,env){
       cachedProviderSearch("zaycev",q,limit,()=>fetchZaycevSearch(q,limit)),
       cachedProviderSearch("jamendo",q,jamLimit,()=>searchJamendo(q,jamLimit,env))
     ]);
-    let h={status:"rejected",reason:Error("Hitmotop skipped until primary sources return too few tracks")};
+    let h={status:"skipped"};
     const zTracks=z.status==="fulfilled"?z.value:[],jTracks=j.status==="fulfilled"?j.value:[];
     if(zTracks.length+jTracks.length<Math.min(limit,6)){
       try{h={status:"fulfilled",value:await cachedProviderSearch("hitmotop",q,limit,()=>fetchHitmotopSearch(q,limit,env))}}catch(error){h={status:"rejected",reason:error}}
