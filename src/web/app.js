@@ -131,22 +131,11 @@ img{max-width:100%}
 .sub{margin-top:4px;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .track-meta{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
 .meta-pill{padding:4px 7px;border-radius:999px;background:rgba(255,255,255,.035);border:1px solid rgba(166,255,205,.07);color:#aec7b8;font-size:8px}
-.wave-card,.taste-panel,.track-profile{
+.taste-panel,.track-profile{
  position:relative;overflow:hidden;margin-bottom:22px;padding:11px;border-radius:27px;
  border:1px solid rgba(166,255,205,.10);background:linear-gradient(145deg,rgba(14,34,22,.84),rgba(6,15,10,.76));
  box-shadow:var(--shadow),inset 0 1px rgba(255,255,255,.06)
 }
-.wave-cover{position:relative;overflow:hidden;aspect-ratio:21/10;border-radius:21px;background:#0d2115}
-.wave-cover:before{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,transparent 40%,rgba(2,8,5,.66));pointer-events:none}
-.wave-cover img{width:100%;height:100%;display:block;object-fit:cover}
-.wave-badge{position:absolute;z-index:2;left:13px;top:13px;padding:7px 9px;border-radius:999px;background:rgba(3,12,7,.62);backdrop-filter:blur(12px);font-size:9px;font-weight:800;border:1px solid rgba(166,255,205,.10)}
-.wave-info{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;padding:13px 4px 3px}
-.wave-info h2{margin:0;font:700 27px/1.06 Space Grotesk,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.wave-info .sub{font-size:11px;margin-top:5px}
-.wave-actions{display:flex;align-items:center;gap:7px;justify-content:flex-end;flex-wrap:wrap}
-.wave-actions button{width:42px;height:42px;padding:0;border-radius:50%}
-.wave-actions .wave-main{width:54px;height:54px;border:0;background:#effff5;color:#06120a}
-.wave-meta{font-size:10px;color:var(--muted)}
 .taste-panel{padding:17px}.taste-panel h3{margin:0 0 5px;font-size:16px}.taste-panel p{margin:0;color:var(--muted);font-size:11px;line-height:1.55}
 .offline-panel{
  display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 22px;padding:14px 16px;
@@ -223,7 +212,7 @@ img{max-width:100%}
 :root[data-theme="road"]{--bg:#111006;--panel:#211d09;--panel2:#30290b;--card:#282209;--green:#e6d15a;--green2:#c6ad32;--green3:#fff09b;--muted:#c0b98e;--line:rgba(230,209,90,.16)}
 :root[data-theme="party"]{--bg:#100719;--panel:#1e0d2c;--panel2:#28103a;--card:#21102e;--green:#d66cff;--green2:#a844ef;--green3:#efb3ff;--muted:#bda7c9;--line:rgba(214,108,255,.17)}
 :root[data-theme="phonk"]{--bg:#0e0809;--panel:#1d0d0e;--panel2:#281113;--card:#211012;--green:#ff5b68;--green2:#dc303f;--green3:#ff9da5;--muted:#c5a4a8;--line:rgba(255,91,104,.16)}
-html,body,.app,.top,.hero,.card,.wave-card,.taste-panel,.track-profile,.result,.playlist,.player,.nav,.dialog,.mood-card,.offline-panel,.input,.logo,.primary,.nav button.active,.home-play{transition:background-color .65s ease,background .65s ease,border-color .65s ease,color .65s ease,box-shadow .65s ease,filter .65s ease}
+html,body,.app,.top,.hero,.card,.taste-panel,.track-profile,.result,.playlist,.player,.nav,.dialog,.mood-card,.offline-panel,.input,.logo,.primary,.nav button.active{transition:background-color .65s ease,background .65s ease,border-color .65s ease,color .65s ease,box-shadow .65s ease,filter .65s ease}
 </style></head>
 <body><script>document.documentElement.dataset.telegramBot="${String(env.TELEGRAM_BOT_USERNAME||"").replace(/"/g,"&quot;")}";</script>
 <div class="app">
@@ -522,24 +511,6 @@ async function openAlbum(name){
   document.querySelector("#albumBack").onclick=()=>render("search");bind(view);if(tracks.length)toast("В альбоме "+tracks.length+" треков")
  }catch(e){view.innerHTML='<div class="profile-back"><button id="albumBack">← Назад</button></div><div class="empty">Не удалось загрузить альбом.<br><small>'+esc(e.message)+'</small></div>';document.querySelector("#albumBack").onclick=()=>render("search")}
 }
-function waveTrack(){return current||tracks[0]||localTracks[0]||null}
-function drawHomeWave(){
- const box=document.querySelector("#homeWave");if(!box)return;
- const t=waveTrack();
- if(!t){box.innerHTML='<div class="wave-empty"><strong>🎵 Каталог загружается</strong><span>Подожди немного — локальная музыка появится здесь.</span></div>';return}
- const liked=state.liked.some(x=>x.id===t.id);
- box.innerHTML='<div class="wave-cover" id="waveOpen">'+(t.image?'<img src="'+esc(t.image)+'" loading="eager">':"♫")+'<span class="wave-badge">♫ Моя волна</span></div><div class="wave-info"><div class="wave-meta"><h2>'+esc(t.title)+'</h2><div class="sub">'+esc(t.artist)+(t.source?" · "+esc(t.source):"")+'</div></div><div class="wave-actions"><button id="wavePrev" title="Предыдущий">⏮</button><button id="wavePlay" class="wave-main" title="Воспроизвести">'+(playing&&current?.id===t.id?"Ⅱ":"▶")+'</button><button id="waveNext" title="Следующий">⏭</button><button id="waveLike" title="Любимое">'+(liked?"♥":"♡")+'</button></div></div>';
- document.querySelector("#waveOpen").onclick=()=>openTrackProfile(t.id);
- document.querySelector("#wavePrev").onclick=playPrevious;
- document.querySelector("#waveNext").onclick=playNext;
- document.querySelector("#wavePlay").onclick=()=>{if(current?.id===t.id&&playing){audio.pause();return}play(t)};
- document.querySelector("#waveLike").onclick=()=>like(t);
-}
-function playPrevious(){
- if(audio.currentTime>3){audio.currentTime=0;return}
- const i=findTrackIndex(current),prev=i>0?tracks[i-1]:null;
- if(prev)play(prev);else if(tracks.length)play(tracks[0]);
-}
 function addToPlaylist(t){if(!t)return;if(!state.playlists.length){toast("Сначала создай плейлист");modal.classList.add("open");document.querySelector("#playlistName").focus();return}const names=state.playlists.map((p,i)=>(i+1)+". "+p.name+" ("+p.tracks.length+")").join("\n");const answer=window.prompt("Добавить в какой плейлист?\\n\\n"+names+"\\n\\nВведи номер:","1");const n=Number(answer);if(!Number.isInteger(n)||!state.playlists[n-1])return;const p=state.playlists[n-1];if(p.tracks.some(x=>x.id===t.id)){toast("Трек уже есть в плейлисте");return}p.tracks.push(t);save();toast("Добавлено в «"+p.name+"» ✨")}
 const TASTE_GENRES=["Русский рэп","Поп","Рок","Электроника","Хип-хоп","Фонк","R&B","Lo-fi","Инди","Метал","Классика","Джаз","K-pop"]; const TASTE_MOODS=["Спокойно","Энергично","Грустно","Романтично","Ночью","Для дороги","Вечеринка","Фон для работы"]; function openTaste(){const m=document.querySelector("#tasteModal"),g=document.querySelector("#genreChips"),mo=document.querySelector("#moodChips");g.innerHTML=TASTE_GENRES.map(x=>'<button class="chip '+(state.taste.genres.includes(x)?"on":"")+'" data-g="'+esc(x)+'">'+esc(x)+'</button>').join("");mo.innerHTML=TASTE_MOODS.map(x=>'<button class="chip '+(state.taste.moods.includes(x)?"on":"")+'" data-m="'+esc(x)+'">'+esc(x)+'</button>').join("");g.querySelectorAll("[data-g]").forEach(b=>b.onclick=()=>{const x=b.dataset.g;state.taste.genres=state.taste.genres.includes(x)?state.taste.genres.filter(v=>v!==x):[...state.taste.genres,x];b.classList.toggle("on")});mo.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{const x=b.dataset.m;state.taste.moods=state.taste.moods.includes(x)?state.taste.moods.filter(v=>v!==x):[...state.taste.moods,x];b.classList.toggle("on")});document.querySelector("#tasteArtists").value=state.taste.artists||"";document.querySelector("#tasteNow").value=state.taste.now||"";m.classList.add("open")} document.querySelector("#tasteBtn").onclick=openTaste; document.querySelector("#tasteCancel").onclick=()=>document.querySelector("#tasteModal").classList.remove("open"); document.querySelector("#tasteSave").onclick=()=>{state.taste.artists=document.querySelector("#tasteArtists").value.trim();state.taste.now=document.querySelector("#tasteNow").value.trim();save();document.querySelector("#tasteModal").classList.remove("open");toast("Вкус сохранён ✨");render("home")}; async function home(){
  view.innerHTML='<section class="hero hero-v2"><div class="hero-grid"></div><div class="hero-main"><div class="hero-kicker"><span>✦ OK MUSIC</span><span class="live-dot">КАТАЛОГ ОНЛАЙН</span><span>УМНЫЙ АВТОПОДБОР</span></div><h2>Твоя музыка.<br><em>Твой ритм.</em></h2><p>Ищи любую музыку и слушай без лишних экранов. Следующие треки подбираются скрыто и заранее — без спойлеров очереди.</p><div class="searchbar"><input id="homeQ" class="input" placeholder="Исполнитель, трек или настроение" autocomplete="off"><button id="homeSearch" class="primary">Найти музыку</button></div><div class="hero-quick"><button type="button" data-quick-q="Ночной вайб">🌙 Ночной вайб</button><button type="button" data-quick-q="Энергия">⚡ Энергия</button><button type="button" data-quick-q="Lo-fi">☁ Lo-fi</button><button type="button" data-quick-q="В дорогу">🚗 В дорогу</button></div></div><div class="hero-bottom"><div class="hero-note">🎧 Следующие песни подбираются автоматически</div><div class="hero-providers"><span>Zaycev</span><span>Jamendo</span><span>Hitmotop</span></div></div></section><div class="taste-panel"><h3>🎧 Музыкальный профиль</h3><p>Жанры, настроение и любимые исполнители используются скрыто внутри автоподбора. Никаких списков будущих песен на экране.</p><button id="editTaste" style="margin-top:12px">Настроить вкус</button></div><div class="offline-panel" id="offlineHome"><div><strong>◉ Офлайн-режим</strong><span id="offlineHomeText">Сохраняй треки кнопкой ⇩ и слушай их без интернета.</span></div><button id="clearOffline">Очистить</button></div>';
@@ -720,8 +691,8 @@ function drawPlayer(){if(!current){playerEl.className="player";return}
  if(spatial)spatial.oninput=e=>{setSpatial3d(e.target.value);const out=spatial.closest(".spatial3d")?.querySelector("span");if(out)out.textContent=Math.round(spatial3d*100)+"%"};
 }
 
-audio.onplay=()=>{playing=true;if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});if(spatial3d)updateSpatial3d();if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer();drawHomeWave()};audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
-audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer();drawHomeWave()};audio.onended=()=>{playing=false;if(autoNext)playNext();else{if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()}};audio.onerror=()=>{toast("Не удалось загрузить аудио");playing=false;drawPlayer()};
+audio.onplay=()=>{playing=true;if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});if(spatial3d)updateSpatial3d();if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer()};audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
+audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer()};audio.onended=()=>{playing=false;if(autoNext)playNext();else{if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()}};audio.onerror=()=>{toast("Не удалось загрузить аудио");playing=false;drawPlayer()};
 nextAudio.onerror=()=>{nextAudio.removeAttribute("src")};
 audio.addEventListener("canplay",()=>{preloadNext();const remaining=playbackQueue.length-queueIndex-1;if(remaining<=2)void fetchRecommendationBatch()});
 document.querySelector("#closeModal").onclick=()=>modal.classList.remove("open");modal.onclick=e=>{if(e.target===modal)modal.classList.remove("open")};
