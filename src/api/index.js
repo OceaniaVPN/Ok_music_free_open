@@ -768,6 +768,16 @@ export async function handleApi(request,env){
     const genres=recommendationTerms(url.searchParams.get("genres")||"");
     const moods=recommendationTerms(url.searchParams.get("moods")||mood);
     const now=recommendationTerms(url.searchParams.get("now")||"");
+    const artistScoreMap=new Map();
+    for(const item of String(url.searchParams.get("artistScores")||"").split(",")){
+      const m=item.match(/^(.+?)=(-?\d+(?:\.\d+)?)$/);
+      if(m)artistScoreMap.set(recommendationText(m[1]),Number(m[2]));
+    }
+    const genreScoreMap=new Map();
+    for(const item of String(url.searchParams.get("genreScores")||"").split(",")){
+      const m=item.match(/^(.+?)=(-?\d+(?:\.\d+)?)$/);
+      if(m)genreScoreMap.set(recommendationText(m[1]),Number(m[2]));
+    }
     const preferredArtists=recommendationUnique([
       ...(url.searchParams.get("artists")||"").split(/[,;]+/),
       ...(url.searchParams.get("likedArtists")||"").split(/[,;]+/),
@@ -807,10 +817,20 @@ export async function handleApi(request,env){
         let score=0;
         if(artist&&preferredArtists.includes(artist))score+=52;
         else if(artist&&preferredArtists.some(a=>artist.includes(a)||a.includes(artist)))score+=32;
+        // Long-term feedback: finishing a track gives +1, skipping before half
+        // gives -1, and an explicit like gives +10 to the artist.
+        const artistAffinity=artistScoreMap.get(artist)||0;
+        score+=artistAffinity*7;
+        if(artistAffinity>=10)score+=24;
+        if(artistAffinity<=-3)score-=30;
         if(currentArtist&&artist===currentArtist)score+=15;
         if(currentArtist&&artist&&artist.includes(currentArtist)&&artist!==currentArtist)score+=7;
-        score+=recommendationOverlap(recommendationText(t.genre),genres)*14;
+        const trackGenre=recommendationText(t.genre);
+        score+=recommendationOverlap(trackGenre,genres)*14;
         score+=recommendationOverlap(title+" "+artist,genres)*4;
+        for(const [g,gs] of genreScoreMap){
+          if(g&&trackGenre.includes(g))score+=gs*3;
+        }
         score+=recommendationOverlap(title+" "+artist,moods)*6;
         score+=recommendationOverlap(title+" "+artist,now)*3;
         if(likedText&&(likedText.includes(artist)||likedText.includes(title)))score+=12;
@@ -844,7 +864,7 @@ export async function handleApi(request,env){
 
     return Response.json({
       ok:true,
-      algorithm:"adaptive-autoplay-v3",
+      algorithm:"adaptive-autoplay-v4-feedback",
       batchSize:limit,
       mode:(preferredArtists.length||genres.length||moods.length||now.length)?"personalized":"discovery",
       context:{artist:currentArtist||"",mood:mood||"",genres:[...new Set(genres)].slice(0,6),moods:[...new Set(moods)].slice(0,6)},
