@@ -759,7 +759,17 @@ function updateMediaSession(){
  });
  navigator.mediaSession.playbackState=playing?"playing":"paused";
 }
-function drawPlayer(){if(!current){playerEl.className="player on";playerEl.innerHTML='<div class="pcover">♫</div><div class="pmeta"><strong>Ok Music</strong><span>Выбери трек — плеер готов</span></div><div class="pc"><button class="icon" disabled>⏮</button><button class="big" disabled>▶</button><button class="icon" disabled>⏭</button><button class="icon" disabled>EQ</button></div><input class="seek" type="range" min="0" max="100" value="0" disabled><span class="time">0:00 / 0:00</span>';return}
+function drawPlayer(){if(!current){
+ playerEl.className="player on";
+ playerEl.innerHTML='<div class="pcover">♫</div><div class="pmeta"><strong>Ok Music</strong><span>Нажми ▶ — начну искать музыку</span></div><div class="pc"><button class="icon" disabled>⏮</button><button id="startAutoPlay" class="big" title="Начать автоматический поиск">▶</button><button class="icon" disabled>⏭</button><button class="icon" disabled>EQ</button></div><input class="seek" type="range" min="0" max="100" value="0" disabled><span class="time">Готов к подбору</span>';
+ const start=document.querySelector("#startAutoPlay");
+ if(start)start.onclick=()=>{
+  start.disabled=true;
+  start.textContent="…";
+  clearTimeout(window.__okHomeRetry);
+  void initializeHomePlayer();
+ };
+ return}
  playerEl.className="player on";
  playerEl.innerHTML='<div class="pcover" data-player-profile="1">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="prev" class="icon" title="Предыдущий">⏮</button><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button><button id="next" class="icon" title="Следующий">⏭</button><button id="eqToggle" class="icon eq-toggle" title="Эквалайзер">EQ</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>'+eqPanel();
  document.querySelector("#pause").onclick=()=>{if(playing)audio.pause();else{if(showEq&&audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});audio.play().catch(()=>toast("Браузер не разрешил воспроизведение"))}};
