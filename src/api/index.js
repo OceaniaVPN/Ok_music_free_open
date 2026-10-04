@@ -191,7 +191,6 @@ function parseHitmotopSearch(html,base,limit){
       out.push({id,title,artist,album:"",image:"",audio:"/api/hitmotop/play?url="+encodeURIComponent(urlDown),duration:0,license:"",source:"Hitmotop",sourceUrl:urlDown,genre:"",downloadUrl:urlDown});
     }
     }
-  }
   return out;
 }
 
