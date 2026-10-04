@@ -680,7 +680,13 @@ function library(){
  ps.querySelectorAll("[data-pl]").forEach(b=>b.onclick=()=>openPlaylist(b.dataset.pl));ps.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{state.playlists=state.playlists.filter(p=>p.id!==b.dataset.del);save();library();toast("Плейлист удалён")});
 }
 function openPlaylist(id){const p=state.playlists.find(x=>x.id===id);if(!p)return;tracks=p.tracks;view.innerHTML='<div class="section"><h2>'+esc(p.name)+'</h2><small>'+p.tracks.length+' треков</small></div><div class="results">'+(p.tracks.length?p.tracks.map(result).join(""):'<div class="empty">Добавляй треки из поиска.</div>')+'</div>';bind()}
-function like(t){if(!t)return;const i=state.liked.findIndex(x=>x.id===t.id);if(i>=0){state.liked.splice(i,1);toast("Убрано из любимого")}else{state.liked.unshift(t);toast("♥ Добавлено в любимое")}save();render(document.querySelector(".nav button.active").dataset.view)}
+function like(t){
+ if(!t)return;
+ const i=state.liked.findIndex(x=>x.id===t.id);
+ if(i>=0){state.liked.splice(i,1);registerLikeScore(t,false);toast("Убрано из любимого")}
+ else{state.liked.unshift(t);registerLikeScore(t,true);toast("♥ Добавлено в любимое")}
+ save();render(document.querySelector(".nav button.active").dataset.view)
+}
 function recommendationExcludeList(){return [...recommendationSeen].slice(-60)}
 function recommendationParams(extra={}){
  const explicitMood=Boolean(String(extra.mood||"").trim());
@@ -742,8 +748,31 @@ function preloadNext(){
  if(nextAudio.src===absolute)return;
  nextAudio.src=src;nextAudio.load();void token;
 }
+function artistKey(t){return String(t?.artist||"").trim().toLowerCase()}
+function genreKey(t){return String(t?.genre||"").trim().toLowerCase()}
+function recordListeningResult(t,reason="switch"){
+ if(!t?.artist)return;
+ const duration=Number(t.duration||audio.duration||0),position=Number(audio.currentTime||0);
+ if(!duration||position<=0)return;
+ const artist=artistKey(t),genre=genreKey(t),key=String(t.id||"")+"|"+artist+"|"+Math.floor(duration);
+ const last=state.playHistory[state.playHistory.length-1];
+ if(last?.key===key&&last.reason==="scored")return;
+ const half=position/duration>=0.5,delta=half?1:-1;
+ state.artistScores[artist]=Math.max(-50,Math.min(100,Number(state.artistScores[artist]||0)+delta));
+ if(genre)state.genreScores[genre]=Math.max(-50,Math.min(100,Number(state.genreScores[genre]||0)+delta));
+ state.playHistory.push({key,artist,genre,position,duration,half,reason:"scored",at:Date.now()});
+ if(state.playHistory.length>200)state.playHistory=state.playHistory.slice(-200);
+ save();
+}
+function registerLikeScore(t,liked){
+ if(!t?.artist)return;
+ const artist=artistKey(t);
+ state.artistScores[artist]=Math.max(-50,Math.min(100,Number(state.artistScores[artist]||0)+(liked?10:-10)));
+ save();
+}
 function play(t,{fromEnded=false,keepQueue=false,fromBootstrap=false}={}){
  if(!t)return;
+ if(current&&current.id!==t.id)recordListeningResult(current,"switch");
  let idx=playbackQueue.findIndex(x=>x?.id===t.id);
  if(!keepQueue||idx<0){
   playbackQueue=[t];idx=0;recommendationSeen=new Set([String(t.id)]);recommendationContextKey="";
@@ -902,7 +931,7 @@ function drawPlayer(){if(!current){
  if(spatial)spatial.oninput=e=>{setSpatial3d(e.target.value);const out=spatial.closest(".spatial3d")?.querySelector("span");if(out)out.textContent=Math.round(spatial3d*100)+"%"};
 }
 audio.onplay=()=>{playing=true;if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});if(spatial3d)updateSpatial3d();if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer()};audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
-audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer()};audio.onended=()=>{playing=false;if(autoNext)playNext();else{if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()}};audio.onerror=()=>{
+audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer()};audio.onended=()=>{playing=false;if(current)recordListeningResult(current,"ended");if(autoNext)playNext();else{if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()}};audio.onerror=()=>{
  const code=audio.error?.code||0;
  console.warn("Ok Music audio error",{code,src:audio.src,current:current?.id,source:current?.source});
  playing=false;
