@@ -1,0 +1,4 @@
+name = "ok-music-free-open-hitmoz"
+main = "hitmoz-worker/src/entry.py"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["python_workers"]
