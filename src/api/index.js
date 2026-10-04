@@ -1,4 +1,3 @@
-import { LOCAL_MUSIC } from "../local-music.js";
 const ZAYCEV_BASE="https://zaycev.net";
 const ZAYCEV_SEARCH="https://zaycev.net/search";
 const ZAYCEV_TRACK_API="https://zaycev.net/api/external/track";
@@ -486,8 +485,34 @@ function isChartLikeTrack(t){
 function recommendationText(value){
   return String(value||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9а-яё]+/gi," ").replace(/\s+/g," ").trim();
 }
+const RECOMMENDATION_VOCAB={
+  "русский рэп":["russian rap","hip hop","rap"],
+  "поп":["pop"],
+  "рок":["rock","alternative rock"],
+  "электроника":["electronic","electro","edm"],
+  "хип-хоп":["hip hop","rap"],
+  "фонк":["phonk","drift phonk"],
+  "r&b":["rnb","r&b","soul"],
+  "lo-fi":["lofi","chill","beats"],
+  "инди":["indie","indie pop","alternative"],
+  "метал":["metal","heavy metal"],
+  "классика":["classical"],
+  "джаз":["jazz"],
+  "k-pop":["k-pop","korean pop"],
+  "спокойно":["chill","calm","ambient"],
+  "энергично":["energetic","dance","upbeat"],
+  "грустно":["sad","melancholic","emotional"],
+  "романтично":["romantic","love","soft"],
+  "ночью":["night","late night","dark"],
+  "для дороги":["road trip","driving"],
+  "вечеринка":["party","dance"],
+  "фонк":["phonk","drift"]
+};
 function recommendationTerms(value){
-  return String(value||"").split(/[,;]+/).map(recommendationText).filter(Boolean).flatMap(x=>x.split(/\s+/).filter(v=>v.length>2));
+  return String(value||"").split(/[,;]+/).map(recommendationText).filter(Boolean).flatMap(x=>{
+    const mapped=RECOMMENDATION_VOCAB[x];
+    return mapped?mapped.flatMap(v=>recommendationText(v).split(/\s+/).filter(v=>v.length>2)):x.split(/\s+/).filter(v=>v.length>2);
+  });
 }
 function recommendationUnique(values){
   return [...new Set(values.map(x=>String(x||"").trim()).filter(Boolean))];
@@ -554,8 +579,7 @@ function chooseRecommendations(pool,limit,context){
 
 export async function handleApi(request,env){
   const url=new URL(request.url);
-  if(url.pathname==="/api/local-music")return Response.json({ok:true,source:"🔐 Ключник",tracks:LOCAL_MUSIC});
-  if(url.pathname==="/api/health")return Response.json({ok:true,service:env.APP_NAME||"Ok Music",version:"7.0",providers:["Zaycev.net","Jamendo","Hitmotop","🔐 Ключник"],zaycev:{configured:true,mode:"current-web-api"},jamendo:{configured:Boolean(String(env.JAMENDO_CLIENT_ID||"").trim())},hitmotop:{configured:true,mode:"Python parser RPC + open-source parser API + HTML fallback",pythonRpc:Boolean(env.HITMOZ_PYTHON)}});
+  if(url.pathname==="/api/health")return Response.json({ok:true,service:env.APP_NAME||"Ok Music",version:"7.0",providers:["Zaycev.net","Jamendo","Hitmotop"],zaycev:{configured:true,mode:"current-web-api"},jamendo:{configured:Boolean(String(env.JAMENDO_CLIENT_ID||"").trim())},hitmotop:{configured:true,mode:"Python parser RPC + open-source parser API + HTML fallback",pythonRpc:Boolean(env.HITMOZ_PYTHON)}});
   if(url.pathname==="/api/hitmotop/test"){
     const q=(url.searchParams.get("q")||"Linkin Park").trim().slice(0,160);
     try{
@@ -782,16 +806,15 @@ export async function handleApi(request,env){
     const excluded=new Set((url.searchParams.get("exclude")||"").split(",").map(x=>x.trim()).filter(Boolean));
     if(currentArtist&&currentTitle)excluded.add(currentArtist+" | "+currentTitle);
 
-    const themeQuery=[...new Set([...genres.slice(0,3),...moods.slice(0,3),...now.slice(0,3)])].join(" ");
+    const themeQuery=[...new Set([...genres.slice(0,4),...moods.slice(0,4),...now.slice(0,3)])].join(" ");
     const primaryArtist=preferredArtists[0]||currentArtist;
-    const backupArtist=preferredArtists.find(x=>x!==primaryArtist)||"";
-    const discoveryQueries=["popular music","pop music"];
+    const discoveryQueries=["indie music","electronic music","pop music"];
     const queries=recommendationUnique([
-      [primaryArtist,genres[0]||"",moods[0]||""].filter(Boolean).join(" "),
-      [themeQuery,now.slice(0,2).join(" ")].filter(Boolean).join(" "),
-      seed,
+      [primaryArtist,genres.slice(0,2).join(" "),moods.slice(0,2).join(" ")].filter(Boolean).join(" "),
+      [themeQuery,seed].filter(Boolean).join(" "),
+      preferredArtists.slice(1,3).join(" "),
       ...((!primaryArtist&&!themeQuery&&!seed)?discoveryQueries:[])
-    ]).filter(Boolean).slice(0,2);
+    ]).filter(q=>q.length>1).slice(0,3);
 
     const errors=[],providerHits={z:0,j:0,h:0};
     const pool=[],seenIds=new Set(),seenSongs=new Set();
@@ -809,15 +832,17 @@ export async function handleApi(request,env){
         if(currentArtist&&currentTitle&&artist===currentArtist&&title===currentTitle)continue;
         seenIds.add(t.id);if(songKey)seenSongs.add(songKey);
         let score=0;
-        if(artist&&preferredArtists.includes(artist))score+=52;
-        else if(artist&&preferredArtists.some(a=>artist.includes(a)||a.includes(artist)))score+=32;
-        if(currentArtist&&artist===currentArtist)score+=15;
-        if(currentArtist&&artist&&artist.includes(currentArtist)&&artist!==currentArtist)score+=7;
-        score+=recommendationOverlap(recommendationText(t.genre),genres)*14;
-        score+=recommendationOverlap(title+" "+artist,genres)*4;
-        score+=recommendationOverlap(title+" "+artist,moods)*6;
-        score+=recommendationOverlap(title+" "+artist,now)*3;
-        if(likedText&&(likedText.includes(artist)||likedText.includes(title)))score+=12;
+        if(artist&&preferredArtists.includes(artist))score+=70;
+        else if(artist&&preferredArtists.some(a=>artist.includes(a)||a.includes(artist)))score+=40;
+        if(currentArtist&&artist===currentArtist)score+=18;
+        if(currentArtist&&artist&&artist.includes(currentArtist)&&artist!==currentArtist)score+=9;
+        score+=recommendationOverlap(recommendationText(t.genre),genres)*18;
+        score+=recommendationOverlap(title+" "+artist+" "+recommendationText(t.genre),genres)*6;
+        score+=recommendationOverlap(title+" "+artist+" "+recommendationText(t.genre),moods)*8;
+        score+=recommendationOverlap(title+" "+artist+" "+recommendationText(t.genre),now)*4;
+        if(likedText&&(likedText.includes(artist)||likedText.includes(title)))score+=18;
+        if(t.image)score+=2;
+        if(t.duration>=90&&t.duration<=480)score+=2;
         if(String(t.source||"")==="Hitmotop")score+=2;
         if(String(t.source||"")==="Jamendo")score+=1;
         score+=(recommendationHash(context.salt+"|"+t.id)%100)/100;
