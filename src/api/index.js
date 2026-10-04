@@ -207,6 +207,55 @@ async function hitmotopSearchRequest(searchUrl,headers,limit){
   return tracks;
 }
 
+function normalizeHitmozParserSongs(data,limit){
+  if(data?.success!==true||!Array.isArray(data.songs))throw Error(data?.error||"HitMoz parser returned no songs");
+  const out=[],seen=new Set();
+  for(const song of data.songs.slice(0,limit)){
+    const downloadUrl=hitmotopAbsoluteUrl(song?.download,"https://eu.hitmoz.com");
+    const sourceUrl=hitmotopAbsoluteUrl(song?.link,"https://eu.hitmoz.com");
+    if(!downloadUrl||seen.has(downloadUrl))continue;
+    const target=new URL(downloadUrl);
+    const host=target.hostname.toLowerCase();
+    const audioAllowed=host==="eu.hitmoz.com"||host.endsWith(".eu.hitmoz.com")||host==="ru.hitmoz.org"||host.endsWith(".ru.hitmoz.org")||host==="rus.hitmoz.org"||host.endsWith(".rus.hitmoz.org")||host==="hitmos.me"||host.endsWith(".hitmos.me")||host==="hitmos.fm"||host.endsWith(".hitmos.fm");
+    if(!audioAllowed||!target.pathname.toLowerCase().startsWith("/get/music/")||!target.pathname.toLowerCase().endsWith(".mp3"))continue;
+    seen.add(downloadUrl);
+    const idMatch=sourceUrl.match(/\/song\/(\d+)/i);
+    const fileId=downloadUrl.match(/_(\d{6,})\.mp3(?:$|[?#])/i)?.[1];
+    const id=idMatch?.[1]||fileId||String(out.length+1);
+    let image="";
+    const cover=String(song?.cover||"").trim();
+    if(cover){
+      try{
+        const u=new URL(cover,downloadUrl),h=u.hostname.toLowerCase();
+        if(h==="eu.hitmoz.com"||h.endsWith(".eu.hitmoz.com")||h==="statcore.hitmcdn.com"||h.endsWith(".hitmcdn.com"))image=u.href;
+      }catch{}
+    }
+    out.push({
+      id:"hitmotop-"+id,
+      title:stripHtml(song?.title)||"Без названия",
+      artist:stripHtml(song?.artist)||"Неизвестный исполнитель",
+      album:"",
+      image,
+      audio:"/api/hitmotop/play?url="+encodeURIComponent(downloadUrl),
+      duration:parseDuration(String(song?.duration||"")),
+      license:"",
+      source:"Hitmotop",
+      sourceUrl:sourceUrl||downloadUrl,
+      genre:"",
+      downloadUrl
+    });
+  }
+  if(!out.length)throw Error("HitMoz parser returned no usable tracks");
+  return out;
+}
+
+async function fetchHitmozPython(q,limit,env){
+  const rpc=env?.HITMOZ_PYTHON;
+  if(!rpc||typeof rpc.search!=="function")throw Error("HitMoz Python service is not configured");
+  const data=await rpc.search(q,limit);
+  return normalizeHitmozParserSongs(data,limit);
+}
+
 async function fetchHitmozParserApi(q,limit){
   const api=new URL(HITMOZ_PARSER_API_BASE);
   api.searchParams.set("search",q);
@@ -219,52 +268,16 @@ async function fetchHitmozParserApi(q,limit){
   if(!response.ok)throw Error("HitMoz parser API HTTP "+response.status);
   let data;
   try{data=JSON.parse(body)}catch{throw Error("HitMoz parser API returned invalid JSON")}
-  if(data?.success!==true||!Array.isArray(data.songs))throw Error(data?.error||"HitMoz parser API returned no songs");
-
-  const out=[],seen=new Set();
-  for(const song of data.songs.slice(0,limit)){
-    const downloadUrl=hitmotopAbsoluteUrl(song?.download,"https://eu.hitmoz.com");
-    const sourceUrl=hitmotopAbsoluteUrl(song?.link,"https://eu.hitmoz.com");
-    if(!downloadUrl||seen.has(downloadUrl))continue;
-    const host=new URL(downloadUrl).hostname.toLowerCase();
-    const audioAllowed=host==="eu.hitmoz.com"||host.endsWith(".eu.hitmoz.com")||host==="ru.hitmoz.org"||host.endsWith(".ru.hitmoz.org")||host==="rus.hitmoz.org"||host.endsWith(".rus.hitmoz.org")||host==="hitmos.me"||host.endsWith(".hitmos.me")||host==="hitmos.fm"||host.endsWith(".hitmos.fm");
-    if(!audioAllowed||!/\/get\/music\/[^/?#]+\.mp3(?:[?#].*)?$/i.test(new URL(downloadUrl).pathname+new URL(downloadUrl).search+new URL(downloadUrl).hash))continue;
-    seen.add(downloadUrl);
-    let idMatch=sourceUrl.match(/\/song\/(\d+)/i),id=idMatch?.[1]||downloadUrl.match(/_(\d{6,})\.mp3(?:$|[?#])/i)?.[1]||String(out.length+1);
-    const cover=String(song?.cover||"").trim();
-    let image="";
-    if(cover){
-      try{
-        const u=new URL(cover,downloadUrl),h=u.hostname.toLowerCase();
-        if(h==="eu.hitmoz.com"||h.endsWith(".eu.hitmoz.com")||h==="statcore.hitmcdn.com"||h.endsWith(".hitmcdn.com"))image=u.href;
-      }catch{}
-    }
-    const title=stripHtml(song?.title)||"Без названия";
-    const artist=stripHtml(song?.artist)||"Неизвестный исполнитель";
-    const duration=parseDuration(String(song?.duration||""));
-    out.push({
-      id:"hitmotop-"+id,
-      title,
-      artist,
-      album:"",
-      image,
-      audio:"/api/hitmotop/play?url="+encodeURIComponent(downloadUrl),
-      duration,
-      license:"",
-      source:"Hitmotop",
-      sourceUrl:sourceUrl||downloadUrl,
-      genre:"",
-      downloadUrl
-    });
-  }
-  if(!out.length)throw Error("HitMoz parser API returned no usable tracks");
-  return out;
+  return normalizeHitmozParserSongs(data,limit);
 }
 
-async function fetchHitmotopSearch(q,limit){
+async function fetchHitmotopSearch(q,limit,env){
   let lastError=null;
   // Prefer the independently working deployment of the open-source parser.
   // The Worker then keeps the native HTML parser as a fallback.
+  // Prefer the native Python port when its Service Binding is configured.
+  try{return await fetchHitmozPython(q,limit,env)}catch(error){lastError=error}
+  // Proven public deployment of the original parser as the next fallback.
   try{return await fetchHitmozParserApi(q,limit)}catch(error){lastError=error}
   for(const configuredBase of HITMOTOP_BASES){
     try{
@@ -361,11 +374,11 @@ async function searchJamendo(q, limit, env) {
 export async function handleApi(request,env){
   const url=new URL(request.url);
   if(url.pathname==="/api/local-music")return Response.json({ok:true,source:"🔐 Ключник",tracks:LOCAL_MUSIC});
-  if(url.pathname==="/api/health")return Response.json({ok:true,service:env.APP_NAME||"Ok Music",version:"7.0",providers:["Zaycev.net","Jamendo","Hitmotop","🔐 Ключник"],zaycev:{configured:true,mode:"current-web-api"},jamendo:{configured:Boolean(String(env.JAMENDO_CLIENT_ID||"").trim())},hitmotop:{configured:true,mode:"open-source HitMoz parser API + HTML fallback"}});
+  if(url.pathname==="/api/health")return Response.json({ok:true,service:env.APP_NAME||"Ok Music",version:"7.0",providers:["Zaycev.net","Jamendo","Hitmotop","🔐 Ключник"],zaycev:{configured:true,mode:"current-web-api"},jamendo:{configured:Boolean(String(env.JAMENDO_CLIENT_ID||"").trim())},hitmotop:{configured:true,mode:"Python parser RPC + open-source parser API + HTML fallback",pythonRpc:Boolean(env.HITMOZ_PYTHON)}});
   if(url.pathname==="/api/hitmotop/test"){
     const q=(url.searchParams.get("q")||"Linkin Park").trim().slice(0,160);
     try{
-      const tracks=await fetchHitmotopSearch(q,5);
+      const tracks=await fetchHitmotopSearch(q,5,env);
       return Response.json({
         ok:true,
         provider:"Hitmotop",
@@ -381,7 +394,7 @@ export async function handleApi(request,env){
   if(url.pathname==="/api/search"){
     const q=(url.searchParams.get("q")||"").trim(),limit=Math.min(Math.max(Number(url.searchParams.get("limit")||24),1),50);
     if(!q)return Response.json({ok:true,query:"",tracks:[],providers:[]});
-    const [z,j,h]=await Promise.allSettled([fetchZaycevSearch(q,limit),searchJamendo(q,Math.max(6,Math.ceil(limit/3)),env),fetchHitmotopSearch(q,limit)]);
+    const [z,j,h]=await Promise.allSettled([fetchZaycevSearch(q,limit),searchJamendo(q,Math.max(6,Math.ceil(limit/3)),env),fetchHitmotopSearch(q,limit,env)]);
     const zTracks=z.status==="fulfilled"?z.value:[],jTracks=j.status==="fulfilled"?j.value:[],hTracks=h.status==="fulfilled"?h.value:[],tracks=uniqueTracks([...zTracks,...jTracks,...hTracks],limit);
     const errors=[...(z.status==="rejected"?["Zaycev.net: "+(z.reason?.message||"ошибка")]:[]),...(j.status==="rejected"?["Jamendo: "+(j.reason?.message||"ошибка")]:[]),...(h.status==="rejected"?["Hitmotop: "+(h.reason?.message||"ошибка")]:[])];
     if(!tracks.length)return Response.json({ok:false,error:errors.length?"Музыкальные каталоги недоступны":"Ничего не найдено",details:errors,query:q,tracks:[],diagnostics:{zaycevConfigured:true,jamendoConfigured:Boolean(String(env.JAMENDO_CLIENT_ID||"").trim()),hitmotopConfigured:true,errors}},{status:errors.length?502:200});
@@ -498,7 +511,7 @@ export async function handleApi(request,env){
     const [zr,jr,hr]=await Promise.all([
       Promise.allSettled(uniqueQueries.map(q=>fetchZaycevSearch(q,fetchLimit))),
       Promise.allSettled(uniqueQueries.slice(0,3).map(q=>searchJamendo(q,8,env))),
-      Promise.allSettled(uniqueQueries.slice(0,3).map(q=>fetchHitmotopSearch(q,Math.min(12,fetchLimit))))
+      Promise.allSettled(uniqueQueries.slice(0,3).map(q=>fetchHitmotopSearch(q,Math.min(12,fetchLimit),env)))
     ]);
     const zaycev=zr.flatMap(r=>r.status==="fulfilled"?r.value:[]),
       jam=jr.flatMap(r=>r.status==="fulfilled"?r.value:[]),
