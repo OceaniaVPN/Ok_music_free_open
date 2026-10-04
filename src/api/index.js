@@ -170,20 +170,26 @@ function parseHitmotopSearch(html,base,limit){
   // without the older track__download-btn markup. Parse those links as a fallback.
   if(out.length<limit){
     const seenUrls=new Set(out.map(t=>t.downloadUrl).filter(Boolean));
-    const links=[...source.matchAll(/<a\b[^>]*href=["']([^"']*\/get\/music\/[^"']+\.mp3(?:\?[^"']*)?)["'][^>]*>([\s\S]*?)<\/a>/gi)];
+    // Simple href scan avoids complex regex escaping inside the generated Worker source.
+    const links=[...source.matchAll(/href=["']([^"']+)["']/gi)];
     for(const match of links){
       if(out.length>=limit)break;
-      const urlDown=hitmotopAbsoluteUrl(match[1],base);
+      const rawHref=match[1]||"";
+      if(!rawHref.toLowerCase().includes("/get/music/")||!rawHref.toLowerCase().includes(".mp3"))continue;
+      const urlDown=hitmotopAbsoluteUrl(rawHref,base);
       if(!urlDown||seenUrls.has(urlDown))continue;
       seenUrls.add(urlDown);
-      const filename=decodeURIComponent(urlDown.split("/").pop().split("?")[0].replace(/\\.mp3$/i,""));
-      const clean=filename.replace(/[_]+/g," ").trim();
+      let filename=urlDown.split("/").pop().split("?")[0];
+      try{filename=decodeURIComponent(filename)}catch{}
+      if(filename.toLowerCase().endsWith(".mp3"))filename=filename.slice(0,-4);
+      const clean=filename.replace(/_/g," ").trim();
       let artist="Неизвестный исполнитель", title=clean||"Без названия";
-      const parts=clean.split(/\\s+-\\s+/);
+      const parts=clean.split(" - ");
       if(parts.length>=2){artist=parts[0].trim()||artist;title=parts.slice(1).join(" - ").trim()||title}
-      const idMatch=urlDown.match(/_(\\d{6,})\\.mp3(?:\\?|$)/i);
-      const id=idMatch?"hitmotop-"+idMatch[1]:"hitmotop-"+Math.abs([...urlDown].reduce((h,c)=>((h<<5)-h+c.charCodeAt(0))|0,0));
+      const idPart=filename.split("_").pop()||"";
+      const id=/^\d{6,}$/.test(idPart)?"hitmotop-"+idPart:"hitmotop-"+Math.abs([...urlDown].reduce((h,c)=>((h<<5)-h+c.charCodeAt(0))|0,0));
       out.push({id,title,artist,album:"",image:"",audio:"/api/hitmotop/play?url="+encodeURIComponent(urlDown),duration:0,license:"",source:"Hitmotop",sourceUrl:urlDown,genre:"",downloadUrl:urlDown});
+    }
     }
   }
   return out;
