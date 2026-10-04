@@ -251,6 +251,7 @@ state.taste.moods=Array.isArray(state.taste.moods)?state.taste.moods:[];
 state.taste.artists=typeof state.taste.artists==="string"?state.taste.artists:"";
 state.taste.now=typeof state.taste.now==="string"?state.taste.now:"";
 let tracks=[], localTracks=[], current=null, currentIndex=-1, audio=new Audio(), nextAudio=new Audio(), playing=false, autoNext=true, nextPreloadToken=0;
+let playbackQueue=[], queueIndex=-1, recommendationLoading=false, recommendationSeen=new Set(), recommendationContextKey="";
 audio.preload="auto";
 audio.crossOrigin="anonymous";
 nextAudio.preload="auto";
@@ -541,74 +542,25 @@ function playPrevious(){
 }
 function addToPlaylist(t){if(!t)return;if(!state.playlists.length){toast("Сначала создай плейлист");modal.classList.add("open");document.querySelector("#playlistName").focus();return}const names=state.playlists.map((p,i)=>(i+1)+". "+p.name+" ("+p.tracks.length+")").join("\n");const answer=window.prompt("Добавить в какой плейлист?\\n\\n"+names+"\\n\\nВведи номер:","1");const n=Number(answer);if(!Number.isInteger(n)||!state.playlists[n-1])return;const p=state.playlists[n-1];if(p.tracks.some(x=>x.id===t.id)){toast("Трек уже есть в плейлисте");return}p.tracks.push(t);save();toast("Добавлено в «"+p.name+"» ✨")}
 const TASTE_GENRES=["Русский рэп","Поп","Рок","Электроника","Хип-хоп","Фонк","R&B","Lo-fi","Инди","Метал","Классика","Джаз","K-pop"]; const TASTE_MOODS=["Спокойно","Энергично","Грустно","Романтично","Ночью","Для дороги","Вечеринка","Фон для работы"]; function openTaste(){const m=document.querySelector("#tasteModal"),g=document.querySelector("#genreChips"),mo=document.querySelector("#moodChips");g.innerHTML=TASTE_GENRES.map(x=>'<button class="chip '+(state.taste.genres.includes(x)?"on":"")+'" data-g="'+esc(x)+'">'+esc(x)+'</button>').join("");mo.innerHTML=TASTE_MOODS.map(x=>'<button class="chip '+(state.taste.moods.includes(x)?"on":"")+'" data-m="'+esc(x)+'">'+esc(x)+'</button>').join("");g.querySelectorAll("[data-g]").forEach(b=>b.onclick=()=>{const x=b.dataset.g;state.taste.genres=state.taste.genres.includes(x)?state.taste.genres.filter(v=>v!==x):[...state.taste.genres,x];b.classList.toggle("on")});mo.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{const x=b.dataset.m;state.taste.moods=state.taste.moods.includes(x)?state.taste.moods.filter(v=>v!==x):[...state.taste.moods,x];b.classList.toggle("on")});document.querySelector("#tasteArtists").value=state.taste.artists||"";document.querySelector("#tasteNow").value=state.taste.now||"";m.classList.add("open")} document.querySelector("#tasteBtn").onclick=openTaste; document.querySelector("#tasteCancel").onclick=()=>document.querySelector("#tasteModal").classList.remove("open"); document.querySelector("#tasteSave").onclick=()=>{state.taste.artists=document.querySelector("#tasteArtists").value.trim();state.taste.now=document.querySelector("#tasteNow").value.trim();save();document.querySelector("#tasteModal").classList.remove("open");toast("Вкус сохранён ✨");render("home")}; async function home(){
- tracks=[];
- view.innerHTML='<section class="hero hero-v2"><div class="hero-grid"></div><div class="hero-main"><div class="hero-kicker"><span>✦ OK MUSIC</span><span class="live-dot">КАТАЛОГ ОНЛАЙН</span><span>ЧИСТЫЙ ЗВУК</span></div><h2>Твоя музыка.<br><em>Твой ритм.</em></h2><p>Поиск, любимые треки, умные подборки и твоя библиотека — в одном музыкальном пространстве без лишних экранов.</p><div class="searchbar"><input id="homeQ" class="input" placeholder="Исполнитель, трек или настроение" autocomplete="off"><button id="homeSearch" class="primary">Найти музыку</button></div><div class="hero-quick"><button type="button" data-quick-q="Ночной вайб">🌙 Ночной вайб</button><button type="button" data-quick-q="Энергия">⚡ Энергия</button><button type="button" data-quick-q="Lo-fi">☁ Lo-fi</button><button type="button" data-quick-q="В дорогу">🚗 В дорогу</button></div></div><div class="hero-bottom"><div class="hero-note">🔐 <span><strong>Ключник</strong> · локальная музыка + MEGA metadata</span></div><div class="hero-providers"><span>Zaycev</span><span>Jamendo</span><span>MEGA</span></div></div></section><div id="homeWave" class="wave-card"></div><div class="taste-panel"><h3>🎧 Твой музыкальный профиль</h3><p>Настрой предпочтения, и алгоритм будет учитывать их в каждом новом миксе.</p><button id="editTaste" style="margin-top:12px">Настроить вкус</button></div><div class="offline-panel" id="offlineHome"><div><strong>◉ Офлайн-режим</strong><span id="offlineHomeText">Сохраняй треки кнопкой ⇩ и слушай их без интернета.</span></div><button id="clearOffline">Очистить</button></div><div class="section"><div><h2>✨ Твой микс</h2><small id="mixStatus">Подбираю музыку…</small></div><div class="section-actions"><button id="refreshMix" title="Пересобрать подборку">↻</button><button id="mixPlay" class="home-play" title="Слушать микс">▶</button></div></div><div id="mix" class="grid"><div class="empty" style="grid-column:1/-1">Создаю персональную подборку…</div></div><div class="section"><div><h2>🔐 Ключник</h2><small>GitHub + MEGA</small></div></div><div id="localMusic" class="grid"><div class="empty" style="grid-column:1/-1">Загружаю локальную музыку…</div></div>';
- document.querySelector("#homeSearch").onclick=()=>doSearch(document.querySelector("#homeQ").value);document.querySelector("#homeQ").onkeydown=e=>{if(e.key==="Enter")doSearch(e.target.value)};view.querySelectorAll("[data-quick-q]").forEach(b=>b.onclick=()=>doSearch(b.dataset.quickQ));
+ view.innerHTML='<section class="hero hero-v2"><div class="hero-grid"></div><div class="hero-main"><div class="hero-kicker"><span>✦ OK MUSIC</span><span class="live-dot">КАТАЛОГ ОНЛАЙН</span><span>УМНЫЙ АВТОПОДБОР</span></div><h2>Твоя музыка.<br><em>Твой ритм.</em></h2><p>Ищи любую музыку и слушай без лишних экранов. Следующие треки подбираются скрыто и заранее — без спойлеров очереди.</p><div class="searchbar"><input id="homeQ" class="input" placeholder="Исполнитель, трек или настроение" autocomplete="off"><button id="homeSearch" class="primary">Найти музыку</button></div><div class="hero-quick"><button type="button" data-quick-q="Ночной вайб">🌙 Ночной вайб</button><button type="button" data-quick-q="Энергия">⚡ Энергия</button><button type="button" data-quick-q="Lo-fi">☁ Lo-fi</button><button type="button" data-quick-q="В дорогу">🚗 В дорогу</button></div></div><div class="hero-bottom"><div class="hero-note">🎧 Следующие песни подбираются автоматически</div><div class="hero-providers"><span>Zaycev</span><span>Jamendo</span><span>Hitmotop</span></div></div></section><div class="taste-panel"><h3>🎧 Музыкальный профиль</h3><p>Жанры, настроение и любимые исполнители используются скрыто внутри автоподбора. Никаких списков будущих песен на экране.</p><button id="editTaste" style="margin-top:12px">Настроить вкус</button></div><div class="offline-panel" id="offlineHome"><div><strong>◉ Офлайн-режим</strong><span id="offlineHomeText">Сохраняй треки кнопкой ⇩ и слушай их без интернета.</span></div><button id="clearOffline">Очистить</button></div>';
+ document.querySelector("#homeSearch").onclick=()=>doSearch(document.querySelector("#homeQ").value);
+ document.querySelector("#homeQ").onkeydown=e=>{if(e.key==="Enter")doSearch(e.target.value)};
+ view.querySelectorAll("[data-quick-q]").forEach(b=>b.onclick=()=>doSearch(b.dataset.quickQ));
  document.querySelector("#editTaste").onclick=openTaste;
- document.querySelector("#refreshMix").onclick=()=>loadMix(true);
-document.querySelector("#mixPlay").onclick=()=>{const t=waveTrack();if(t)play(t)};
-drawHomeWave();
- const initialMix=document.querySelector("#mix");if(initialMix){initialMix.innerHTML='<div class="empty" style="grid-column:1/-1">Создаю персональную подборку…</div>'}
- bind();
- void loadLocalMusic();
- void loadMix();
+ const clear=document.querySelector("#clearOffline");if(clear)clear.onclick=clearOffline;
+ await refreshOfflineButtons(view);
 }
-async function loadLocalMusic(attempt=0){
- const box=document.querySelector("#localMusic");if(!box)return;
- try{
-  const r=await fetch("/api/local-music",{cache:attempt?"no-store":"default"});const d=await r.json();if(!d.ok)throw Error("Ключник недоступен");
-  localTracks=Array.isArray(d.tracks)?d.tracks:[];try{localStorage.setItem("okmusic:catalog:v1",JSON.stringify(localTracks))}catch{};
-  if(d.mega?.ready===false&&attempt<4)setTimeout(()=>void loadLocalMusic(attempt+1),2500);
-  if(!localTracks.length){box.innerHTML='<div class="empty" style="grid-column:1/-1">Ключник пока пуст.</div>';return}
-  const renderLocal=()=>{box.innerHTML=localTracks.map(card).join("");bind(box)};
-  tracks=[...tracks,...localTracks.filter(t=>!tracks.some(x=>x.id===t.id))];
-  renderLocal();
-  if(!current){drawHomeWave()}
-  if(window.__megaEnrichLocalTracks){
-   const idle=window.requestIdleCallback?fn=>window.requestIdleCallback(fn,{timeout:4500}):fn=>setTimeout(fn,900);
-   idle(()=>{
-    void Promise.resolve(window.__megaEnrichLocalTracks(localTracks,{onTrack:t=>{
-      const ti=tracks.findIndex(x=>x.id===t.id);if(ti>=0)tracks[ti]=t;
-      renderLocal();if(current?.id===t.id){current=t;drawPlayer();updateMediaSession()}
-    }})).catch(error=>console.warn("🔐 Ключник metadata background:",error));
-   });
-  }
- }catch(e){
-  console.error("🔐 Ключник:",e);localTracks=[];box.innerHTML='<div class="empty" style="grid-column:1/-1">Не удалось загрузить 🔐 Ключник.</div>';
- }
-}
-
-async function loadMix(force=false){
- const refresh=force?String(Date.now()):"";
- const seed=[...state.liked.slice(0,8).map(t=>t.artist),...state.liked.slice(0,5).map(t=>t.genre||""),...(state.taste.genres||[]),...(state.taste.moods||[]),state.taste.artists,state.taste.now].filter(Boolean).join(", ");
- const box=document.querySelector("#mix"), status=document.querySelector("#mixStatus");
- try{
-   const shown=force?tracks.slice(0,24).map(t=>t.id).filter(Boolean).join(","):"";
- const likedArtists=[...new Set(state.liked.slice(0,20).map(t=>t.artist).filter(Boolean))].join(", ");
- const r=await fetch("/api/recommendations?limit=16&seed="+encodeURIComponent(seed)+"&genres="+encodeURIComponent(state.taste.genres.join(", "))+"&moods="+encodeURIComponent(state.taste.moods.join(", "))+"&artists="+encodeURIComponent(state.taste.artists)+"&likedArtists="+encodeURIComponent(likedArtists)+"&now="+encodeURIComponent(state.taste.now)+"&liked="+encodeURIComponent(state.liked.slice(0,10).map(t=>t.artist+" "+t.title).join(", "))+"&exclude="+encodeURIComponent(shown)+"&refresh="+encodeURIComponent(refresh));
-   const d=await r.json();
-   if(!d.ok || !d.tracks?.length) throw Error("Нет доступных рекомендаций");
-   tracks=[...d.tracks,...localTracks.filter(t=>!d.tracks.some(x=>x.id===t.id))];
-   drawHomeWave();
-   box.innerHTML=d.tracks.map(card).join("");
-   status.textContent=(d.mode==="personalized"?"Под твои предпочтения":"Новая подборка")+" · "+(d.providers||[]).join(" + ");
-   bind(box);
- }catch(e){
-   tracks=[...localTracks];
-   box.innerHTML=localTracks.length?localTracks.slice(0,8).map(card).join(""):'<div class="empty" style="grid-column:1/-1">Подборка пока недоступна.</div>';
-   status.textContent="Каталоги временно недоступны";
-   bind(box);
- }
-}
-
 function mood(){
  const moodItems=[["🌙","Ночной вайб","Спокойное и атмосферное"],["⚡","Энергия","Больше ритма и движения"],["☁️","Chill","Расслабиться и выдохнуть"],["💜","Любовь","Мягкие и тёплые треки"],["🚗","В дорогу","Музыка для долгой поездки"],["🔥","Вечеринка","Ритм, который не отпускает"],["🖤","Фонк","Бас, дрифт и ночной вайб"]];
- view.innerHTML='<div class="section"><h2>Какое настроение?</h2><small>Выбери атмосферу</small></div><div class="moods">'+moodItems.map((x,i)=>'<button class="mood-card" data-mood="'+i+'"><b>'+x[0]+'</b><strong>'+x[1]+'</strong><span>'+x[2]+'</span></button>').join('')+'</div><div class="section"><h2>Популярное</h2><small>Из твоего каталога</small></div><div class="grid">'+(localTracks.length?localTracks:tracks).map(card).join('')+'</div>';
- bind();view.querySelectorAll("[data-mood]").forEach(b=>b.onclick=()=>{
- const i=Number(b.dataset.mood),item=moodItems[i];
- applyMusicTheme(["night","energy","chill","love","road","party","phonk"][i]||"default");
- toast("Подбираю: "+item[1]);tracks=[...localTracks];view.querySelector(".section h2").textContent=item[1];
-});
+ view.innerHTML='<div class="section"><h2>Подбор по настроению</h2><small>Выбери атмосферу — песни не показываются заранее</small></div><div class="moods">'+moodItems.map((x,i)=>'<button class="mood-card" data-mood="'+i+'"><b>'+x[0]+'</b><strong>'+x[1]+'</strong><span>'+x[2]+'</span></button>').join("")+'</div><div class="empty" style="margin-top:16px">Выбранное настроение будет влиять на скрытую очередь автоподбора.</div>';
+ view.querySelectorAll("[data-mood]").forEach(b=>b.onclick=async()=>{
+  const i=Number(b.dataset.mood),item=moodItems[i];
+  applyMusicTheme(["night","energy","chill","love","road","party","phonk"][i]||"default");
+  state.taste.moods=[item[1]];
+  save();
+  toast("Подбираю "+item[1]+"…");
+  await startRecommendationFromContext({mood:item[1]});
+ });
 }
 function searchView(){
  view.innerHTML='<div class="section"><h2>Поиск музыки</h2><small>Zaycev.net · Jamendo · Hitmotop · 🔐 Ключник</small></div><div class="searchbar"><input id="q" class="input" placeholder="Исполнитель, название, жанр…"><button id="go" class="primary">Искать</button></div><div id="results" class="results" style="margin-top:18px"><div class="empty">Начни с названия трека или исполнителя.</div></div>';
@@ -629,19 +581,62 @@ function library(){
 }
 function openPlaylist(id){const p=state.playlists.find(x=>x.id===id);if(!p)return;tracks=p.tracks;view.innerHTML='<div class="section"><h2>'+esc(p.name)+'</h2><small>'+p.tracks.length+' треков</small></div><div class="results">'+(p.tracks.length?p.tracks.map(result).join(""):'<div class="empty">Добавляй треки из поиска.</div>')+'</div>';bind()}
 function like(t){if(!t)return;const i=state.liked.findIndex(x=>x.id===t.id);if(i>=0){state.liked.splice(i,1);toast("Убрано из любимого")}else{state.liked.unshift(t);toast("♥ Добавлено в любимое")}save();render(document.querySelector(".nav button.active").dataset.view)}
-function findTrackIndex(t){return tracks.findIndex(x=>x?.id===t?.id)}
-function preloadNext(){
- const i=findTrackIndex(current), next=i>=0?tracks[i+1]:null, token=++nextPreloadToken;
- const src=playableAudio(next);
- if(!src){nextAudio.removeAttribute("src");return}
- if(nextAudio.src===new URL(src,location.href).href)return;
- nextAudio.src=src;
- nextAudio.load();
- void token;
+function recommendationExcludeList(){return [...recommendationSeen].slice(-60)}
+function recommendationParams(extra={}){
+ const artist=String(extra.artist||current?.artist||"").trim(),title=String(extra.title||current?.title||"").trim();
+ return {
+  seed:[artist,title,...state.liked.slice(0,8).map(t=>t.artist),...state.taste.genres,...state.taste.moods,state.taste.artists,state.taste.now].filter(Boolean).join(", "),
+  artist,title,mood:String(extra.mood||""),genres:state.taste.genres.join(", "),moods:state.taste.moods.join(", "),
+  artists:state.taste.artists,likedArtists:[...new Set(state.liked.slice(0,20).map(t=>t.artist).filter(Boolean))].join(", "),
+  now:state.taste.now,liked:state.liked.slice(0,10).map(t=>t.artist+" "+t.title).join(", "),
+  exclude:recommendationExcludeList().join(","),refresh:String(Date.now())
+ };
 }
-function play(t,{fromEnded=false}={}){
+async function fetchRecommendationBatch(extra={}){
+ if(recommendationLoading)return [];
+ recommendationLoading=true;
+ try{
+  const p=recommendationParams(extra);
+  const qs=new URLSearchParams({limit:"5",seed:p.seed,artist:p.artist,title:p.title,mood:p.mood,genres:p.genres,moods:p.moods,artists:p.artists,likedArtists:p.likedArtists,now:p.now,liked:p.liked,exclude:p.exclude,refresh:p.refresh});
+  const r=await fetch("/api/recommendations?"+qs.toString(),{cache:"no-store"});
+  const d=await r.json();
+  if(!d.ok||!Array.isArray(d.tracks))throw Error(d.error||"Нет рекомендаций");
+  const existing=new Set(playbackQueue.map(t=>t?.id));
+  const fresh=d.tracks.filter(t=>t?.id&&!existing.has(t.id)&&!recommendationSeen.has(t.id));
+  fresh.forEach(t=>recommendationSeen.add(t.id));
+  playbackQueue.push(...fresh);
+  recommendationContextKey=p.seed;
+  preloadNext();
+  return fresh;
+ }catch(e){console.warn("Ok Music recommendations:",e);return []}
+ finally{recommendationLoading=false}
+}
+async function ensureRecommendationWindow(extra={}){
+ const remaining=playbackQueue.length-queueIndex-1;
+ if(recommendationLoading||remaining>1)return;
+ await fetchRecommendationBatch(extra);
+}
+async function startRecommendationFromContext(extra={}){
+ playbackQueue=[];queueIndex=-1;recommendationSeen=new Set();
+ const batch=await fetchRecommendationBatch(extra);
+ if(batch.length)playbackQueue=[...batch];
+ if(playbackQueue.length){queueIndex=0;play(playbackQueue[0],{keepQueue:true})}
+}
+function findTrackIndex(t){return playbackQueue.findIndex(x=>x?.id===t?.id)}
+function preloadNext(){
+ const next=playbackQueue[queueIndex+1],token=++nextPreloadToken,src=playableAudio(next);
+ if(!src){nextAudio.removeAttribute("src");return}
+ const absolute=new URL(src,location.href).href;
+ if(nextAudio.src===absolute)return;
+ nextAudio.src=src;nextAudio.load();void token;
+}
+function play(t,{fromEnded=false,keepQueue=false}){
  if(!t)return;
- const idx=findTrackIndex(t);currentIndex=idx;current=t;drawHomeWave();updateMediaSession();
+ let idx=playbackQueue.findIndex(x=>x?.id===t.id);
+ if(!keepQueue||idx<0){
+  playbackQueue=[t];idx=0;recommendationSeen=new Set([String(t.id)]);recommendationContextKey="";
+ }
+ queueIndex=idx;currentIndex=idx;current=t;updateMediaSession();
  const src=playableAudio(t);
  if(!src){toast(String(t?.audio||"").startsWith("mega://")?"MEGA-трек пока не готов к воспроизведению":"У этого трека нет аудиопотока");return}
  const token=++window.__okPlayToken;
@@ -650,15 +645,17 @@ function play(t,{fromEnded=false}={}){
   if(audio.src!==absolute){audio.src=src;audio.load()}
   const promise=audio.play();
   Promise.resolve(promise).then(()=>{
-   if(token===window.__okPlayToken&&current?.id===t.id){playing=true;updateMediaSession();drawPlayer();preloadNext()}
+   if(token===window.__okPlayToken&&current?.id===t.id){
+    playing=true;updateMediaSession();drawPlayer();preloadNext();void fetchRecommendationBatch();
+   }
   }).catch(error=>{console.warn("Ok Music playback:",error);toast(error?.name==="NotAllowedError"?"Нажми ▶ ещё раз для запуска":"Не удалось воспроизвести трек")});
  }catch(error){console.warn("Ok Music playback:",error);toast("Не удалось воспроизвести трек")}
 }
-
-
-function playNext(){
- const next=tracks[currentIndex+1];
- if(next){play(next,{fromEnded:true});return}
+async function playNext(){
+ const remaining=playbackQueue.length-queueIndex-1;
+ if(remaining<=1)await fetchRecommendationBatch();
+ const next=playbackQueue[queueIndex+1];
+ if(next){play(next,{fromEnded:true,keepQueue:true});return}
  playing=false;
  if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";
  drawPlayer();
@@ -726,7 +723,7 @@ function drawPlayer(){if(!current){playerEl.className="player";return}
 audio.onplay=()=>{playing=true;if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});if(spatial3d)updateSpatial3d();if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer();drawHomeWave()};audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
 audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer();drawHomeWave()};audio.onended=()=>{playing=false;if(autoNext)playNext();else{if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()}};audio.onerror=()=>{toast("Не удалось загрузить аудио");playing=false;drawPlayer()};
 nextAudio.onerror=()=>{nextAudio.removeAttribute("src")};
-audio.addEventListener("canplay",preloadNext);
+audio.addEventListener("canplay",()=>{preloadNext();const remaining=playbackQueue.length-queueIndex-1;if(remaining<=1)void fetchRecommendationBatch()});
 document.querySelector("#closeModal").onclick=()=>modal.classList.remove("open");modal.onclick=e=>{if(e.target===modal)modal.classList.remove("open")};
 document.querySelector("#createPlaylist").onclick=()=>{const name=document.querySelector("#playlistName").value.trim();if(!name)return toast("Введи название");state.playlists.unshift({id:"pl-"+Date.now(),name,tracks:[]});save();document.querySelector("#playlistName").value="";modal.classList.remove("open");library();toast("Плейлист создан ✨")}
 function render(name){document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));({home,mood,search:searchView,library}[name]||home)()}
