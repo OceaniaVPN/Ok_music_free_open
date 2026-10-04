@@ -471,14 +471,18 @@ async function searchJamendo(q, limit, env) {
   api.searchParams.set("imagesize", "300");
   api.searchParams.set("audioformat", "mp32");
   api.searchParams.set("include", "musicinfo");
-  api.searchParams.set("order", "popularity_total");
+  api.searchParams.set("order", "relevance");
 
   const response = await fetch(api, { headers: { accept: "application/json" } });
   if (!response.ok) throw new Error("Jamendo HTTP " + response.status);
   const data = await response.json();
-  return (data.results || []).map(normalizeJamendo).filter(t => t.audio);
+  return (data.results || []).filter(t => !isChartLikeTrack(t)).map(normalizeJamendo).filter(t => t.audio);
 }
 
+function isChartLikeTrack(t){
+  const raw=[t?.sourceUrl,t?.shareurl,t?.name,t?.album_name].map(v=>String(v||"")).join(" ").toLowerCase();
+  return /(?:^|[\s\/_-])(chart|charts|top\s*tracks?|top\s*music|trending|trend|weekly|week|popular\s*this\s*week|топ|чарт|недель)/i.test(raw);
+}
 function recommendationText(value){
   return String(value||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9а-яё]+/gi," ").replace(/\s+/g," ").trim();
 }
@@ -798,7 +802,7 @@ export async function handleApi(request,env){
       providerHits[key]+=list.length;
       for(const t of list){
         const hasAudio=Boolean(t?.zaycevId||String(t?.audio||"").trim()||String(t?.src||"").trim());
-        if(!hasAudio||!t?.id||excluded.has(t.id)||seenIds.has(t.id))continue;
+        if(!hasAudio||!t?.id||isChartLikeTrack(t)||excluded.has(t.id)||seenIds.has(t.id))continue;
         const songKey=trackDedupeKey(t);
         if(songKey&&seenSongs.has(songKey))continue;
         const artist=recommendationText(t.artist),title=recommendationText(t.title);
