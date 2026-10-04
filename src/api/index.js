@@ -1,3 +1,6 @@
+import { LOCAL_MUSIC } from "../local-music.js";
+const LOCAL_MUSIC_CATALOG=Array.isArray(LOCAL_MUSIC)?LOCAL_MUSIC:[];
+
 const ZAYCEV_BASE="https://zaycev.net";
 const ZAYCEV_SEARCH="https://zaycev.net/search";
 const ZAYCEV_TRACK_API="https://zaycev.net/api/external/track";
@@ -527,6 +530,33 @@ function recommendationOverlap(text,terms){
   for(const term of terms)if(term&&text.includes(term))score++;
   return score;
 }
+function searchLocalTracks(q,limit=10){
+  const terms=recommendationTerms(q);
+  const query=recommendationText(q);
+  const scored=LOCAL_MUSIC_CATALOG
+    .filter(t=>t?.id&&String(t.audio||t.src||"").trim())
+    .map(t=>{
+      const title=recommendationText(t.title);
+      const artist=recommendationText(t.artist);
+      const album=recommendationText(t.album);
+      const genre=recommendationText(t.genre);
+      const searchable=[title,artist,album,genre].filter(Boolean).join(" ");
+      let score=0;
+      if(query&&searchable.includes(query))score+=45;
+      if(query&&title===query)score+=80;
+      if(query&&artist===query)score+=65;
+      score+=recommendationOverlap(searchable,terms)*18;
+      if(artist&&query.includes(artist))score+=25;
+      if(title&&query.includes(title))score+=30;
+      score+=(recommendationHash(query+"|"+t.id)%100)/100;
+      return {track:t,score};
+    })
+    .filter(x=>x.score>0)
+    .sort((a,b)=>b.score-a.score)
+    .slice(0,Math.max(1,limit));
+  return scored.map(x=>x.track);
+}
+
 function chooseRecommendations(pool,limit,context){
   const selected=[],used=new Set(),artistCounts=new Map(),sourceCounts=new Map();
   const scoreTrack=t=>{
@@ -591,7 +621,9 @@ export async function handleApi(request,env){
       cachedProviderSearch("hitmotop",q,providerLimit,()=>fetchHitmotopSearch(q,providerLimit,env))
     ]);
     const zTracks=z.status==="fulfilled"?z.value:[],jTracks=j.status==="fulfilled"?j.value:[],hTracks=h.status==="fulfilled"?h.value:[];
-    const tracks=mergeProviderTracks([zTracks,jTracks,hTracks],limit);
+    const localTracks=searchLocalTracks(q,limit);
+     const remoteTracks=mergeProviderTracks([zTracks,jTracks,hTracks],limit);
+     const tracks=uniqueTracks([...remoteTracks,...localTracks],limit);
     const errors=[
       ...(z.status==="rejected"?["Zaycev.net: "+(z.reason?.message||"ошибка")]:[]),
       ...(j.status==="rejected"?["Jamendo: "+(j.reason?.message||"ошибка")]:[]),
@@ -605,7 +637,7 @@ export async function handleApi(request,env){
     },{status:errors.length?502:200});
     return Response.json({
       ok:true,query:q,
-      providers:[...(zTracks.length?["Zaycev.net"]:[]),...(jTracks.length?["Jamendo"]:[]),...(hTracks.length?["Hitmotop"]:[])],
+      providers:[...(zTracks.length?["Zaycev.net"]:[]),...(jTracks.length?["Jamendo"]:[]),...(hTracks.length?["Hitmotop"]:[]),...(localTracks.length?["Локальная библиотека"]:[])],
       tracks,errors:[...new Set(errors)].slice(0,6)
     });
   }
@@ -798,22 +830,23 @@ export async function handleApi(request,env){
     const genreQueries=rawGenres.map(x=>(RECOMMENDATION_VOCAB[x]||[x]).slice(0,3).join(" "));
     const moodQueries=rawMoods.map(x=>(RECOMMENDATION_VOCAB[x]||[x]).slice(0,2).join(" "));
     const primaryArtist=preferredArtists[0]||currentArtist;
+    const contextQuery=[currentArtist,currentTitle].filter(Boolean).join(" ");
     const discoveryQueries=["rock metal","electronic","party energetic"];
-    // Search selected directions separately so provider popularity cannot
-    // dominate a giant mixed query.
+    // Search the current artist+title first so autoplay can recover a
+    // concrete local/remote track instead of only searching by artist.
     const queries=recommendationUnique([
+      contextQuery,
       ...genreQueries.slice(0,3),
       ...moodQueries.slice(0,2),
       mappedNow.slice(0,3).join(" "),
-      primaryArtist,
-      ...((!primaryArtist&&!genreQueries.length&&!moodQueries.length&&!mappedNow.length)?discoveryQueries:[])
+      primaryArtist
     ]).filter(q=>q.length>1).slice(0,5);
 
-    const errors=[],providerHits={z:0,j:0,h:0};
+    const errors=[],providerHits={z:0,j:0,h:0,l:0};
     const pool=[],seenIds=new Set(),seenSongs=new Set();
     const context={currentArtist,currentTitle,preferredArtists,genres,moods,now,likedText,salt:String(url.searchParams.get("refresh")||Date.now())};
 
-    const addList=(list,key)=>{
+    const addList=(list,key,query)=>{
       if(!Array.isArray(list))return;
       providerHits[key]+=list.length;
       for(const t of list){
@@ -826,7 +859,7 @@ export async function handleApi(request,env){
         seenIds.add(t.id);if(songKey)seenSongs.add(songKey);
         let score=0;
         const searchable=title+" "+artist+" "+recommendationText(t.genre);
-        const queryTerms=recommendationText(q).split(/\s+/).filter(x=>x.length>2);
+        const queryTerms=recommendationText(query).split(/\s+/).filter(x=>x.length>2);
         const queryScore=recommendationOverlap(searchable,queryTerms);
         score+=queryScore*20;
         if(artist&&preferredArtists.includes(artist))score+=70;
@@ -865,14 +898,49 @@ export async function handleApi(request,env){
         cachedProviderSearch("jamendo",q,providerLimit,()=>searchJamendo(q,providerLimit,env)),
         cachedProviderSearch("hitmotop",q,providerLimit,()=>fetchHitmotopSearch(q,providerLimit,env))
       ]);
-      if(z.status==="fulfilled")addList(z.value,"z");else errors.push("Zaycev.net: "+(z.reason?.message||"ошибка"));
-      if(j.status==="fulfilled")addList(j.value,"j");else errors.push("Jamendo: "+(j.reason?.message||"ошибка"));
-      if(h.status==="fulfilled")addList(h.value,"h");else errors.push("Hitmotop: "+(h.reason?.message||"ошибка"));
+      if(z.status==="fulfilled")addList(z.value,"z",q);else errors.push("Zaycev.net: "+(z.reason?.message||"ошибка"));
+      if(j.status==="fulfilled")addList(j.value,"j",q);else errors.push("Jamendo: "+(j.reason?.message||"ошибка"));
+      if(h.status==="fulfilled")addList(h.value,"h",q);else errors.push("Hitmotop: "+(h.reason?.message||"ошибка"));
       if(pool.length>=Math.max(limit,5))break;
     }
 
-    const tracks=chooseRecommendations(pool,limit,context);
-    const providers=[...(providerHits.z?["Zaycev.net"]:[]),...(providerHits.j?["Jamendo"]:[]),...(providerHits.h?["Hitmotop"]:[])];
+         if(pool.length<Math.max(limit,5)){
+       for(const q of discoveryQueries){
+         const providerLimit=Math.max(5,Math.min(8,limit+1));
+         const [z,j,h]=await Promise.allSettled([
+           cachedProviderSearch("zaycev",q,providerLimit,()=>fetchZaycevSearch(q,providerLimit)),
+           cachedProviderSearch("jamendo",q,providerLimit,()=>searchJamendo(q,providerLimit,env)),
+           cachedProviderSearch("hitmotop",q,providerLimit,()=>fetchHitmotopSearch(q,providerLimit,env))
+         ]);
+         if(z.status==="fulfilled")addList(z.value,"z",q);else errors.push("Zaycev.net: "+(z.reason?.message||"ошибка"));
+         if(j.status==="fulfilled")addList(j.value,"j",q);else errors.push("Jamendo: "+(j.reason?.message||"ошибка"));
+         if(h.status==="fulfilled")addList(h.value,"h",q);else errors.push("Hitmotop: "+(h.reason?.message||"ошибка"));
+         if(pool.length>=Math.max(limit,5))break;
+       }
+     }
+
+     if(pool.length<Math.max(limit,5)){
+       const localQueries=recommendationUnique([
+         contextQuery,primaryArtist,
+         ...genreQueries.slice(0,2),
+         ...moodQueries.slice(0,2),
+         mappedNow.slice(0,2).join(" ")
+       ]).filter(q=>q.length>1);
+       for(const q of localQueries){
+         addList(searchLocalTracks(q,Math.max(8,limit*2)),"l",q);
+         if(pool.length>=Math.max(limit,5))break;
+       }
+     }
+     if(pool.length<Math.max(limit,5)){
+       const fallback=LOCAL_MUSIC_CATALOG
+         .filter(t=>t?.id&&String(t.audio||t.src||"").trim())
+         .slice()
+         .sort((a,b)=>(recommendationHash(context.salt+"|"+a.id)-recommendationHash(context.salt+"|"+b.id)));
+       addList(fallback.slice(0,Math.max(10,limit*3)),"l",contextQuery||primaryArtist||"");
+     }
+
+const tracks=chooseRecommendations(pool,limit,context);
+    const providers=[...(providerHits.z?["Zaycev.net"]:[]),...(providerHits.j?["Jamendo"]:[]),...(providerHits.h?["Hitmotop"]:[]),...(providerHits.l?["Локальная библиотека"]:[])];
 
     return Response.json({
       ok:true,
