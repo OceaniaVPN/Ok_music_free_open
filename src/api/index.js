@@ -183,26 +183,34 @@ async function fetchHitmotopSearch(q,limit){
   let lastError=null;
   for(const configuredBase of HITMOTOP_BASES){
     try{
-      // Mirror the pars-hitmotop package flow: open hitmos.me first,
-      // keep the session cookie, then request /search?q=...
-      const home=await fetch(configuredBase,{headers:HITMOTOP_HEADERS,redirect:"follow"});
+      // Follow the current pars-hitmotop flow: establish the Hitmo session
+      // first, persist the returned sid cookie, then call /search?q=...
+      const home=await fetch(configuredBase+"/",{headers:HITMOTOP_HEADERS,redirect:"follow"});
       const base=new URL(home.url||configuredBase).origin;
-      const cookie=hitmotopCookieHeader(home);
+      let cookie=hitmotopCookieHeader(home);
+
+      // pars-hitmotop explicitly performs a second GET after a successful
+      // landing-page response. This is important for Hitmo's session cookie.
+      const sessionHeaders={...HITMOTOP_HEADERS,referer:base+"/"};
+      if(cookie)sessionHeaders.cookie=cookie;
+      const warm=await fetch(base+"/",{headers:sessionHeaders,redirect:"follow"});
+      const warmCookie=hitmotopCookieHeader(warm);
+      if(warmCookie)cookie=warmCookie;
+
       const headers={...HITMOTOP_HEADERS,referer:base+"/"};
       if(cookie)headers.cookie=cookie;
 
       const search=new URL("/search",base);
       search.searchParams.set("q",q);
-      try{
-        return await hitmotopSearchRequest(search.href,headers,limit);
-      }catch(error){
-        lastError=error;
-      }
 
-      // The reference package retries the main site when the first request
-      // does not establish a usable session, so make one fresh request too.
-      const retryHeaders={...HITMOTOP_HEADERS,referer:base+"/"};
-      return await hitmotopSearchRequest(search.href,retryHeaders,limit);
+      // Keep the browser-like navigation headers used by the package's
+      // requests session. We do not attempt to bypass a 403.
+      headers["sec-fetch-dest"]="document";
+      headers["sec-fetch-mode"]="navigate";
+      headers["sec-fetch-site"]="same-origin";
+      headers["upgrade-insecure-requests"]="1";
+
+      return await hitmotopSearchRequest(search.href,headers,limit);
     }catch(error){
       lastError=error;
     }
