@@ -862,7 +862,7 @@ function drawPlayer(){if(!current){
  return}
  playerEl.className="player on";
  playerEl.innerHTML='<div class="pcover" data-player-profile="1">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="prev" class="icon" title="Предыдущий">⏮</button><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button><button id="next" class="icon" title="Следующий">⏭</button><button id="eqToggle" class="icon eq-toggle" title="Эквалайзер">EQ</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>'+eqPanel();
- document.querySelector("#pause").onclick=()=>{if(playing)audio.pause();else{unlockMediaFromGesture();if(showEq&&audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});audio.play().catch(()=>toast("Браузер не разрешил воспроизведение"))}};
+ document.querySelector("#pause").onclick=()=>{if(playing)audio.pause();else{if(showEq&&audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});audio.play().catch(error=>toast(error?.name==="NotAllowedError"?"Нажми ▶ ещё раз для запуска":"Не удалось воспроизвести трек"))}};
  document.querySelector("#prev").onclick=playPrevious;
  document.querySelector("#next").onclick=playNext;
  document.querySelector("#eqToggle").onclick=toggleEq;
