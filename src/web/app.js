@@ -649,13 +649,13 @@ async function fetchRecommendationBatch(extra={},signal,options={}){
 async function fillQueue(extra={},signal){
  let next=playbackQueue[queueIndex+1];
  if(next)return next;
- const before=playbackQueue.length;
- await fetchRecommendationBatch(extra,signal,{force:true});
- next=playbackQueue[queueIndex+1];
- if(next)return next;
- await loadLocalCatalog(signal);
- if(playbackQueue.length===before)addLocalTracksToQueue(5);
- else if(playbackQueue.length-queueIndex-1<2)addLocalTracksToQueue(3);
+ // Wave is online-only. Local music remains implemented but is not wired into autoplay.
+ for(let round=0;round<3;round++){
+  const added=await fetchRecommendationBatch({...extra,refresh:String(Date.now())},signal,{force:true});
+  next=playbackQueue[queueIndex+1];
+  if(next)return next;
+  if(!added?.length)await new Promise(resolve=>setTimeout(resolve,180));
+ }
  return playbackQueue[queueIndex+1]||null;
 }
 
@@ -671,22 +671,14 @@ async function startRecommendationFromContext(extra={}){
  recommendationSeen=new Set(current?[String(current.id)]:[]);
  recommendationLastPrefetchIndex=-1;
  recommendationContextKey="";
- const results=await Promise.allSettled([
-  fetchRecommendationBatch(extra,undefined,{force:true}),
-  loadLocalCatalog()
- ]);
- if(results[0].status==="rejected")console.warn("Ok Music context wave:",results[0].reason);
- if(results[1].status==="rejected")console.warn("Ok Music context local:",results[1].reason);
- if(playbackQueue.length<5){
-  await loadLocalCatalog();
-  addLocalTracksToQueue(5-playbackQueue.length);
+ for(let round=0;round<3&&playbackQueue.length<5;round++){
+  const batch=await fetchRecommendationBatch({...extra,refresh:String(Date.now())},undefined,{force:true});
+  if(!batch?.length)await new Promise(resolve=>setTimeout(resolve,180));
  }
  if(!current&&playbackQueue.length){
   queueIndex=0;
   play(playbackQueue[0],{keepQueue:true,fromBootstrap:true});
- }else if(current){
-  preloadNext();
- }
+ }else if(current)preloadNext();
 }
 
 function prepareHomeQueue(){
@@ -698,15 +690,12 @@ function prepareHomeQueue(){
    recommendationSeen=new Set();
    recommendationLastPrefetchIndex=-1;
    recommendationContextKey="";
-   const results=await Promise.allSettled([
-    fetchRecommendationBatch({refresh:String(Date.now())},undefined,{force:true}),
-    loadLocalCatalog()
-   ]);
-   const remoteTracks=results[0].status==="fulfilled"?results[0].value:[];
-   if(results[0].status==="rejected")console.warn("Ok Music initial recommendations:",results[0].reason);
-   if(results[1].status==="rejected")console.warn("Ok Music initial local catalog:",results[1].reason);
-   playbackQueue=[...remoteTracks.filter(t=>t?.id)];
-   addLocalTracksToQueue(Math.max(3,5-playbackQueue.length));
+   let remoteTracks=[];
+   for(let round=0;round<3&&remoteTracks.length<5;round++){
+    remoteTracks=await fetchRecommendationBatch({refresh:String(Date.now())},undefined,{force:true});
+    if(remoteTracks.length<5)await new Promise(resolve=>setTimeout(resolve,180));
+   }
+   playbackQueue=[...new Map(remoteTracks.filter(t=>t?.id&&t?.source&&t.source!=="🔐 Ключник").map(t=>[String(t.id),t])).values()];
    if(playbackQueue.length){
     queueIndex=-1;
     const first=playbackQueue[0],src=playableAudio(first);
@@ -751,19 +740,13 @@ async function initializeHomePlayer({force=false}={}){
    queueIndex=-1;
    recommendationSeen=new Set();
    recommendationLastPrefetchIndex=-1;
-   const results=await Promise.allSettled([
-    fetchRecommendationBatch({refresh:String(Date.now())},controller.signal,{force:true}),
-    loadLocalCatalog(controller.signal)
-   ]);
-   if(controller.signal.aborted)throw new DOMException("Aborted","AbortError");
-   const remote=results[0].status==="fulfilled"?results[0].value:[];
-   if(results[0].status==="rejected")console.warn("Ok Music click recommendations:",results[0].reason);
-   if(results[1].status==="rejected")console.warn("Ok Music click local:",results[1].reason);
-   addLocalTracksToQueue(Math.max(5-remote.length,3));
-   if(!playbackQueue.length){
-    await fetchRecommendationBatch({refresh:String(Date.now())},controller.signal,{force:true});
-    addLocalTracksToQueue(5);
+   let remote=[];
+   for(let round=0;round<3&&remote.length<5;round++){
+    if(controller.signal.aborted)throw new DOMException("Aborted","AbortError");
+    remote=await fetchRecommendationBatch({refresh:String(Date.now())},controller.signal,{force:true});
+    if(remote.length<5)await new Promise(resolve=>setTimeout(resolve,180));
    }
+   playbackQueue=[...new Map(remote.filter(t=>t?.id&&t?.source&&t.source!=="🔐 Ключник").map(t=>[String(t.id),t])).values()];
    if(playbackQueue.length){
     queueIndex=0;
     recommendationSeen=new Set(playbackQueue.map(t=>String(t?.id||"")));
