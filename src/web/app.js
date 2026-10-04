@@ -805,22 +805,24 @@ function play(t,{fromEnded=false,keepQueue=false,fromBootstrap=false}={}){
    audio.pause();
    audio.src=absolute;
    audio.load();
-   const promise=audio.play();
-   Promise.resolve(promise).then(()=>{
-    if(token!==window.__okPlayToken||current?.id!==t.id)return;
-    playing=true;
-    updateMediaSession();
-    drawPlayer();
-    preloadNext();
-    void ensureRecommendationWindow();
-   }).catch(async error=>{
+
+   let settled=false;
+   let timer=0;
+   const cleanup=()=>{
+    clearTimeout(timer);
+    audio.removeEventListener("error",onAudioError);
+   };
+   const fail=(error)=>{
+    if(settled)return;
+    settled=true;
+    cleanup();
     if(token!==window.__okPlayToken)return;
     if(error?.name==="NotAllowedError"){
      toast("Браузер запретил автозапуск — нажми ▶");
      return;
     }
-    // Hitmotop can reject the direct file in one context while the same
-    // track remains playable through the Worker proxy, so try the next URL.
+    // Hitmotop may leave the media request pending or return a non-playable
+    // response. Give the next candidate a chance before dropping the track.
     if(candidateIndex<candidates.length-1){
      candidateIndex++;
      tryCandidate();
@@ -837,7 +839,22 @@ function play(t,{fromEnded=false,keepQueue=false,fromBootstrap=false}={}){
     playing=false;
     toast("Поток не ответил — переключаюсь");
     setTimeout(()=>void playNext(),60);
-   });
+   };
+   const onAudioError=()=>fail(new Error("Audio element error"));
+   audio.addEventListener("error",onAudioError,{once:true});
+   timer=setTimeout(()=>fail(new Error("Audio load timeout")),7000);
+
+   Promise.resolve(audio.play()).then(()=>{
+    if(settled)return;
+    settled=true;
+    cleanup();
+    if(token!==window.__okPlayToken||current?.id!==t.id)return;
+    playing=true;
+    updateMediaSession();
+    drawPlayer();
+    preloadNext();
+    void ensureRecommendationWindow();
+   }).catch(fail);
   }catch(error){
    if(candidateIndex<candidates.length-1){candidateIndex++;tryCandidate();return;}
    console.warn("Ok Music playback:",error);
