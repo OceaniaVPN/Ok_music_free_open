@@ -80,7 +80,7 @@ async function zaycevPlay(id){
   throw Error("Zaycev playback URL missing");
 }
 
-const HITMOTOP_BASES=["https://hitmos.me","https://rus.hitmotop.com"];
+const HITMOTOP_BASES=["https://hitmos.fm","https://rus.hitmos.fm"];
 const HITMOTOP_HEADERS={
   "accept":"text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
   "accept-language":"ru-RU,ru;q=0.9,en;q=0.7",
@@ -177,7 +177,7 @@ async function hitmotopPlaybackUrl(rawUrl){
   let target;
   try{target=new URL(rawUrl)}catch{throw Error("Invalid Hitmotop audio URL")}
   const host=target.hostname.toLowerCase();
-  const allowed=host==="hitmos.me"||host.endsWith(".hitmos.me")||host==="hitmotop.com"||host.endsWith(".hitmotop.com");
+  const allowed=host==="hitmos.fm"||host.endsWith(".hitmos.fm")||host==="hitmotop.com"||host.endsWith(".hitmotop.com");
   if(!allowed||!/^https?:$/.test(target.protocol))throw Error("Hitmotop audio host is not allowed");
   return target.href;
 }
@@ -246,12 +246,12 @@ export async function handleApi(request,env){
     let target;
     try{target=new URL(raw)}catch{return Response.json({ok:false,error:"Invalid artwork URL"},{status:400})}
     const host=target.hostname.toLowerCase();
-    const allowed=host==="zaycev.net"||host.endsWith(".zaycev.net")||host==="jamendo.com"||host.endsWith(".jamendo.com")||host==="hitmos.me"||host.endsWith(".hitmos.me")||host==="hitmotop.com"||host.endsWith(".hitmotop.com");
+    const allowed=host==="zaycev.net"||host.endsWith(".zaycev.net")||host==="jamendo.com"||host.endsWith(".jamendo.com")||host==="hitmos.fm"||host.endsWith(".hitmos.fm")||host==="hitmotop.com"||host.endsWith(".hitmotop.com");
     if(!allowed||!/^https?:$/.test(target.protocol))return Response.json({ok:false,error:"Artwork host is not allowed"},{status:403});
     try{
       const upstream=await fetch(target,{headers:{
         accept:"image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-        referer:host.endsWith("zaycev.net")?ZAYCEV_BASE+"/":host.endsWith("jamendo.com")?"https://www.jamendo.com/":"https://hitmos.me/",
+        referer:host.endsWith("zaycev.net")?ZAYCEV_BASE+"/":host.endsWith("jamendo.com")?"https://www.jamendo.com/":"https://hitmos.fm/",
         "user-agent":ZAYCEV_HEADERS["user-agent"]
       }});
       if(!upstream.ok)throw Error("Artwork HTTP "+upstream.status);
