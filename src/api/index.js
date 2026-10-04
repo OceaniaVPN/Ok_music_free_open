@@ -634,13 +634,13 @@ export async function handleApi(request,env){
     const themeQuery=[...new Set([...genres.slice(0,3),...moods.slice(0,3),...now.slice(0,3)])].join(" ");
     const primaryArtist=preferredArtists[0]||currentArtist;
     const backupArtist=preferredArtists.find(x=>x!==primaryArtist)||"";
-    const discoveryQueries=["popular music","pop music","rock music","electronic music"];
+    const discoveryQueries=["popular music","pop music","rock music","electronic music","dance music","hip hop music"];
     const queries=recommendationUnique([
       [primaryArtist,genres[0]||"",moods[0]||""].filter(Boolean).join(" "),
       [themeQuery,now.slice(0,2).join(" ")].filter(Boolean).join(" "),
       seed,
       ...((!primaryArtist&&!themeQuery&&!seed)?discoveryQueries:[])
-    ]).slice(0,2);
+    ]).filter(Boolean).slice(0,6);
 
     const errors=[],providerHits={z:0,j:0,h:0};
     const pool=[],seenIds=new Set(),seenSongs=new Set();
@@ -650,7 +650,8 @@ export async function handleApi(request,env){
       if(!Array.isArray(list))return;
       providerHits[key]+=list.length;
       for(const t of list){
-        if(!t?.id||excluded.has(t.id)||seenIds.has(t.id))continue;
+        const hasAudio=Boolean(t?.zaycevId||String(t?.audio||"").trim()||String(t?.src||"").trim());
+        if(!hasAudio||!t?.id||excluded.has(t.id)||seenIds.has(t.id))continue;
         const songKey=trackDedupeKey(t);
         if(songKey&&seenSongs.has(songKey))continue;
         const artist=recommendationText(t.artist),title=recommendationText(t.title);
@@ -678,14 +679,14 @@ export async function handleApi(request,env){
       const q=queries[round];
       if(!q)continue;
       const [z,j,h]=await Promise.allSettled([
-        fetchZaycevSearch(q,Math.min(7,Math.max(5,limit+1))),
-        searchJamendo(q,Math.min(6,Math.max(4,limit+1)),env),
-        fetchHitmotopSearch(q,Math.min(7,Math.max(5,limit+1)),env)
+        fetchZaycevSearch(q,Math.min(8,Math.max(6,limit+2))),
+        searchJamendo(q,Math.min(8,Math.max(6,limit+2)),env),
+        fetchHitmotopSearch(q,Math.min(8,Math.max(6,limit+2)),env)
       ]);
       if(z.status==="fulfilled")addList(z.value,"z");else errors.push("Zaycev.net: "+(z.reason?.message||"ошибка"));
       if(j.status==="fulfilled")addList(j.value,"j");else errors.push("Jamendo: "+(j.reason?.message||"ошибка"));
       if(h.status==="fulfilled")addList(h.value,"h");else errors.push("Hitmotop: "+(h.reason?.message||"ошибка"));
-      if(pool.length>=Math.max(limit*2,8))break;
+      if(pool.length>=Math.max(limit,5))break;
     }
 
     const tracks=chooseRecommendations(pool,limit,context);
