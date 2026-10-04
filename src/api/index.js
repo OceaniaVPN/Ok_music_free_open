@@ -436,13 +436,14 @@ function mergeProviderTracks(providerLists, limit) {
 }
 
 function normalizeJamendo(t) {
+  const rawAudio=String(t.audio||"").trim();
   return {
     id: "jamendo-" + t.id,
     title: t.name || "Без названия",
     artist: t.artist_name || "Неизвестный исполнитель",
     album: t.album_name || "",
     image: t.image || t.album_image || "",
-    audio: t.audio || "",
+    audio: rawAudio?"/api/jamendo/play?url="+encodeURIComponent(rawAudio):"",
     duration: Number(t.duration || 0),
     license: t.license_ccurl || "",
     source: "Jamendo",
@@ -588,6 +589,37 @@ export async function handleApi(request,env){
       providers:[...(zTracks.length?["Zaycev.net"]:[]),...(jTracks.length?["Jamendo"]:[]),...(hTracks.length?["Hitmotop"]:[])],
       tracks,errors:[...new Set(errors)].slice(0,6)
     });
+  }
+  if(url.pathname==="/api/jamendo/play"){
+    const raw=(url.searchParams.get("url")||"").trim();
+    let target;
+    try{target=new URL(raw)}catch{return Response.json({ok:false,error:"Invalid Jamendo audio URL"},{status:400})}
+    const host=target.hostname.toLowerCase();
+    const allowed=host==="jamendo.com"||host.endsWith(".jamendo.com");
+    if(!allowed||!/^https?:$/.test(target.protocol))return Response.json({ok:false,error:"Jamendo audio host is not allowed"},{status:403});
+    try{
+      const range=request.headers.get("range")||"";
+      const headers={
+        ...(range?{range}:{}),
+        accept:"audio/*,audio/mpeg,audio/mp4,*/*;q=0.8",
+        "user-agent":ZAYCEV_HEADERS["user-agent"],
+        referer:"https://www.jamendo.com/"
+      };
+      const upstream=await fetch(target,{headers,redirect:"follow",signal:AbortSignal.timeout(8_000)});
+      if(!upstream.ok&&upstream.status!==206)throw Error("Jamendo audio HTTP "+upstream.status);
+      const contentType=(upstream.headers.get("content-type")||"").toLowerCase();
+      if(contentType.includes("text/html")||contentType.includes("application/json")||contentType.includes("text/plain"))throw Error("Jamendo returned non-audio");
+      const outHeaders=new Headers();
+      for(const name of ["content-type","content-length","content-range","etag","last-modified"]){
+        const value=upstream.headers.get(name);if(value)outHeaders.set(name,value);
+      }
+      outHeaders.set("cache-control","no-store");
+      outHeaders.set("access-control-allow-origin","*");
+      outHeaders.set("access-control-expose-headers","Content-Length,Content-Range,Accept-Ranges,Content-Type");
+      outHeaders.set("accept-ranges",outHeaders.get("accept-ranges")||"bytes");
+      outHeaders.set("content-type",outHeaders.get("content-type")||"audio/mpeg");
+      return new Response(upstream.body,{status:upstream.status,headers:outHeaders});
+    }catch(e){return Response.json({ok:false,error:e?.message||"Jamendo playback unavailable"},{status:502})}
   }
   if(url.pathname==="/api/artwork"){
     const raw=(url.searchParams.get("url")||"").trim();
