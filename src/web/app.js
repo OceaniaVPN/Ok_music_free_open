@@ -636,7 +636,7 @@ function prepareHomeQueue(){
     remoteTracks=await fetchRecommendationBatch({refresh:String(Date.now())},undefined,{force:true});
     if(remoteTracks.length<5)await new Promise(resolve=>setTimeout(resolve,180));
    }
-   playbackQueue=[...new Map(remoteTracks.filter(t=>t?.id&&t?.source&&t.source!=="🔐 Ключник").map(t=>[String(t.id),t])).values()];
+   playbackQueue=[...new Map(remoteTracks.filter(t=>t?.id&&t?.source).map(t=>[String(t.id),t])).values()];
    if(playbackQueue.length){
     queueIndex=-1;
     const first=playbackQueue[0],src=playableAudio(first);
@@ -687,7 +687,7 @@ async function initializeHomePlayer({force=false}={}){
     remote=await fetchRecommendationBatch({refresh:String(Date.now())},controller.signal,{force:true});
     if(remote.length<5)await new Promise(resolve=>setTimeout(resolve,180));
    }
-   playbackQueue=[...new Map(remote.filter(t=>t?.id&&t?.source&&t.source!=="🔐 Ключник").map(t=>[String(t.id),t])).values()];
+   playbackQueue=[...new Map(remote.filter(t=>t?.id&&t?.source).map(t=>[String(t.id),t])).values()];
    if(playbackQueue.length){
     queueIndex=0;
     recommendationSeen=new Set(playbackQueue.map(t=>String(t?.id||"")));
