@@ -871,36 +871,6 @@ function updateMediaSession(){
  });
  navigator.mediaSession.playbackState=playing?"playing":"paused";
 }
-const SILENT_AUDIO="data:audio/wav;base64,UklGRnQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YVAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";
-let mediaGestureUnlocked=false,mediaUnlocking=null;
-function unlockMediaFromGesture(){
- if(mediaGestureUnlocked)return Promise.resolve(true);
- if(mediaUnlocking)return mediaUnlocking;
- mediaUnlocking=(async()=>{
-  try{
-   // Use the SAME media element as the real player. A separate Audio() element
-   // does not reliably transfer the browser's user-gesture permission.
-   audio.pause();
-   audio.src=SILENT_AUDIO;
-   audio.volume=0.001;
-   audio.muted=false;
-   audio.load();
-   await audio.play();
-   mediaGestureUnlocked=true;
-   audio.pause();
-   audio.removeAttribute("src");
-   audio.load();
-   return true;
-  }catch(error){
-   console.warn("Ok Music media unlock:",error);
-   return false;
-  }finally{
-   audio.volume=1;
-  }
- })();
- mediaUnlocking=mediaUnlocking.finally(()=>{mediaUnlocking=null});
- return mediaUnlocking;
-}
 function drawPlayer(){if(!current){
  const busy=homeBootstrapBusy;
  playerEl.className="player on";
@@ -910,15 +880,26 @@ function drawPlayer(){if(!current){
   if(homeBootstrapBusy)return;
   clearTimeout(window.__okHomeRetry);
   if(playbackQueue.length&&queueIndex<0){
-   void initializeHomePlayer({force:true});
+   initializeHomePlayer({force:true});
    return;
   }
-  void unlockMediaFromGesture().then(()=>initializeHomePlayer({force:true}));
+  // Same-origin emergency source keeps Play synchronous even if the catalog
+  // request has not finished yet.
+  const emergency={id:"key-emergency-pushnoy",title:"Локальный трек",artist:"Ключник",audio:"/music/%D0%90%D0%BB%D0%B5%D0%BA%D1%81%D0%B0%D0%BD%D0%B4%D1%80%20%D0%9F%D1%83%D1%88%D0%BD%D0%BE%D0%B9%20(10).mp3",duration:0,source:"🔐 Ключник"};
+  playbackQueue=[emergency];
+  queueIndex=0;
+  recommendationSeen=new Set([emergency.id]);
+  play(emergency,{keepQueue:true,fromBootstrap:true});
+  void prepareHomeQueue();
  };
  return}
  playerEl.className="player on";
  playerEl.innerHTML='<div class="pcover" data-player-profile="1">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="prev" class="icon" title="Предыдущий">⏮</button><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button><button id="next" class="icon" title="Следующий">⏭</button><button id="eqToggle" class="icon eq-toggle" title="Эквалайзер">EQ</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>'+eqPanel();
- document.querySelector("#pause").onclick=()=>{if(playing)audio.pause();else{if(showEq&&audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});audio.play().catch(error=>toast(error?.name==="NotAllowedError"?"Нажми ▶ ещё раз для запуска":"Не удалось воспроизвести трек"))}};
+ document.querySelector("#pause").onclick=()=>{
+  if(playing){audio.pause();return}
+  const promise=audio.play();
+  Promise.resolve(promise).catch(error=>toast(error?.name==="NotAllowedError"?"Нажми ▶ ещё раз для запуска":"Не удалось воспроизвести трек"));
+};
  document.querySelector("#prev").onclick=playPrevious;
  document.querySelector("#next").onclick=playNext;
  document.querySelector("#eqToggle").onclick=toggleEq;
@@ -957,10 +938,15 @@ const initialPlay=document.querySelector("#initialPlay");
 if(initialPlay)initialPlay.onclick=()=>{
  clearTimeout(window.__okHomeRetry);
  if(playbackQueue.length&&queueIndex<0){
-  void initializeHomePlayer({force:true});
+  initializeHomePlayer({force:true});
   return;
  }
- void unlockMediaFromGesture().then(()=>initializeHomePlayer({force:true}));
+ const emergency={id:"key-emergency-pushnoy",title:"Локальный трек",artist:"Ключник",audio:"/music/%D0%90%D0%BB%D0%B5%D0%BA%D1%81%D0%B0%D0%BD%D0%B4%D1%80%20%D0%9F%D1%83%D1%88%D0%BD%D0%BE%D0%B9%20(10).mp3",duration:0,source:"🔐 Ключник"};
+ playbackQueue=[emergency];
+ queueIndex=0;
+ recommendationSeen=new Set([emergency.id]);
+ play(emergency,{keepQueue:true,fromBootstrap:true});
+ void prepareHomeQueue();
 };
 function initTelegram(){if(!window.Telegram?.WebApp)return;window.Telegram.WebApp.ready();window.Telegram.WebApp.expand();const id=document.documentElement.dataset.theme||"default",t=MUSIC_THEMES.find(x=>x.id===id)||MUSIC_THEMES[0];window.Telegram.WebApp.setHeaderColor(t.telegram);window.Telegram.WebApp.setBackgroundColor(t.telegram)}
 initTelegram();window.addEventListener("DOMContentLoaded",initTelegram,{once:true});
