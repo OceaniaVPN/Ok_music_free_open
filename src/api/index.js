@@ -846,7 +846,7 @@ export async function handleApi(request,env){
     const pool=[],seenIds=new Set(),seenSongs=new Set();
     const context={currentArtist,currentTitle,preferredArtists,genres,moods,now,likedText,salt:String(url.searchParams.get("refresh")||Date.now())};
 
-    const addList=(list,key)=>{
+    const addList=(list,key,query)=>{
       if(!Array.isArray(list))return;
       providerHits[key]+=list.length;
       for(const t of list){
@@ -859,7 +859,7 @@ export async function handleApi(request,env){
         seenIds.add(t.id);if(songKey)seenSongs.add(songKey);
         let score=0;
         const searchable=title+" "+artist+" "+recommendationText(t.genre);
-        const queryTerms=recommendationText(q).split(/\s+/).filter(x=>x.length>2);
+        const queryTerms=recommendationText(query).split(/\s+/).filter(x=>x.length>2);
         const queryScore=recommendationOverlap(searchable,queryTerms);
         score+=queryScore*20;
         if(artist&&preferredArtists.includes(artist))score+=70;
@@ -898,9 +898,9 @@ export async function handleApi(request,env){
         cachedProviderSearch("jamendo",q,providerLimit,()=>searchJamendo(q,providerLimit,env)),
         cachedProviderSearch("hitmotop",q,providerLimit,()=>fetchHitmotopSearch(q,providerLimit,env))
       ]);
-      if(z.status==="fulfilled")addList(z.value,"z");else errors.push("Zaycev.net: "+(z.reason?.message||"ошибка"));
-      if(j.status==="fulfilled")addList(j.value,"j");else errors.push("Jamendo: "+(j.reason?.message||"ошибка"));
-      if(h.status==="fulfilled")addList(h.value,"h");else errors.push("Hitmotop: "+(h.reason?.message||"ошибка"));
+      if(z.status==="fulfilled")addList(z.value,"z",q);else errors.push("Zaycev.net: "+(z.reason?.message||"ошибка"));
+      if(j.status==="fulfilled")addList(j.value,"j",q);else errors.push("Jamendo: "+(j.reason?.message||"ошибка"));
+      if(h.status==="fulfilled")addList(h.value,"h",q);else errors.push("Hitmotop: "+(h.reason?.message||"ошибка"));
       if(pool.length>=Math.max(limit,5))break;
     }
 
@@ -927,7 +927,7 @@ export async function handleApi(request,env){
          mappedNow.slice(0,2).join(" ")
        ]).filter(q=>q.length>1);
        for(const q of localQueries){
-         addList(searchLocalTracks(q,Math.max(8,limit*2)),"l");
+         addList(searchLocalTracks(q,Math.max(8,limit*2)),"l",q);
          if(pool.length>=Math.max(limit,5))break;
        }
      }
@@ -936,7 +936,7 @@ export async function handleApi(request,env){
          .filter(t=>t?.id&&String(t.audio||t.src||"").trim())
          .slice()
          .sort((a,b)=>(recommendationHash(context.salt+"|"+a.id)-recommendationHash(context.salt+"|"+b.id)));
-       addList(fallback.slice(0,Math.max(10,limit*3)),"l");
+       addList(fallback.slice(0,Math.max(10,limit*3)),"l",contextQuery||primaryArtist||"");
      }
 
 const tracks=chooseRecommendations(pool,limit,context);
