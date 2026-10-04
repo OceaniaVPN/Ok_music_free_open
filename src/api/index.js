@@ -160,7 +160,7 @@ function parseHitmotopSearch(html,base,limit){
       artist,
       album:"",
       image,
-      audio:"/api/hitmotop/play?url="+encodeURIComponent(urlDown),
+      audio:"/api/hitmotop/play?url="+encodeURIComponent(urlDown)+"&page="+encodeURIComponent(pageUrl||""),
       duration,
       license:"",
       source:"Hitmotop",
@@ -236,7 +236,7 @@ function normalizeHitmozParserSongs(data,limit){
       artist:stripHtml(song?.artist)||"Неизвестный исполнитель",
       album:"",
       image,
-      audio:"/api/hitmotop/play?url="+encodeURIComponent(downloadUrl),
+      audio:"/api/hitmotop/play?url="+encodeURIComponent(downloadUrl)+"&page="+encodeURIComponent(sourceUrl||""),
       duration:parseDuration(String(song?.duration||"")),
       license:"",
       source:"Hitmotop",
@@ -325,29 +325,62 @@ async function hitmotopPlaybackUrl(rawUrl){
   return target.href;
 }
 
+function trackDedupeKey(track) {
+  const normalize = value => String(value || "")
+    .normalize("NFKD")
+    .replace(/[\\u0300-\\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/\\b(feat(?:uring)?|ft)\\.?.*$/i, "")
+    .replace(/[^a-z0-9а-яё]+/gi, " ")
+    .replace(/\\s+/g, " ")
+    .trim();
+
+  const artist = normalize(track?.artist);
+  const title = normalize(track?.title);
+  return artist && title ? artist + " | " + title : "";
+}
+
 function uniqueTracks(tracks, limit) {
-  const seen = new Set();
+  const seenIds = new Set();
+  const seenSongs = new Set();
   return tracks.filter(track => {
-    if (!track?.id || seen.has(track.id)) return false;
-    seen.add(track.id);
+    if (!track?.id || seenIds.has(track.id)) return false;
+    const key = trackDedupeKey(track);
+    if (key && seenSongs.has(key)) return false;
+    seenIds.add(track.id);
+    if (key) seenSongs.add(key);
     return true;
   }).slice(0, limit);
 }
 
 function mergeProviderTracks(providerLists, limit) {
   const out = [];
-  const seen = new Set();
+  const seenIds = new Set();
+  const seenSongs = new Set();
   const lists = providerLists.filter(Array.isArray);
   let cursor = 0;
 
-  while (out.length < limit && lists.some(list => list.some(track => track?.id && !seen.has(track.id)))) {
+  const available = () => lists.some(list => list.some(track => {
+    if (!track?.id || seenIds.has(track.id)) return false;
+    const key = trackDedupeKey(track);
+    return !key || !seenSongs.has(key);
+  }));
+
+  while (out.length < limit && available()) {
     const list = lists[cursor % lists.length];
     cursor++;
 
-    const track = list.find(item => item?.id && !seen.has(item.id));
+    const track = list.find(item => {
+      if (!item?.id || seenIds.has(item.id)) return false;
+      const key = trackDedupeKey(item);
+      return !key || !seenSongs.has(key);
+    });
     if (!track) continue;
 
-    seen.add(track.id);
+    seenIds.add(track.id);
+    const key = trackDedupeKey(track);
+    if (key) seenSongs.add(key);
     out.push(track);
   }
 
@@ -563,10 +596,14 @@ export async function handleApi(request,env){
       jam=jr.flatMap(r=>r.status==="fulfilled"?r.value:[]),
       hitmotop=hr.flatMap(r=>r.status==="fulfilled"?r.value:[]),
       local=Array.isArray(LOCAL_MUSIC)?LOCAL_MUSIC.filter(t=>t?.audio):[];
-    const pool=[],seen=new Set();
+    const pool=[],seenIds=new Set(),seenSongs=new Set();
     for(const list of [zaycev,jam,hitmotop,local]) for(const t of list){
-      if(!t||!t.id||seen.has(t.id))continue;
-      seen.add(t.id);pool.push(t);
+      if(!t||!t.id||seenIds.has(t.id))continue;
+      const songKey=trackDedupeKey(t);
+      if(songKey&&seenSongs.has(songKey))continue;
+      seenIds.add(t.id);
+      if(songKey)seenSongs.add(songKey);
+      pool.push(t);
     }
     const excluded=new Set(excludeRaw.split(",").map(x=>x.trim()).filter(Boolean));
     const wanted=preferredArtists.map(x=>x.toLowerCase());
