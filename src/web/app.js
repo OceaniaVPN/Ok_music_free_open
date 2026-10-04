@@ -849,13 +849,6 @@ function play(t,{fromEnded=false,keepQueue=false,fromBootstrap=false}={}){
  tryCandidate();
 }
 
-function playLegacyUnused(t){
-  console.warn("Ok Music playback:",error);
-  current=null;
-  playing=false;
-  setTimeout(()=>void playNext(),60);
- }
-}
 
 function playPrevious(){
  if(queueIndex>0){
