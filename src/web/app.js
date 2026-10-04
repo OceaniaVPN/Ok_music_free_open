@@ -168,7 +168,26 @@ img{max-width:100%}
  border:1px solid rgba(166,255,205,.11);border-radius:21px;background:rgba(6,18,11,.88);backdrop-filter:blur(23px) saturate(1.15);
  box-shadow:0 22px 70px rgba(0,0,0,.45),inset 0 1px rgba(255,255,255,.06)
 }
-.player.on{display:grid}.pcover{width:49px;height:49px;border-radius:13px;overflow:hidden;display:grid;place-items:center;background:#12311f}.pcover img{width:100%;height:100%;object-fit:cover}.pmeta{min-width:0;overflow:hidden}.pmeta strong,.pmeta span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pmeta strong{font-size:12px}.pmeta span{font-size:10px;color:var(--muted);margin-top:3px}
+.player.on{display:grid}.pcover{width:49px;height:49px;border-radius:13px;overflow:hidden;display:grid;place-items:center;background:#12311f;cursor:pointer}.pcover img{width:100%;height:100%;object-fit:cover}.pmeta{min-width:0;overflow:hidden}.pmeta strong,.pmeta span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pmeta strong{font-size:12px}.pmeta span{font-size:10px;color:var(--muted);margin-top:3px}
+.fullscreen-player{position:fixed;inset:0;z-index:9999;display:none;place-items:center;background:rgba(2,7,4,.96);overflow:auto}
+.fullscreen-player.open{display:grid}
+.fs-backdrop{position:absolute;inset:0;background:var(--fs-art) center/cover no-repeat;filter:blur(32px);transform:scale(1.08);opacity:.25}
+.fs-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(2,7,4,.38),rgba(2,7,4,.94))}
+.fs-inner{position:relative;z-index:1;width:min(720px,100%);min-height:100%;padding:24px 20px max(26px,env(safe-area-inset-bottom));display:grid;grid-template-rows:auto 1fr auto;gap:18px}
+.fs-top{display:flex;justify-content:space-between;align-items:center}
+.fs-top strong{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#b9cfc1}
+.fs-close{width:42px;height:42px;border-radius:50%;padding:0}
+.fs-art-wrap{min-height:0;display:grid;place-items:center;padding:8px}
+.fs-art{display:block;width:auto;height:auto;max-width:100%;max-height:66vh;object-fit:contain;border-radius:24px;box-shadow:0 28px 80px rgba(0,0,0,.5)}
+.fs-bottom{display:grid;gap:12px}
+.fs-title{font:700 clamp(24px,5vw,42px)/1.05 Space Grotesk,sans-serif;letter-spacing:-1px}
+.fs-artist{margin-top:5px;color:#9bb5a6;font-size:12px}
+.fs-seek{width:100%;accent-color:var(--green)}
+.fs-time{display:flex;justify-content:space-between;color:#809789;font-size:9px}
+.fs-controls{display:flex;justify-content:center;align-items:center;gap:12px}
+.fs-controls button{width:46px;height:46px;border-radius:50%;padding:0}
+.fs-controls .fs-play{width:64px;height:64px;border:0;background:linear-gradient(135deg,var(--green3),var(--green2));color:#06120a}
+@media(max-width:600px){.fs-inner{padding-top:max(18px,env(safe-area-inset-top));padding-left:14px;padding-right:14px}.fs-art{max-width:92vw;max-height:55vh}.fs-title{font-size:24px}}
 .pc{display:flex;align-items:center;gap:6px}.pc .big{width:45px;height:45px;padding:0;border:0;border-radius:50%;background:#effff5;color:#06120a}.seek{grid-column:1/-1;width:100%;accent-color:var(--green)}.time{grid-column:1/-1;color:var(--muted);font-size:9px;margin-top:-5px}
 .fx-panel{grid-column:1/-1;border-top:1px solid rgba(166,255,205,.07);padding:11px 3px 2px}.eq-switch{display:inline-flex;align-items:center;gap:7px;font-size:9px;color:var(--muted);cursor:pointer}.eq-switch input{width:34px;height:18px;margin:0;accent-color:var(--green)}.eq-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.eq-band{text-align:center;min-width:0}.eq-band input{width:100%;accent-color:var(--green)}.eq-band small{display:block;color:var(--muted);font-size:8px;margin-top:3px}.spatial3d{margin-top:12px;padding:10px 11px;border:1px solid rgba(166,255,205,.08);border-radius:14px;background:rgba(78,228,143,.035)}.spatial3d-head{display:flex;align-items:center;justify-content:space-between;font-size:11px;margin-bottom:5px}.spatial3d-head span{color:var(--green);font-variant-numeric:tabular-nums}.spatial3d input{width:100%;accent-color:var(--green)}.spatial3d>small{display:block;color:var(--muted);font-size:8px;margin-top:3px}
 .nav{
@@ -220,7 +239,7 @@ html,body,.app,.top,.hero,.card,.taste-panel,.track-profile,.result,.playlist,.p
   <main id="view"></main>
 </div>
 <div id="player" class="player on"><div class="pcover">♫</div><div class="pmeta"><strong>Ok Music</strong><span>Выбери трек — плеер готов</span></div><div class="pc"><button class="icon" disabled>⏮</button><button id="initialPlay" class="big" type="button" title="Начать автоподбор">▶</button><button class="icon" disabled>⏭</button><button class="icon" disabled>EQ</button></div><input class="seek" type="range" min="0" max="100" value="0" disabled><span class="time">0:00 / 0:00</span></div>
-<nav class="nav" id="nav"><button data-view="home" class="active">⌂<span>Главная</span></button><button data-view="mood">◈<span>Настроение</span></button><button data-view="search">⌕<span>Поиск</span></button><button data-view="library">♫<span>Плейлисты</span></button></nav>
+<div id="fullscreenPlayer" class="fullscreen-player" aria-hidden="true"></div><nav class="nav" id="nav"><button data-view="home" class="active">⌂<span>Главная</span></button><button data-view="mood">◈<span>Настроение</span></button><button data-view="search">⌕<span>Поиск</span></button><button data-view="library">♫<span>Плейлисты</span></button></nav>
 <div id="modal" class="modal"><div class="dialog"><h3>Новый плейлист</h3><p>Придумай название — треки можно будет добавлять из поиска.</p><input id="playlistName" class="input" placeholder="Например: Ночная поездка"><div class="row"><button id="closeModal">Отмена</button><button id="createPlaylist" class="primary">Создать</button></div></div></div>
 <audio id="okAudio" preload="auto" playsinline></audio><div id="toast" class="toast"></div><div id="tasteModal" class="modal"><div class="dialog"><h3>🎧 Мой музыкальный вкус</h3><p>Выбери любимые направления и настроение — Ok Music будет учитывать их в каждом миксе.</p><div class="taste-grid"><div class="taste-field"><label>Любимые жанры</label><div id="genreChips" class="chips"></div></div><div class="taste-field"><label>Настроение</label><div id="moodChips" class="chips"></div></div></div><div style="margin-top:14px"><label style="display:block;font-size:11px;color:var(--muted);margin-bottom:7px">Любимые исполнители</label><input id="tasteArtists" class="input" placeholder="Например: Miyagi, The Weeknd, Кино"></div><div style="margin-top:14px"><label style="display:block;font-size:11px;color:var(--muted);margin-bottom:7px">Что хочется сейчас</label><input id="tasteNow" class="input" placeholder="Например: спокойный русский рэп для дороги"></div><div class="taste-actions"><button id="tasteCancel">Отмена</button><button id="tasteSave" class="primary" style="flex:1">Сохранить вкус ✨</button></div></div></div>
 <script>
@@ -936,6 +955,31 @@ function updateMediaSession(){
  });
  navigator.mediaSession.playbackState=playing?"playing":"paused";
 }
+function closeFullscreenPlayer(){
+ const fs=document.querySelector("#fullscreenPlayer");
+ if(!fs)return;
+ fs.classList.remove("open");
+ fs.setAttribute("aria-hidden","true");
+ fs.innerHTML="";
+}
+function openFullscreenPlayer(){
+ if(!current)return;
+ const fs=document.querySelector("#fullscreenPlayer");
+ if(!fs)return;
+ const art=mediaArtworkUrl(current.image);
+ fs.style.setProperty("--fs-art",art?'url("'+art.replace(/"/g,"%22")+'")':"none");
+ fs.innerHTML='<div class="fs-backdrop"></div><div class="fs-shade"></div><div class="fs-inner"><div class="fs-top"><strong>NOW PLAYING</strong><button class="fs-close" id="fsClose" aria-label="Закрыть">✕</button></div><div class="fs-art-wrap">'+(art?'<img class="fs-art" src="'+esc(art)+'" alt="'+esc(current.title||"Обложка")+'">':'<div class="fs-art">♫</div>')+'</div><div class="fs-bottom"><div><div class="fs-title">'+esc(current.title||"Без названия")+'</div><div class="fs-artist">'+esc(current.artist||"Неизвестный исполнитель")+'</div></div><input id="fsSeek" class="fs-seek" type="range" min="0" max="100" value="0"><div class="fs-time"><span id="fsCur">0:00</span><span id="fsDur">'+fmt(audio.duration)+'</span></div><div class="fs-controls"><button id="fsPrev" title="Предыдущий">⏮</button><button id="fsPlay" class="fs-play">'+(playing?"Ⅱ":"▶")+'</button><button id="fsNext" title="Следующий">⏭</button></div></div></div>';
+ fs.classList.add("open");
+ fs.setAttribute("aria-hidden","false");
+ const close=fs.querySelector("#fsClose"); if(close)close.onclick=closeFullscreenPlayer;
+ const prev=fs.querySelector("#fsPrev"); if(prev)prev.onclick=playPrevious;
+ const next=fs.querySelector("#fsNext"); if(next)next.onclick=playNext;
+ const playButton=fs.querySelector("#fsPlay");
+ if(playButton)playButton.onclick=()=>playing?audio.pause():audio.play().catch(()=>toast("Нажми ▶ ещё раз для запуска"));
+ const seek=fs.querySelector("#fsSeek");
+ if(seek)seek.oninput=e=>{if(audio.duration)audio.currentTime=audio.duration*Number(e.target.value)/100};
+}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeFullscreenPlayer()});
 function drawPlayer(){if(!current){
  const busy=homeBootstrapBusy;
  playerEl.className="player on";
@@ -954,7 +998,7 @@ function drawPlayer(){if(!current){
   return;
  }
  playerEl.className="player on";
- playerEl.innerHTML='<div class="pcover" data-player-profile="1">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="prev" class="icon" title="Предыдущий">⏮</button><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button><button id="next" class="icon" title="Следующий">⏭</button><button id="eqToggle" class="icon eq-toggle" title="Эквалайзер">EQ</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>'+eqPanel();
+ playerEl.innerHTML='<div class="pcover" data-player-profile="1" title="Открыть плеер на весь экран">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="prev" class="icon" title="Предыдущий">⏮</button><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button><button id="next" class="icon" title="Следующий">⏭</button><button id="eqToggle" class="icon eq-toggle" title="Эквалайзер">EQ</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>'+eqPanel();
  document.querySelector("#pause").onclick=()=>{
   if(playing){audio.pause();return}
   const promise=audio.play();
@@ -963,7 +1007,7 @@ function drawPlayer(){if(!current){
  document.querySelector("#prev").onclick=playPrevious;
  document.querySelector("#next").onclick=playNext;
  document.querySelector("#eqToggle").onclick=toggleEq;
- document.querySelector("[data-player-profile]").onclick=()=>openTrackProfile(current.id);
+ document.querySelector("[data-player-profile]").onclick=()=>openFullscreenPlayer();
  document.querySelector("#seek").oninput=e=>{if(audio.duration)audio.currentTime=audio.duration*e.target.value/100};
  document.querySelectorAll("[data-eq]").forEach(s=>s.oninput=e=>setEq(Number(e.target.dataset.eq),e.target.value));
  const eqSwitch=document.querySelector("[data-eq-enabled]");
@@ -971,7 +1015,7 @@ function drawPlayer(){if(!current){
  const spatial=document.querySelector("[data-spatial3d]");
  if(spatial)spatial.oninput=e=>{setSpatial3d(e.target.value);const out=spatial.closest(".spatial3d")?.querySelector("span");if(out)out.textContent=Math.round(spatial3d*100)+"%"};
 }
-audio.onplay=()=>{playing=true;if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});if(spatial3d)updateSpatial3d();if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer()};audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
+audio.onplay=()=>{playing=true;if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});if(spatial3d)updateSpatial3d();if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer()};audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime"),fsSeek=document.querySelector("#fsSeek"),fsCur=document.querySelector("#fsCur"),fsDur=document.querySelector("#fsDur");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if(fsSeek)fsSeek.value=audio.duration?audio.currentTime/audio.duration*100:0;if(fsCur)fsCur.textContent=fmt(audio.currentTime);if(fsDur)fsDur.textContent=fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
 audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer()};audio.onended=()=>{playing=false;if(autoNext)void playNext();else{if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()}};audio.onerror=()=>{
  const code=audio.error?.code||0;
  console.warn("Ok Music audio error",{code,src:audio.src,current:current?.id,source:current?.source});
