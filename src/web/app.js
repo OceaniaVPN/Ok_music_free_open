@@ -537,13 +537,22 @@ const TASTE_GENRES=["Русский рэп","Поп","Рок","Электрон�
  state.taste.artists=document.querySelector("#tasteArtists").value.trim();
  state.taste.now=document.querySelector("#tasteNow").value.trim();
  save();
- playbackQueue=[];queueIndex=-1;recommendationSeen=new Set();recommendationLastPrefetchIndex=-1;recommendationContextKey="";
+ playbackQueue=current?[current]:[];
+ queueIndex=current?0:-1;
+ recommendationSeen=new Set(current?[String(current.id)]:[]);
+ recommendationLastPrefetchIndex=-1;recommendationContextKey="";
  if(homeBootstrapController)try{homeBootstrapController.abort()}catch{}
  homePrefetchPromise=null;
  document.querySelector("#tasteModal").classList.remove("open");
  toast("Вкус обновлён — перестраиваю волну ✨");
  render("home");
- void prepareHomeQueue();
+ void fetchRecommendationBatch({refresh:String(Date.now())}).then(batch=>{
+  if(!batch.length)return;
+  playbackQueue=current?[current,...batch]:[...batch];
+  queueIndex=current?0:0;
+  preloadNext();
+  drawPlayer();
+ });
 };
 function home(){
  view.innerHTML='<section class="hero hero-v2"><div class="hero-grid"></div><div class="hero-main"><div class="hero-kicker"><span>✦ OK MUSIC</span><span class="live-dot">КАТАЛОГ ОНЛАЙН</span><span>УМНЫЙ АВТОПОДБОР</span></div><h2>Твоя музыка.<br><em>Твой ритм.</em></h2><p>Ищи любую музыку и слушай без лишних экранов. Следующие треки подбираются скрыто и заранее — без спойлеров очереди.</p><div class="searchbar"><input id="homeQ" class="input" placeholder="Исполнитель, трек или настроение" autocomplete="off"><button id="homeSearch" class="primary">Найти музыку</button></div><div class="hero-quick"><button type="button" data-quick-q="Ночной вайб">🌙 Ночной вайб</button><button type="button" data-quick-q="Энергия">⚡ Энергия</button><button type="button" data-quick-q="Lo-fi">☁ Lo-fi</button><button type="button" data-quick-q="В дорогу">🚗 В дорогу</button></div></div><div class="hero-bottom"><div class="hero-note">🎧 Следующие песни подбираются автоматически</div><div class="hero-providers"><span>Zaycev</span><span>Jamendo</span><span>Hitmotop</span></div></div></section><div class="taste-panel"><h3>🎧 Музыкальный профиль</h3><p>Жанры, настроение и любимые исполнители используются скрыто внутри автоподбора. Никаких списков будущих песен на экране.</p><button id="editTaste" style="margin-top:12px">Настроить вкус</button></div><div class="offline-panel" id="offlineHome"><div><strong>◉ Офлайн-режим</strong><span id="offlineHomeText">Сохраняй треки кнопкой ⇩ и слушай их без интернета.</span></div><button id="clearOffline">Очистить</button></div>';
@@ -747,10 +756,19 @@ async function ensureRecommendationWindow(extra={}){
  await fetchRecommendationBatch(extra);
 }
 async function startRecommendationFromContext(extra={}){
- playbackQueue=[];queueIndex=-1;recommendationSeen=new Set();recommendationLastPrefetchIndex=-1;
+ // A mood/genre change invalidates the old wave immediately.
+ playbackQueue=current?[current]:[];
+ queueIndex=current?0:-1;
+ recommendationSeen=new Set(current?[String(current.id)]:[]);
+ recommendationLastPrefetchIndex=-1;
+ recommendationContextKey="";
  const batch=await fetchRecommendationBatch(extra);
- if(batch.length)playbackQueue=[...batch];
- if(playbackQueue.length){queueIndex=0;play(playbackQueue[0],{keepQueue:true})}
+ if(batch.length){
+  playbackQueue=current?[current,...batch]:[...batch];
+  queueIndex=current?0:0;
+ }
+ if(!current&&playbackQueue.length)play(playbackQueue[0],{keepQueue:true});
+ if(current)preloadNext();
 }
 function findTrackIndex(t){return playbackQueue.findIndex(x=>x?.id===t?.id)}
 function preloadNext(){
