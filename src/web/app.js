@@ -544,12 +544,35 @@ function prepareHomeQueue(){
  if(current||playbackQueue.length||homePrefetchPromise)return homePrefetchPromise;
  homePrefetchPromise=(async()=>{
   try{
+   // First load the repository-hosted MP3 catalog. These files are copied to
+   // /public/music by the build, so playback stays same-origin and does not
+   // depend on an external stream being available at click time.
+   const response=await fetch("/api/local-music?bootstrap="+Date.now(),{cache:"no-store"});
+   if(response.ok){
+    const data=await response.json();
+    const local=[...new Map((data.tracks||[]).filter(playableAudio).map(t=>[String(t.id),t])).values()];
+    if(local.length){
+     playbackQueue=local.slice(0,5);
+     queueIndex=-1;
+     recommendationSeen=new Set(playbackQueue.map(t=>String(t.id)));
+     const first=playbackQueue[0],src=playableAudio(first);
+     if(src){
+      const absolute=new URL(src,location.href).href;
+      audio.src=absolute;
+      audio.load();
+     }
+     drawPlayer();
+     return playbackQueue;
+    }
+   }
+   // If the local catalog is unavailable, fall back to online recommendations.
    await fetchRecommendationBatch({refresh:String(Date.now())});
-   if(!current&&queueIndex<0&&playbackQueue.length){
+   if(!current&&playbackQueue.length){
     const first=playbackQueue[0],src=playableAudio(first);
     if(src){
      const absolute=new URL(src,location.href).href;
-     if(audio.src!==absolute){audio.src=src;audio.load()}
+     audio.src=absolute;
+     audio.load();
     }
     drawPlayer();
    }
@@ -564,6 +587,12 @@ async function initializeHomePlayer({force=false}={}){
  // When the hidden background prefetch is already ready, start the first
  // prepared track directly from the user's click. No async network wait occurs.
  if(playbackQueue.length&&queueIndex<0){
+  queueIndex=0;
+  recommendationSeen=new Set(playbackQueue.map(t=>String(t.id)));
+  play(playbackQueue[0],{keepQueue:true,fromBootstrap:true});
+  return;
+ }
+ if(playbackQueue.length&&queueIndex===-1&&playbackQueue[0]){
   queueIndex=0;
   recommendationSeen=new Set(playbackQueue.map(t=>String(t.id)));
   play(playbackQueue[0],{keepQueue:true,fromBootstrap:true});
