@@ -1,4 +1,5 @@
 import { LOCAL_MUSIC } from "../local-music.js";
+import recommendationArtists from "../data/recommendation-artists.json" with { type: "json" };
 const LOCAL_MUSIC_CATALOG=Array.isArray(LOCAL_MUSIC)?LOCAL_MUSIC:[];
 
 const ZAYCEV_BASE="https://zaycev.net";
@@ -514,23 +515,7 @@ const RECOMMENDATION_VOCAB={
   "вечеринка":["party","dance"],
   "фонк":["phonk","drift"]
 };
-const RECOMMENDATION_ARTIST_POOLS={
-  "рок":["Александр Пушной","План Ломоносова","Влом","Кино","Король и Шут"],
-  "метал":["Slipknot","Metallica","Rammstein","System of a Down","Linkin Park"],
-  "поп":["Taylor Swift","The Weeknd","Dua Lipa","Lady Gaga","Adele"],
-  "русский рэп":["Oxxxymiron","Баста","Noize MC","Miyagi","ЕГОР КРИД"],
-  "хип-хоп":["Eminem","Kendrick Lamar","Dr. Dre","2Pac","Snoop Dogg"],
-  "электроника":["The Prodigy","Daft Punk","The Chemical Brothers","Skrillex","deadmau5"],
-  "инди":["Arctic Monkeys","Tame Impala","The Strokes","The 1975","Florence + The Machine"],
-  "джаз":["Miles Davis","John Coltrane","Ella Fitzgerald","Louis Armstrong","Nina Simone"],
-  "классика":["Ludovico Einaudi","Yiruma","Max Richter","Ólafur Arnalds","Hans Zimmer"],
-  "k-pop":["BTS","BLACKPINK","TWICE","Stray Kids","NewJeans"],
-  "фонк":["Kordhell","INTERWORLD","DVRST","LXST CXNTURY","Ghostface Playa"],
-  "r&b":["The Weeknd","SZA","Alicia Keys","Frank Ocean","Bruno Mars"],
-  "lo-fi":["L'indécis","Jinsang","eevee","idealism","Nymano"],
-  "альтернатива":["Linkin Park","Nirvana","Foo Fighters","Muse","Twenty One Pilots"]
-};
-function recommendationGenreKey(value){
+const RECOMMENDATION_ARTIST_POOLS=recommendationArtists&&typeof recommendationArtists==="object"?recommendationArtists:{};function recommendationGenreKey(value){
   const text=recommendationText(value);
   if(!text)return "";
   if(RECOMMENDATION_ARTIST_POOLS[text])return text;
@@ -558,6 +543,19 @@ function recommendationArtistMatches(value,set){
     const known=recommendationText(artist);
     if(text===known||text.includes(known)||known.includes(text))return true;
   }
+  return false;
+}
+function normalizeArtistName(value){
+  return recommendationText(String(value||""))
+    .replace(/\b(feat\.?|ft\.?|featuring|with)\b.*$/i,"")
+    .replace(/\s*[-–—]\s*(official|music|topic|vevo)\b.*$/i,"")
+    .trim();
+}
+function isLikelyTrackTitleAsArtist(artist,title){
+  const a=normalizeArtistName(artist), t=recommendationText(title);
+  if(!a||!t)return true;
+  if(a===t)return true;
+  if(t.length>2&&a.length>2&&t.includes(a)&&t!==a)return true;
   return false;
 }
 
@@ -908,6 +906,8 @@ export async function handleApi(request,env){
     const knownArtists=recommendationKnownArtists(genreKeys,String(url.searchParams.get("refresh")||Date.now()),2);
     const knownArtistQueries=knownArtists.map(artist=>artist);
     const discoveryQueries=["rock metal","electronic","party energetic"];
+    // Keep broad discovery queries as fallback so good tracks are not
+    // discarded just because the known-artist queries filled the first slots.
     // Two known-artist queries reserve roughly 40% of a five-track batch
     // for recognizable genre anchors; the remaining queries stay mixed.
     const queries=recommendationUnique([
@@ -934,10 +934,11 @@ export async function handleApi(request,env){
         const trackGenre=recommendationText(t.genre);
         const genreMismatch=genres.length&&trackGenre&&!recommendationOverlap(trackGenre,genres);
         if(genreMismatch)continue;
+        if(isLikelyTrackTitleAsArtist(t.artist,t.title))continue;
         if(currentArtist&&currentTitle&&artist===currentArtist&&title===currentTitle)continue;
         seenIds.add(t.id);if(songKey)seenSongs.add(songKey);
         let score=0;
-        const searchable=title+" "+artist+" "+recommendationText(t.genre);
+        const searchable=title+" "+normalizeArtistName(artist)+" "+recommendationText(t.genre);
         const queryTerms=recommendationText(query).split(/\s+/).filter(x=>x.length>2);
         const queryScore=recommendationOverlap(searchable,queryTerms);
         const knownArtist=recommendationArtistMatches(t.artist,knownArtists);
