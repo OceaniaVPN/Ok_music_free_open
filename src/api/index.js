@@ -912,9 +912,9 @@ export async function handleApi(request,env){
            cachedProviderSearch("jamendo",q,providerLimit,()=>searchJamendo(q,providerLimit,env)),
            cachedProviderSearch("hitmotop",q,providerLimit,()=>fetchHitmotopSearch(q,providerLimit,env))
          ]);
-         if(z.status==="fulfilled")addList(z.value,"z");else errors.push("Zaycev.net: "+(z.reason?.message||"ошибка"));
-         if(j.status==="fulfilled")addList(j.value,"j");else errors.push("Jamendo: "+(j.reason?.message||"ошибка"));
-         if(h.status==="fulfilled")addList(h.value,"h");else errors.push("Hitmotop: "+(h.reason?.message||"ошибка"));
+         if(z.status==="fulfilled")addList(z.value,"z",q);else errors.push("Zaycev.net: "+(z.reason?.message||"ошибка"));
+         if(j.status==="fulfilled")addList(j.value,"j",q);else errors.push("Jamendo: "+(j.reason?.message||"ошибка"));
+         if(h.status==="fulfilled")addList(h.value,"h",q);else errors.push("Hitmotop: "+(h.reason?.message||"ошибка"));
          if(pool.length>=Math.max(limit,5))break;
        }
      }
