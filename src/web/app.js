@@ -219,7 +219,7 @@ html,body,.app,.top,.hero,.card,.taste-panel,.track-profile,.result,.playlist,.p
   <header class="top"><div class="brand"><div class="logo">♫</div><div><h1>Ok Music</h1><span>Твоя музыка. Твоё настроение.</span></div></div><div class="top-tools"><label class="bg-toggle" title="Переключить фото-фон">ипучка нажми <input id="bgToggle" type="checkbox" aria-label="ипучка нажми"></label><button class="avatar" id="tasteBtn" title="Мой музыкальный вкус">✦</button></div></header>
   <main id="view"></main>
 </div>
-<div id="player" class="player on"><div class="pcover">♫</div><div class="pmeta"><strong>Ok Music</strong><span>Выбери трек — плеер готов</span></div><div class="pc"><button class="icon" disabled>⏮</button><button class="big" disabled>▶</button><button class="icon" disabled>⏭</button><button class="icon" disabled>EQ</button></div><input class="seek" type="range" min="0" max="100" value="0" disabled><span class="time">0:00 / 0:00</span></div>
+<div id="player" class="player on"><div class="pcover">♫</div><div class="pmeta"><strong>Ok Music</strong><span>Выбери трек — плеер готов</span></div><div class="pc"><button class="icon" disabled>⏮</button><button id="initialPlay" class="big" type="button" title="Начать автоподбор">▶</button><button class="icon" disabled>⏭</button><button class="icon" disabled>EQ</button></div><input class="seek" type="range" min="0" max="100" value="0" disabled><span class="time">0:00 / 0:00</span></div>
 <nav class="nav" id="nav"><button data-view="home" class="active">⌂<span>Главная</span></button><button data-view="mood">◈<span>Настроение</span></button><button data-view="search">⌕<span>Поиск</span></button><button data-view="library">♫<span>Плейлисты</span></button></nav>
 <div id="modal" class="modal"><div class="dialog"><h3>Новый плейлист</h3><p>Придумай название — треки можно будет добавлять из поиска.</p><input id="playlistName" class="input" placeholder="Например: Ночная поездка"><div class="row"><button id="closeModal">Отмена</button><button id="createPlaylist" class="primary">Создать</button></div></div></div>
 <div id="toast" class="toast"></div><div id="tasteModal" class="modal"><div class="dialog"><h3>🎧 Мой музыкальный вкус</h3><p>Выбери любимые направления и настроение — Ok Music будет учитывать их в каждом миксе.</p><div class="taste-grid"><div class="taste-field"><label>Любимые жанры</label><div id="genreChips" class="chips"></div></div><div class="taste-field"><label>Настроение</label><div id="moodChips" class="chips"></div></div></div><div style="margin-top:14px"><label style="display:block;font-size:11px;color:var(--muted);margin-bottom:7px">Любимые исполнители</label><input id="tasteArtists" class="input" placeholder="Например: Miyagi, The Weeknd, Кино"></div><div style="margin-top:14px"><label style="display:block;font-size:11px;color:var(--muted);margin-bottom:7px">Что хочется сейчас</label><input id="tasteNow" class="input" placeholder="Например: спокойный русский рэп для дороги"></div><div class="taste-actions"><button id="tasteCancel">Отмена</button><button id="tasteSave" class="primary" style="flex:1">Сохранить вкус ✨</button></div></div></div>
@@ -796,6 +796,16 @@ document.querySelector("#createPlaylist").onclick=()=>{const name=document.query
 function render(name){document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));({home,mood,search:searchView,library}[name]||home)()}
 document.querySelector("#nav").addEventListener("click",e=>{const b=e.target.closest("button[data-view]");if(b)render(b.dataset.view)});
 render("home");
+const initialPlay=document.querySelector("#initialPlay");
+if(initialPlay)initialPlay.onclick=()=>{
+ initialPlay.disabled=true;
+ initialPlay.textContent="…";
+ clearTimeout(window.__okHomeRetry);
+ void initializeHomePlayer().finally(()=>{
+  const b=document.querySelector("#initialPlay");
+  if(b&&!current){b.disabled=false;b.textContent="▶"}
+ });
+};
 function initTelegram(){if(!window.Telegram?.WebApp)return;window.Telegram.WebApp.ready();window.Telegram.WebApp.expand();const id=document.documentElement.dataset.theme||"default",t=MUSIC_THEMES.find(x=>x.id===id)||MUSIC_THEMES[0];window.Telegram.WebApp.setHeaderColor(t.telegram);window.Telegram.WebApp.setBackgroundColor(t.telegram)}
 initTelegram();window.addEventListener("DOMContentLoaded",initTelegram,{once:true});
 if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js",{scope:"/"}).catch(e=>console.warn("Ok Music PWA:",e));
