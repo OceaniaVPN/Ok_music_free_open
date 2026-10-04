@@ -816,6 +816,20 @@ function play(t,{fromEnded=false,keepQueue=false,fromBootstrap=false}={}){
   toast("Не удалось воспроизвести трек");
  }
 }
+function playPrevious(){
+ if(queueIndex>0){
+  const previous=playbackQueue[queueIndex-1];
+  if(previous){
+   play(previous,{keepQueue:true});
+   return;
+  }
+ }
+ try{
+  audio.currentTime=0;
+  const promise=audio.play();
+  Promise.resolve(promise).catch(()=>{});
+ }catch{}
+}
 async function playNext(){
  let next=playbackQueue[queueIndex+1];
  if(!next){
