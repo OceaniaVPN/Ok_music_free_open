@@ -540,69 +540,205 @@ const TASTE_GENRES=["Русский рэп","Поп","Рок","Электрон�
  void refreshOfflineButtons(view);
 }
 let homeBootstrapPromise=null,homeBootstrapController=null,homeBootstrapBusy=false,homePrefetchPromise=null;
+let localCatalog=[],localCatalogPromise=null,localCatalogCursor=0;
+let recommendationPromise=null;
+
+async function loadLocalCatalog(signal){
+ if(localCatalog.length)return localCatalog;
+ if(localCatalogPromise)return localCatalogPromise;
+ localCatalogPromise=(async()=>{
+  let last=[];
+  for(let attempt=0;attempt<4;attempt++){
+   const controller=new AbortController();
+   const timer=setTimeout(()=>controller.abort(),Math.min(6000,3500+attempt*700));
+   const onAbort=()=>controller.abort();
+   if(signal)signal.addEventListener("abort",onAbort,{once:true});
+   try{
+    const r=await fetch("/api/local-music?player="+Date.now()+"&attempt="+attempt,{cache:"no-store",signal:controller.signal});
+    if(!r.ok)throw Error("Локальный каталог HTTP "+r.status);
+    const d=await r.json();
+    last=Array.isArray(d.tracks)?d.tracks:[];
+    const unique=[...new Map(last.filter(t=>t?.id&&playableAudio(t)).map(t=>[String(t.id),t])).values()];
+    if(unique.length||!d?.mega?.warming){
+     localCatalog=unique;
+     localCatalogCursor=0;
+     return localCatalog;
+    }
+    if(signal?.aborted)throw new DOMException("Aborted","AbortError");
+    await new Promise(resolve=>setTimeout(resolve,700));
+   }catch(error){
+    if(error?.name==="AbortError")throw error;
+    console.warn("Ok Music local catalog:",error);
+    if(attempt>=3)break;
+    await new Promise(resolve=>setTimeout(resolve,600));
+   }finally{
+    clearTimeout(timer);
+    if(signal)signal.removeEventListener("abort",onAbort);
+   }
+  }
+  localCatalog=[...new Map(last.filter(t=>t?.id&&playableAudio(t)).map(t=>[String(t.id),t])).values()];
+  localCatalogCursor=0;
+  return localCatalog;
+ })().finally(()=>{localCatalogPromise=null});
+ return localCatalogPromise;
+}
+
+function addLocalTracksToQueue(limit=3){
+ if(!localCatalog.length||limit<=0)return 0;
+ const ids=new Set(playbackQueue.map(t=>String(t?.id||"")));
+ let added=0,scanned=0;
+ while(scanned<localCatalog.length&&added<limit){
+  const t=localCatalog[localCatalogCursor%localCatalog.length];
+  localCatalogCursor=(localCatalogCursor+1)%localCatalog.length;
+  scanned++;
+  if(!t?.id||!playableAudio(t)||ids.has(String(t.id)))continue;
+  playbackQueue.push(t);
+  ids.add(String(t.id));
+  added++;
+ }
+ return added;
+}
+
+async function fetchRecommendationBatch(extra={},signal,options={}){
+ const force=Boolean(options?.force);
+ if(recommendationPromise)return recommendationPromise;
+ if(!force&&queueIndex>=0&&recommendationLastPrefetchIndex===queueIndex)return [];
+ recommendationLoading=true;
+ const runner=(async()=>{
+  try{
+   const p=recommendationParams(extra);
+   const qs=new URLSearchParams({
+    limit:"5",seed:p.seed,artist:p.artist,title:p.title,mood:p.mood,
+    genres:p.genres,moods:p.moods,artists:p.artists,likedArtists:p.likedArtists,
+    now:p.now,liked:p.liked,exclude:p.exclude,refresh:p.refresh
+   });
+   const controller=new AbortController();
+   const timer=setTimeout(()=>controller.abort(),8500);
+   const onAbort=()=>controller.abort();
+   if(signal)signal.addEventListener("abort",onAbort,{once:true});
+   let r;
+   try{
+    r=await fetch("/api/recommendations?"+qs.toString(),{cache:"no-store",signal:controller.signal});
+   }finally{
+    clearTimeout(timer);
+    if(signal)signal.removeEventListener("abort",onAbort);
+   }
+   const d=await r.json();
+   if(!d.ok||!Array.isArray(d.tracks))throw Error(d.error||"Нет рекомендаций");
+   const existing=new Set(playbackQueue.map(t=>String(t?.id||"")));
+   const fresh=d.tracks.filter(t=>t?.id&&playableAudio(t)&&!existing.has(String(t.id))&&!recommendationSeen.has(String(t.id)));
+   fresh.forEach(t=>recommendationSeen.add(String(t.id)));
+   playbackQueue.push(...fresh);
+   recommendationContextKey=p.seed;
+   recommendationLastPrefetchIndex=queueIndex;
+   preloadNext();
+   return fresh;
+  }catch(error){
+   if(error?.name==="AbortError")throw error;
+   console.warn("Ok Music recommendations:",error);
+   return [];
+  }finally{
+   recommendationLoading=false;
+  }
+ })();
+ recommendationPromise=runner;
+ try{return await runner}
+ finally{if(recommendationPromise===runner)recommendationPromise=null}
+}
+
+async function fillQueue(extra={},signal){
+ let next=playbackQueue[queueIndex+1];
+ if(next)return next;
+ const before=playbackQueue.length;
+ await fetchRecommendationBatch(extra,signal,{force:true});
+ next=playbackQueue[queueIndex+1];
+ if(next)return next;
+ await loadLocalCatalog(signal);
+ if(playbackQueue.length===before)addLocalTracksToQueue(5);
+ else if(playbackQueue.length-queueIndex-1<2)addLocalTracksToQueue(3);
+ return playbackQueue[queueIndex+1]||null;
+}
+
+async function ensureRecommendationWindow(extra={}){
+ const remaining=playbackQueue.length-queueIndex-1;
+ if(recommendationLoading||remaining>1)return;
+ await fetchRecommendationBatch(extra);
+}
+
+async function startRecommendationFromContext(extra={}){
+ playbackQueue=current?[current]:[];
+ queueIndex=current?0:-1;
+ recommendationSeen=new Set(current?[String(current.id)]:[]);
+ recommendationLastPrefetchIndex=-1;
+ recommendationContextKey="";
+ const results=await Promise.allSettled([
+  fetchRecommendationBatch(extra,undefined,{force:true}),
+  loadLocalCatalog()
+ ]);
+ if(results[0].status==="rejected")console.warn("Ok Music context wave:",results[0].reason);
+ if(results[1].status==="rejected")console.warn("Ok Music context local:",results[1].reason);
+ if(playbackQueue.length<5){
+  await loadLocalCatalog();
+  addLocalTracksToQueue(5-playbackQueue.length);
+ }
+ if(!current&&playbackQueue.length){
+  queueIndex=0;
+  play(playbackQueue[0],{keepQueue:true,fromBootstrap:true});
+ }else if(current){
+  preloadNext();
+ }
+}
+
 function prepareHomeQueue(){
  if(current||playbackQueue.length||homePrefetchPromise)return homePrefetchPromise;
  homePrefetchPromise=(async()=>{
   try{
-   // First load the repository-hosted MP3 catalog. These files are copied to
-   // /public/music by the build, so playback stays same-origin and does not
-   // depend on an external stream being available at click time.
-   const response=await fetch("/api/local-music?bootstrap="+Date.now(),{cache:"no-store"});
-   if(response.ok){
-    const data=await response.json();
-    const local=[...new Map((data.tracks||[]).filter(playableAudio).map(t=>[String(t.id),t])).values()];
-    if(local.length){
-     playbackQueue=local.slice(0,5);
-     queueIndex=-1;
-     recommendationSeen=new Set(playbackQueue.map(t=>String(t.id)));
-     const first=playbackQueue[0],src=playableAudio(first);
-     if(src){
-      const absolute=new URL(src,location.href).href;
-      audio.src=absolute;
-      audio.load();
-     }
-     drawPlayer();
-     return playbackQueue;
-    }
-   }
-   // If the local catalog is unavailable, fall back to online recommendations.
-   await fetchRecommendationBatch({refresh:String(Date.now())});
-   if(!current&&playbackQueue.length){
+   playbackQueue=[];
+   queueIndex=-1;
+   recommendationSeen=new Set();
+   recommendationLastPrefetchIndex=-1;
+   recommendationContextKey="";
+   const results=await Promise.allSettled([
+    fetchRecommendationBatch({refresh:String(Date.now())},undefined,{force:true}),
+    loadLocalCatalog()
+   ]);
+   const remoteTracks=results[0].status==="fulfilled"?results[0].value:[];
+   if(results[0].status==="rejected")console.warn("Ok Music initial recommendations:",results[0].reason);
+   if(results[1].status==="rejected")console.warn("Ok Music initial local catalog:",results[1].reason);
+   playbackQueue=[...remoteTracks.filter(t=>t?.id)];
+   addLocalTracksToQueue(Math.max(3,5-playbackQueue.length));
+   if(playbackQueue.length){
+    queueIndex=-1;
     const first=playbackQueue[0],src=playableAudio(first);
-    if(src){
-     const absolute=new URL(src,location.href).href;
-     audio.src=absolute;
-     audio.load();
-    }
+    if(src){audio.src=new URL(src,location.href).href;audio.load()}
+    preloadNext();
     drawPlayer();
+    return playbackQueue;
    }
+   toast("Каталоги не ответили — нажми ▶ для повторного поиска");
   }catch(error){
    if(error?.name!=="AbortError")console.warn("Ok Music home prefetch:",error);
-  }finally{homePrefetchPromise=null}
+  }finally{
+   homePrefetchPromise=null;
+  }
  })();
  return homePrefetchPromise;
 }
+
 async function initializeHomePlayer({force=false}={}){
  if(current)return;
- // When the hidden background prefetch is already ready, start the first
- // prepared track directly from the user's click. No async network wait occurs.
- if(playbackQueue.length&&queueIndex<0){
-  queueIndex=0;
-  recommendationSeen=new Set(playbackQueue.map(t=>String(t.id)));
-  play(playbackQueue[0],{keepQueue:true,fromBootstrap:true});
-  return;
- }
- if(playbackQueue.length&&queueIndex===-1&&playbackQueue[0]){
-  queueIndex=0;
-  recommendationSeen=new Set(playbackQueue.map(t=>String(t.id)));
-  play(playbackQueue[0],{keepQueue:true,fromBootstrap:true});
-  return;
- }
  if(force){
   homeBootstrapController?.abort();
   homeBootstrapController=null;
   homeBootstrapPromise=null;
+  homePrefetchPromise=null;
   recommendationLoading=false;
+  recommendationPromise=null;
+ }
+ if(playbackQueue.length&&queueIndex<0){
+  queueIndex=0;
+  play(playbackQueue[0],{keepQueue:true,fromBootstrap:true});
+  return;
  }
  if(homeBootstrapPromise)return homeBootstrapPromise;
  const controller=new AbortController();
@@ -611,53 +747,34 @@ async function initializeHomePlayer({force=false}={}){
  drawPlayer();
  homeBootstrapPromise=(async()=>{
   try{
-   // One bounded request asks all music catalogs for a 5-track batch.
-   const batch=await fetchRecommendationBatch({refresh:String(Date.now())},controller.signal);
+   playbackQueue=[];
+   queueIndex=-1;
+   recommendationSeen=new Set();
+   recommendationLastPrefetchIndex=-1;
+   const results=await Promise.allSettled([
+    fetchRecommendationBatch({refresh:String(Date.now())},controller.signal,{force:true}),
+    loadLocalCatalog(controller.signal)
+   ]);
    if(controller.signal.aborted)throw new DOMException("Aborted","AbortError");
-   if(batch.length){
-    playbackQueue=batch.slice(0,5);
+   const remote=results[0].status==="fulfilled"?results[0].value:[];
+   if(results[0].status==="rejected")console.warn("Ok Music click recommendations:",results[0].reason);
+   if(results[1].status==="rejected")console.warn("Ok Music click local:",results[1].reason);
+   addLocalTracksToQueue(Math.max(5-remote.length,3));
+   if(!playbackQueue.length){
+    await fetchRecommendationBatch({refresh:String(Date.now())},controller.signal,{force:true});
+    addLocalTracksToQueue(5);
+   }
+   if(playbackQueue.length){
     queueIndex=0;
-    recommendationSeen=new Set(playbackQueue.map(t=>String(t.id)));
+    recommendationSeen=new Set(playbackQueue.map(t=>String(t?.id||"")));
     play(playbackQueue[0],{keepQueue:true,fromBootstrap:true});
     return;
    }
-
-   // Fast emergency fallback: the same three providers through /api/search.
-   const response=await fetch("/api/search?q="+encodeURIComponent("popular music")+"&limit=9",{cache:"no-store",signal:controller.signal});
-   if(response.ok){
-    const fallback=await response.json();
-    const candidates=(fallback.tracks||[]).filter(playableAudio);
-    const unique=[...new Map(candidates.map(t=>[String(t.id),t])).values()].slice(0,5);
-    if(unique.length){
-     playbackQueue=unique;
-     queueIndex=0;
-     recommendationSeen=new Set(unique.map(t=>String(t.id)));
-     play(unique[0],{keepQueue:true,fromBootstrap:true});
-     return;
-    }
-   }
-
-   // Last local fallback so Play never leaves an empty player when remote
-   // catalogs are temporarily unavailable.
-   const localResponse=await fetch("/api/local-music?bootstrap="+Date.now(),{cache:"no-store",signal:controller.signal});
-   if(localResponse.ok){
-    const data=await localResponse.json();
-    const local=[...new Map((data.tracks||[]).filter(playableAudio).map(t=>[String(t.id),t])).values()].slice(0,5);
-    if(local.length){
-     playbackQueue=local;
-     queueIndex=0;
-     recommendationSeen=new Set(local.map(t=>String(t.id)));
-     play(local[0],{keepQueue:true,fromBootstrap:true});
-     toast("Онлайн-каталоги недоступны — включаю локальный трек");
-     return;
-    }
-   }
-
-   toast("Не удалось подобрать музыку");
+   toast("Не удалось найти музыку");
   }catch(error){
    if(error?.name!=="AbortError"){
     console.warn("Ok Music home bootstrap:",error);
-    toast("Поиск музыки не ответил вовремя");
+    toast("Не удалось загрузить музыку");
    }
   }finally{
    if(homeBootstrapController===controller){
@@ -670,6 +787,7 @@ async function initializeHomePlayer({force=false}={}){
  })();
  return homeBootstrapPromise;
 }
+
 function mood(){
  const moodItems=[["🌙","Ночной вайб","Спокойное и атмосферное"],["⚡","Энергия","Больше ритма и движения"],["☁️","Chill","Расслабиться и выдохнуть"],["💜","Любовь","Мягкие и тёплые треки"],["🚗","В дорогу","Музыка для долгой поездки"],["🔥","Вечеринка","Ритм, который не отпускает"],["🖤","Фонк","Бас, дрифт и ночной вайб"]];
  view.innerHTML='<div class="section"><h2>Подбор по настроению</h2><small>Выбери атмосферу — песни не показываются заранее</small></div><div class="moods">'+moodItems.map((x,i)=>'<button class="mood-card" data-mood="'+i+'"><b>'+x[0]+'</b><strong>'+x[1]+'</strong><span>'+x[2]+'</span></button>').join("")+'</div><div class="empty" style="margin-top:16px">Выбранное настроение будет влиять на скрытую очередь автоподбора.</div>';
@@ -768,54 +886,68 @@ function preloadNext(){
 }
 function play(t,{fromEnded=false,keepQueue=false,fromBootstrap=false}={}){
  if(!t)return;
- let idx=playbackQueue.findIndex(x=>x?.id===t.id);
+ let idx=playbackQueue.findIndex(x=>String(x?.id||"")===String(t.id||""));
  if(!keepQueue||idx<0){
-  playbackQueue=[t];idx=0;recommendationSeen=new Set([String(t.id)]);recommendationContextKey="";
+  playbackQueue=[t];
+  idx=0;
+  recommendationSeen=new Set([String(t.id)]);
+  recommendationContextKey="";
   recommendationLastPrefetchIndex=-1;
  }
- queueIndex=idx;currentIndex=idx;current=t;updateMediaSession();
+ queueIndex=idx;
+ currentIndex=idx;
+ current=t;
+ playing=false;
+ updateMediaSession();
  drawPlayer();
  const src=playableAudio(t);
- if(!src){toast(String(t?.audio||"").startsWith("mega://")?"MEGA-трек пока не готов к воспроизведению":"У этого трека нет аудиопотока");return}
+ if(!src){
+  toast("У этого трека нет аудиопотока — пропускаю");
+  void playNext();
+  return;
+ }
  const token=++window.__okPlayToken;
  try{
   const absolute=new URL(src,location.href).href;
-  if(audio.src!==absolute){audio.src=src;audio.load()}
+  audio.pause();
+  if(audio.src!==absolute){
+   audio.src=src;
+   audio.load();
+  }
   const promise=audio.play();
   Promise.resolve(promise).then(()=>{
-   if(token===window.__okPlayToken&&current?.id===t.id){
-    playing=true;updateMediaSession();drawPlayer();preloadNext();void ensureRecommendationWindow();
-   }
-  }).catch(error=>{
-   console.warn("Ok Music playback:",error);
-   if(fromBootstrap&&token===window.__okPlayToken&&playbackQueue.length>1){
-    const failedIndex=playbackQueue.findIndex(x=>x?.id===t.id);
-    if(failedIndex>=0)playbackQueue.splice(failedIndex,1);
-    queueIndex=Math.max(0,Math.min(failedIndex,playbackQueue.length-1));
-    current=null;playing=false;
-    toast("Этот поток не ответил — включаю следующий");
-    const next=playbackQueue[queueIndex];
-    if(next)setTimeout(()=>play(next,{keepQueue:true,fromBootstrap:true}),80);
+   if(token!==window.__okPlayToken||current?.id!==t.id)return;
+   playing=true;
+   updateMediaSession();
+   drawPlayer();
+   preloadNext();
+   void ensureRecommendationWindow();
+  }).catch(async error=>{
+   if(token!==window.__okPlayToken)return;
+   console.warn("Ok Music playback:",{error,current:t});
+   if(error?.name==="NotAllowedError"){
+    toast("Браузер запретил автозапуск — нажми ▶");
     return;
    }
-   if(error?.name==="NotAllowedError"){
-    toast("Браузер запретил автоматическое воспроизведение — нажми ▶");
-   }else{
-    const failedIndex=playbackQueue.findIndex(x=>x?.id===t.id);
-    const next=playbackQueue[failedIndex+1];
-    if(next){
-     toast("Этот поток не ответил — пробую следующий");
-     setTimeout(()=>play(next,{keepQueue:true,fromBootstrap:true}),80);
-     return;
-    }
-    toast("Не удалось воспроизвести трек");
+   const failedIndex=playbackQueue.findIndex(x=>String(x?.id||"")===String(t.id||""));
+   if(failedIndex>=0){
+    playbackQueue.splice(failedIndex,1);
+    recommendationSeen.delete(String(t.id||""));
+    queueIndex=Math.max(-1,failedIndex-1);
    }
+   current=null;
+   playing=false;
+   toast("Поток не ответил — переключаюсь");
+   setTimeout(()=>void playNext(),60);
   });
  }catch(error){
   console.warn("Ok Music playback:",error);
-  toast("Не удалось воспроизвести трек");
+  current=null;
+  playing=false;
+  setTimeout(()=>void playNext(),60);
  }
 }
+
 function playPrevious(){
  if(queueIndex>0){
   const previous=playbackQueue[queueIndex-1];
@@ -831,14 +963,14 @@ function playPrevious(){
  }catch{}
 }
 async function playNext(){
- let next=playbackQueue[queueIndex+1];
- if(!next){
-  await fetchRecommendationBatch();
-  next=playbackQueue[queueIndex+1];
+ const next=await fillQueue({},undefined);
+ if(next){
+  play(next,{fromEnded:true,keepQueue:true});
+  return;
  }
- if(next){play(next,{fromEnded:true,keepQueue:true});return}
  playing=false;
  if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";
+ toast("Очередь закончилась — ищу ещё музыку");
  drawPlayer();
 }
 function mediaArtworkUrl(image){
@@ -926,7 +1058,7 @@ function drawPlayer(){if(!current){
  if(spatial)spatial.oninput=e=>{setSpatial3d(e.target.value);const out=spatial.closest(".spatial3d")?.querySelector("span");if(out)out.textContent=Math.round(spatial3d*100)+"%"};
 }
 audio.onplay=()=>{playing=true;if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});if(spatial3d)updateSpatial3d();if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer()};audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
-audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer()};audio.onended=()=>{playing=false;if(autoNext)playNext();else{if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()}};audio.onerror=()=>{
+audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer()};audio.onended=()=>{playing=false;if(autoNext)void playNext();else{if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()}};audio.onerror=()=>{
  const code=audio.error?.code||0;
  console.warn("Ok Music audio error",{code,src:audio.src,current:current?.id,source:current?.source});
  playing=false;
@@ -952,15 +1084,11 @@ const initialPlay=document.querySelector("#initialPlay");
 if(initialPlay)initialPlay.onclick=()=>{
  clearTimeout(window.__okHomeRetry);
  if(playbackQueue.length&&queueIndex<0){
-  initializeHomePlayer({force:true});
+  queueIndex=0;
+  play(playbackQueue[0],{keepQueue:true,fromBootstrap:true});
   return;
  }
- const emergency={id:"key-emergency-pushnoy",title:"Локальный трек",artist:"Ключник",audio:"/music/%D0%90%D0%BB%D0%B5%D0%BA%D1%81%D0%B0%D0%BD%D0%B4%D1%80%20%D0%9F%D1%83%D1%88%D0%BD%D0%BE%D0%B9%20(10).mp3",duration:0,source:"🔐 Ключник"};
- playbackQueue=[emergency];
- queueIndex=0;
- recommendationSeen=new Set([emergency.id]);
- play(emergency,{keepQueue:true,fromBootstrap:true});
- void prepareHomeQueue();
+ initializeHomePlayer({force:true});
 };
 function initTelegram(){if(!window.Telegram?.WebApp)return;window.Telegram.WebApp.ready();window.Telegram.WebApp.expand();const id=document.documentElement.dataset.theme||"default",t=MUSIC_THEMES.find(x=>x.id===id)||MUSIC_THEMES[0];window.Telegram.WebApp.setHeaderColor(t.telegram);window.Telegram.WebApp.setBackgroundColor(t.telegram)}
 initTelegram();window.addEventListener("DOMContentLoaded",initTelegram,{once:true});
