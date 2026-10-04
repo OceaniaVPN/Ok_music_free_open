@@ -169,6 +169,7 @@ img{max-width:100%}
 .track-profile h2{margin:0;font:700 clamp(25px,4vw,42px)/1.03 Space Grotesk,sans-serif;letter-spacing:-1.1px}
 .track-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}.profile-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-top:19px}
 .track-stat{padding:12px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid rgba(166,255,205,.06)}.track-stat small{display:block;color:var(--muted);font-size:8px;text-transform:uppercase;letter-spacing:.55px}.track-stat strong{display:block;margin-top:4px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.track-extra{margin-top:10px;font-size:10px;line-height:1.5;color:#bcd4c6}
+.artist-link,.album-link{border:0;background:none;padding:0;margin:0;color:var(--green3);cursor:pointer;font:inherit;text-align:left}.artist-link:hover,.album-link:hover{text-decoration:underline;transform:none;background:none}.profile-back{display:flex;align-items:center;gap:8px;margin-bottom:12px}.profile-back button{font-size:11px}.profile-kicker{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px}.profile-kicker span{padding:5px 8px;border-radius:999px;font-size:8px;color:#bcefd0;background:rgba(78,228,143,.06);border:1px solid rgba(78,228,143,.11)}.catalog-list{margin-top:12px}.catalog-title{display:flex;align-items:end;justify-content:space-between;gap:10px}.catalog-title h2{margin:0;font:700 28px/1.05 Space Grotesk,sans-serif}.catalog-title small{color:var(--muted);font-size:10px}.catalog-track{cursor:pointer}.catalog-track .mini{transition:transform .2s ease}.catalog-track:hover .mini{transform:scale(1.03)}
 .playlist{display:flex;align-items:center;gap:10px;padding:10px;margin-bottom:8px;border-radius:18px;background:rgba(7,18,11,.5);border:1px solid rgba(166,255,205,.07)}
 .playlist .pic{width:52px;height:52px;flex:0 0 52px;border-radius:15px;display:grid;place-items:center;background:linear-gradient(135deg,var(--green3),var(--green2));color:#06120a;font-size:21px}
 .playlist main{min-width:0;flex:1}.playlist strong,.playlist span{display:block}.playlist span{margin-top:3px;color:var(--muted);font-size:9px}.playlist button{font-size:10px;padding:8px 9px}.danger{color:#ff95a0}
@@ -463,14 +464,63 @@ async function toggleOffline(t,button){
 async function clearOffline(){if(!window.__okOfflineClear)return;try{await window.__okOfflineClear();toast("Офлайн-кэш очищен");await refreshOfflineButtons(view)}catch{toast("Не удалось очистить кэш")}}
 function card(t){
  const pills=[Number(t.duration)>0?"◷ "+fmt(t.duration):"",t.genre?"♪ "+t.genre:"",t.year?"▣ "+t.year:""].filter(Boolean).slice(0,3);
- return '<article class="card" data-track-profile="'+esc(t.id)+'"><div class="cover">'+(t.image?'<img src="'+esc(t.image)+'" loading="lazy">':"♫")+'<button class="play" data-play="'+esc(t.id)+'" aria-label="Слушать">▶</button></div><div class="card-body"><div class="title-row"><div class="title">'+esc(t.title||"Без названия")+'</div>'+(t.source?'<span class="source-badge">'+esc(t.source)+'</span>':"")+'</div><div class="sub">'+esc(t.artist||"Неизвестный исполнитель")+'</div>'+(pills.length?'<div class="track-meta">'+pills.map(x=>'<span class="meta-pill">'+esc(x)+'</span>').join("")+'</div>':"")+'<div class="card-actions"><button class="offline-btn" data-offline="'+esc(t.id)+'" aria-label="Офлайн" title="Сохранить для офлайн">⇩</button><button class="icon" data-like="'+esc(t.id)+'" aria-label="Любимое">'+(state.liked.some(x=>x.id===t.id)?"♥":"♡")+'</button></div></div></article>';
+ return '<article class="card" data-track-profile="'+esc(t.id)+'"><div class="cover">'+(t.image?'<img src="'+esc(t.image)+'" loading="lazy">':"♫")+'<button class="play" data-play="'+esc(t.id)+'" aria-label="Слушать">▶</button></div><div class="card-body"><div class="title-row"><div class="title">'+esc(t.title||"Без названия")+'</div>'+(t.source?'<span class="source-badge">'+esc(t.source)+'</span>':"")+'</div><div class="sub"><button class="artist-link" data-artist="'+esc(t.artist||"Неизвестный исполнитель")+'">'+esc(t.artist||"Неизвестный исполнитель")+'</button>'+(t.album?' · <button class="album-link" data-album="'+esc(t.album)+'">'+esc(t.album)+'</button>':"")+'</div>'+(pills.length?'<div class="track-meta">'+pills.map(x=>'<span class="meta-pill">'+esc(x)+'</span>').join("")+'</div>':"")+'<div class="card-actions"><button class="offline-btn" data-offline="'+esc(t.id)+'" aria-label="Офлайн" title="Сохранить для офлайн">⇩</button><button class="icon" data-like="'+esc(t.id)+'" aria-label="Любимое">'+(state.liked.some(x=>x.id===t.id)?"♥":"♡")+'</button></div></div></article>';
 }
 function result(t){
  const liked=state.liked.some(x=>x.id===t.id);
  const pills=[Number(t.duration)>0?"◷ "+fmt(t.duration):"",t.genre?"♪ "+t.genre:""].filter(Boolean).slice(0,2);
- return '<div class="result"><div class="mini">'+(t.image?'<img src="'+esc(t.image)+'" loading="lazy">':"♫")+'</div><div class="meta"><strong>'+esc(t.title||"Без названия")+'</strong><span>'+esc(t.artist||"Неизвестный исполнитель")+(t.album?" · "+esc(t.album):"")+(t.source?" · "+esc(t.source):"")+'</span>'+(pills.length?'<div class="track-meta">'+pills.map(x=>'<span class="meta-pill">'+esc(x)+'</span>').join("")+'</div>':"")+'</div><div class="actions"><button class="icon" data-like="'+esc(t.id)+'">'+(liked?"♥":"♡")+'</button><button class="icon" data-add="'+esc(t.id)+'">＋</button><button class="offline-btn" data-offline="'+esc(t.id)+'" aria-label="Офлайн" title="Сохранить для офлайн">⇩</button><button class="icon" data-play="'+esc(t.id)+'">▶</button></div></div>';
+ return '<div class="result catalog-track" data-track-profile="'+esc(t.id)+'"><div class="mini">'+(t.image?'<img src="'+esc(t.image)+'" loading="lazy">':"♫")+'</div><div class="meta"><strong>'+esc(t.title||"Без названия")+'</strong><span><button class="artist-link" data-artist="'+esc(t.artist||"Неизвестный исполнитель")+'">'+esc(t.artist||"Неизвестный исполнитель")+'</button>'+(t.album?' · <button class="album-link" data-album="'+esc(t.album)+'">'+esc(t.album)+'</button>':"")+(t.source?" · "+esc(t.source):"")+'</span>'+(pills.length?'<div class="track-meta">'+pills.map(x=>'<span class="meta-pill">'+esc(x)+'</span>').join("")+'</div>':"")+'</div><div class="actions"><button class="icon" data-like="'+esc(t.id)+'">'+(liked?"♥":"♡")+'</button><button class="icon" data-add="'+esc(t.id)+'">＋</button><button class="offline-btn" data-offline="'+esc(t.id)+'" aria-label="Офлайн" title="Сохранить для офлайн">⇩</button><button class="icon" data-play="'+esc(t.id)+'">▶</button></div></div>';
 }
-function bind(container=view){container.querySelectorAll("[data-offline]").forEach(b=>b.onclick=e=>{e.stopPropagation();const t=tracks.find(t=>t.id===b.dataset.offline)||state.liked.find(t=>t.id===b.dataset.offline);toggleOffline(t,b)});container.querySelectorAll("[data-play]").forEach(b=>b.onclick=e=>{e.stopPropagation();play(tracks.find(t=>t.id===b.dataset.play)||state.liked.find(t=>t.id===b.dataset.play))});container.querySelectorAll("[data-track-profile]").forEach(b=>b.onclick=e=>{if(e.target.closest("button"))return;openTrackProfile(b.dataset.trackProfile)});container.querySelectorAll("[data-like]").forEach(b=>b.onclick=()=>like(tracks.find(t=>t.id===b.dataset.like)||state.liked.find(t=>t.id===b.dataset.like)));container.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>addToPlaylist(tracks.find(t=>t.id===b.dataset.add)||state.liked.find(t=>t.id===b.dataset.add)));void refreshOfflineButtons(container)}
+function findTrack(id){return tracks.find(t=>t.id===id)||localTracks.find(t=>t.id===id)||state.liked.find(t=>t.id===id)||(current?.id===id?current:null)}
+function bind(container=view){
+ container.querySelectorAll("[data-offline]").forEach(b=>b.onclick=e=>{e.stopPropagation();toggleOffline(findTrack(b.dataset.offline),b)});
+ container.querySelectorAll("[data-play]").forEach(b=>b.onclick=e=>{e.stopPropagation();play(findTrack(b.dataset.play))});
+ container.querySelectorAll("[data-track-profile]").forEach(b=>b.onclick=e=>{if(e.target.closest("button"))return;openTrackProfile(b.dataset.trackProfile)});
+ container.querySelectorAll("[data-artist]").forEach(b=>b.onclick=e=>{e.stopPropagation();openArtist(b.dataset.artist)});
+ container.querySelectorAll("[data-album]").forEach(b=>b.onclick=e=>{e.stopPropagation();openAlbum(b.dataset.album)});
+ container.querySelectorAll("[data-like]").forEach(b=>b.onclick=e=>{e.stopPropagation();like(findTrack(b.dataset.like))});
+ container.querySelectorAll("[data-add]").forEach(b=>b.onclick=e=>{e.stopPropagation();addToPlaylist(findTrack(b.dataset.add))});
+ void refreshOfflineButtons(container)
+}
+function trackInfoHtml(t){
+ const image=t?.image?'<img src="'+esc(t.image)+'" loading="eager">':"♫";
+ const artist=esc(t?.artist||"Неизвестный исполнитель"),album=t?.album?esc(t.album):"";
+ const stats=[Number(t?.duration)>0?["Длительность",fmt(t.duration)]:null,t?.source?["Источник",t.source]:null,t?.genre?["Жанр",t.genre]:null,t?.year?["Год",t.year]:null].filter(Boolean);
+ return '<div class="profile-back"><button id="profileBack">← Назад</button></div><section class="track-profile"><div class="track-head"><div class="track-cover">'+image+'</div><div><div class="profile-kicker"><span>♫ ТРЕК</span>'+(t?.source?'<span>'+esc(t.source)+'</span>':"")+'</div><h2>'+esc(t?.title||"Без названия")+'</h2><div class="sub" style="margin-top:8px"><button class="artist-link" data-artist="'+artist+'">'+artist+'</button>'+(album?' · <button class="album-link" data-album="'+album+'">'+album+'</button>':"")+'</div><div class="track-actions"><button id="profilePlay" class="primary">▶ Слушать</button><button id="profileLike">'+(state.liked.some(x=>x.id===t.id)?"♥ В любимом":"♡ В любимое")+'</button><button id="profileOffline" data-offline="'+esc(t.id)+'">⇩ Офлайн</button></div></div></div>'+(stats.length?'<div class="profile-grid">'+stats.map(x=>'<div class="track-stat"><small>'+esc(x[0])+'</small><strong>'+esc(x[1])+'</strong></div>').join("")+'</div>':"")+'</section>';
+}
+function openTrackProfile(id){
+ const t=findTrack(id);if(!t)return toast("Трек не найден");
+ view.innerHTML=trackInfoHtml(t);
+ document.querySelector("#profileBack").onclick=()=>render("search");
+ document.querySelector("#profilePlay").onclick=()=>play(t);
+ document.querySelector("#profileLike").onclick=()=>{like(t);openTrackProfile(t.id)};
+ document.querySelector("#profileOffline").onclick=e=>toggleOffline(t,e.currentTarget);
+ view.querySelectorAll("[data-artist]").forEach(b=>b.onclick=()=>openArtist(b.dataset.artist));
+ view.querySelectorAll("[data-album]").forEach(b=>b.onclick=()=>openAlbum(b.dataset.album));
+ void refreshOfflineButtons(view);window.scrollTo({top:0,behavior:"smooth"})
+}
+async function openArtist(name){
+ const artist=String(name||"").trim();if(!artist)return;
+ view.innerHTML='<div class="section"><div><h2>'+esc(artist)+'</h2><small>Исполнитель · загружаю песни</small></div></div><div class="empty">Ищу все доступные песни исполнителя…</div>';
+ try{
+  const r=await fetch("/api/search?q="+encodeURIComponent(artist)+"&limit=50").then(x=>x.json());if(!r.ok)throw Error(r.error||"Ошибка");
+  const needle=artist.toLowerCase();
+  tracks=(r.tracks||[]).filter(t=>String(t.artist||"").toLowerCase()===needle||String(t.artist||"").toLowerCase().includes(needle));
+  view.innerHTML='<div class="profile-back"><button id="artistBack">← Назад</button></div><div class="catalog-title"><div><h2>🎤 '+esc(artist)+'</h2><small>Все найденные песни исполнителя</small></div><small>'+tracks.length+' треков</small></div><div class="catalog-list results">'+(tracks.length?tracks.map(result).join(""):'<div class="empty">Песен не найдено.</div>')+'</div>';
+  document.querySelector("#artistBack").onclick=()=>render("search");bind(view);if(tracks.length)toast("Найдено "+tracks.length+" песен")
+ }catch(e){view.innerHTML='<div class="profile-back"><button id="artistBack">← Назад</button></div><div class="empty">Не удалось загрузить песни исполнителя.<br><small>'+esc(e.message)+'</small></div>';document.querySelector("#artistBack").onclick=()=>render("search")}
+}
+async function openAlbum(name){
+ const album=String(name||"").trim();if(!album)return;
+ view.innerHTML='<div class="section"><div><h2>'+esc(album)+'</h2><small>Альбом · загружаю треки</small></div></div><div class="empty">Ищу треки альбома…</div>';
+ try{
+  const r=await fetch("/api/search?q="+encodeURIComponent(album)+"&limit=50").then(x=>x.json());if(!r.ok)throw Error(r.error||"Ошибка");
+  const needle=album.toLowerCase();
+  tracks=(r.tracks||[]).filter(t=>String(t.album||"").toLowerCase()===needle||String(t.album||"").toLowerCase().includes(needle));
+  view.innerHTML='<div class="profile-back"><button id="albumBack">← Назад</button></div><div class="catalog-title"><div><h2>💿 '+esc(album)+'</h2><small>Треки альбома</small></div><small>'+tracks.length+' треков</small></div><div class="catalog-list results">'+(tracks.length?tracks.map(result).join(""):'<div class="empty">Треки этого альбома не найдены в доступных каталогах.</div>')+'</div>';
+  document.querySelector("#albumBack").onclick=()=>render("search");bind(view);if(tracks.length)toast("В альбоме "+tracks.length+" треков")
+ }catch(e){view.innerHTML='<div class="profile-back"><button id="albumBack">← Назад</button></div><div class="empty">Не удалось загрузить альбом.<br><small>'+esc(e.message)+'</small></div>';document.querySelector("#albumBack").onclick=()=>render("search")}
+}
 function waveTrack(){return current||tracks[0]||localTracks[0]||null}
 function drawHomeWave(){
  const box=document.querySelector("#homeWave");if(!box)return;
