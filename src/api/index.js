@@ -636,10 +636,9 @@ export async function handleApi(request,env){
     const backupArtist=preferredArtists.find(x=>x!==primaryArtist)||"";
     const queries=recommendationUnique([
       [primaryArtist,genres[0]||"",moods[0]||""].filter(Boolean).join(" "),
-      [backupArtist,themeQuery].filter(Boolean).join(" "),
       [themeQuery,now.slice(0,2).join(" ")].filter(Boolean).join(" "),
       seed
-    ]).slice(0,3);
+    ]).slice(0,1);
 
     const errors=[],providerHits={z:0,j:0,h:0};
     const pool=[],seenIds=new Set(),seenSongs=new Set();
@@ -677,14 +676,14 @@ export async function handleApi(request,env){
       const q=queries[round];
       if(!q)continue;
       const [z,j,h]=await Promise.allSettled([
-        fetchZaycevSearch(q,Math.min(12,Math.max(8,limit*2))),
-        searchJamendo(q,Math.min(8,Math.max(5,limit+2)),env),
-        fetchHitmotopSearch(q,Math.min(12,Math.max(8,limit*2)),env)
+        fetchZaycevSearch(q,Math.min(7,Math.max(5,limit+1))),
+        searchJamendo(q,Math.min(6,Math.max(4,limit+1)),env),
+        fetchHitmotopSearch(q,Math.min(7,Math.max(5,limit+1)),env)
       ]);
       if(z.status==="fulfilled")addList(z.value,"z");else errors.push("Zaycev.net: "+(z.reason?.message||"ошибка"));
       if(j.status==="fulfilled")addList(j.value,"j");else errors.push("Jamendo: "+(j.reason?.message||"ошибка"));
       if(h.status==="fulfilled")addList(h.value,"h");else errors.push("Hitmotop: "+(h.reason?.message||"ошибка"));
-      if(pool.length>=Math.max(limit*3,10))break;
+      if(pool.length>=Math.max(limit*2,8))break;
     }
 
     const tracks=chooseRecommendations(pool,limit,context);
