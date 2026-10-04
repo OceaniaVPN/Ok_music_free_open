@@ -1011,15 +1011,18 @@ audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaS
  const code=audio.error?.code||0;
  console.warn("Ok Music audio error",{code,src:audio.src,current:current?.id,source:current?.source});
  playing=false;
- if(homeBootstrapBusy&&playbackQueue.length>1){
-  const failedIndex=playbackQueue.findIndex(x=>x?.id===current?.id);
-  if(failedIndex>=0)playbackQueue.splice(failedIndex,1);
-  const next=playbackQueue[Math.max(0,Math.min(failedIndex,playbackQueue.length-1))];
-  current=null;
-  if(next){toast("Поток не ответил — пробую следующий");setTimeout(()=>play(next,{keepQueue:true,fromBootstrap:true}),50);return}
+ const failedId=String(current?.id||"");
+ if(failedId){
+  const failedIndex=playbackQueue.findIndex(x=>String(x?.id||"")===failedId);
+  if(failedIndex>=0){
+   playbackQueue.splice(failedIndex,1);
+   recommendationSeen.delete(failedId);
+   queueIndex=Math.max(-1,failedIndex-1);
+  }
  }
- toast("Не удалось загрузить аудио");
- drawPlayer();
+ current=null;
+ toast("Поток не ответил — переключаюсь");
+ setTimeout(()=>void playNext(),60);
 };
 nextAudio.onerror=()=>{nextAudio.removeAttribute("src")};
 audio.addEventListener("canplay",()=>{preloadNext();const remaining=playbackQueue.length-queueIndex-1;if(remaining<=1)void fetchRecommendationBatch()});
