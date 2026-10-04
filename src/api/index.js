@@ -79,6 +79,104 @@ async function zaycevPlay(id){
   }
   throw Error("Zaycev playback URL missing");
 }
+
+const HITMOTOP_BASES=["https://hitmos.me","https://rus.hitmotop.com"];
+const HITMOTOP_HEADERS={
+  "accept":"text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+  "accept-language":"ru-RU,ru;q=0.9,en;q=0.7",
+  "user-agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36"
+};
+
+function hitmotopAbsoluteUrl(value,base){
+  const raw=String(value||"").trim();
+  if(!raw)return "";
+  try{return new URL(raw,base).href}catch{return ""}
+}
+function hitmotopExtractSid(response){
+  const raw=response.headers.get("set-cookie")||"";
+  const m=raw.match(/(?:^|[;,]\s*)sid=([^;,\s]+)/i);
+  return m?m[1]:"";
+}
+function hitmotopExtractAttr(tag,name){
+  const m=String(tag||"").match(new RegExp(name+'\\s*=\\s*["\\']([^"\\']+)["\\']',"i"));
+  return m?m[1]:"";
+}
+function hitmotopExtractImage(chunk,base){
+  const tag=String(chunk||"").match(/<(?:div|img|source)\b[^>]*(?:track__img|src=|style=)[^>]*>/i);
+  const attrs=tag?tag[0]:String(chunk||"");
+  const style=hitmotopExtractAttr(attrs,"style");
+  const direct=hitmotopExtractAttr(attrs,"src")||hitmotopExtractAttr(attrs,"data-src")||hitmotopExtractAttr(attrs,"data-original");
+  const fromStyle=style.match(/url\(\s*["']?([^"')]+)["']?\s*\)/i);
+  const image=fromStyle?.[1]||direct;
+  return image?hitmotopAbsoluteUrl(image,base):"";
+}
+function parseHitmotopSearch(html,base,limit){
+  const out=[],seen=new Set(),source=String(html||"");
+  const items=source.match(/<li\b[^>]*class=["'][^"']*tracks__item[^"']*["'][^>]*>[\s\S]*?<\/li>/gi)||[];
+  const chunks=items.length?items:(source.match(/<div\b[^>]*class=["'][^"']*track__title[^"']*["'][^>]*>[\s\S]{0,12000}?<\/(?:li|article|div)>/gi)||[]);
+  for(const chunk of chunks){
+    const titleMatch=chunk.match(/<div\b[^>]*class=["'][^"']*track__title[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+    const artistMatch=chunk.match(/<div\b[^>]*class=["'][^"']*track__desc[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+    const durationMatch=chunk.match(/<div\b[^>]*class=["'][^"']*track__fulltime[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+    const downloadMatch=chunk.match(/<a\b[^>]*class=["'][^"']*track__download-btn[^"']*["'][^>]*>/i);
+    const infoMatch=chunk.match(/<a\b[^>]*class=["'][^"']*track__info-l[^"']*["'][^>]*>/i);
+    const downloadHref=hitmotopExtractAttr(downloadMatch?.[0],"href");
+    const infoHref=hitmotopExtractAttr(infoMatch?.[0],"href");
+    if(!downloadHref)continue;
+    const urlDown=hitmotopAbsoluteUrl(downloadHref,base);
+    if(!urlDown)continue;
+    const pageUrl=hitmotopAbsoluteUrl(infoHref||downloadHref,base);
+    const title=stripHtml(titleMatch?.[1]||"")||"Без названия";
+    const artist=stripHtml(artistMatch?.[1]||"")||"Неизвестный исполнитель";
+    const durationText=stripHtml(durationMatch?.[1]||"");
+    const duration=parseDuration(durationText.match(/\b\d{1,2}:\d{2}(?::\d{2})?\b/)?.[0]||"");
+    const image=hitmotopExtractImage(chunk,base);
+    const key=pageUrl||urlDown;
+    const idPart=(key.match(/\/([^/?#]+)(?:[?#]|$)/)?.[1]||key).replace(/[^a-zA-Z0-9_-]/g,"-").slice(-140);
+    const id="hitmotop-"+idPart;
+    if(seen.has(id))continue;
+    seen.add(id);
+    out.push({
+      id,title,artist,album:"",image,audio:"/api/hitmotop/play?url="+encodeURIComponent(urlDown),
+      duration,license:"",source:"Hitmotop",sourceUrl:pageUrl||urlDown,genre:"",downloadUrl:urlDown
+    });
+    if(out.length>=limit)break;
+  }
+  return out;
+}
+async function fetchHitmotopSearch(q,limit){
+  let lastError=null;
+  for(const configuredBase of HITMOTOP_BASES){
+    try{
+      const home=await fetch(configuredBase,{headers:HITMOTOP_HEADERS,redirect:"follow"});
+      if(!home.ok)throw Error("Hitmotop home HTTP "+home.status);
+      const base=new URL(home.url||configuredBase).origin;
+      const sid=hitmotopExtractSid(home);
+      const search=new URL("/search",base);
+      search.searchParams.set("q",q);
+      const headers={...HITMOTOP_HEADERS,referer:base+"/"};
+      if(sid)headers.cookie="sid="+sid;
+      const response=await fetch(search,{headers,redirect:"follow"});
+      if(!response.ok)throw Error("Hitmotop search HTTP "+response.status);
+      const html=await response.text();
+      const tracks=parseHitmotopSearch(html,base,limit);
+      if(tracks.length)return tracks;
+      throw Error("Hitmotop search returned no parsable tracks");
+    }catch(error){
+      lastError=error;
+    }
+  }
+  throw lastError||Error("Hitmotop unavailable");
+}
+async function hitmotopPlaybackUrl(rawUrl){
+  let target;
+  try{target=new URL(rawUrl)}catch{throw Error("Invalid Hitmotop audio URL")}
+  const host=target.hostname.toLowerCase();
+  const allowed=host==="hitmos.me"||host.endsWith(".hitmos.me")||host==="hitmotop.com"||host.endsWith(".hitmotop.com");
+  if(!allowed||!/^https?:$/.test(target.protocol))throw Error("Hitmotop audio host is not allowed");
+  return target.href;
+}
+
 function uniqueTracks(tracks, limit) {
   const seen = new Set();
   return tracks.filter(track => {
