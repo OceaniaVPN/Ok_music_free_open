@@ -23,7 +23,3 @@ state = "deleted"
 [exports.AuthCodesV2]
 type = "durable-object"
 state = "deleted"
-
-[[services]]
-binding = "HITMOZ_PYTHON"
-service = "ok-music-free-open-hitmoz"
