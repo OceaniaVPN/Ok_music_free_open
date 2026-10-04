@@ -566,9 +566,8 @@ function recommendationParams(extra={}){
 }
 async function fetchRecommendationBatch(extra={}){
  if(recommendationLoading)return [];
- if(recommendationLastPrefetchIndex===queueIndex)return [];
+ if(queueIndex>=0&&recommendationLastPrefetchIndex===queueIndex)return [];
  recommendationLoading=true;
- recommendationLastPrefetchIndex=queueIndex;
  try{
   const p=recommendationParams(extra);
   const qs=new URLSearchParams({limit:"5",seed:p.seed,artist:p.artist,title:p.title,mood:p.mood,genres:p.genres,moods:p.moods,artists:p.artists,likedArtists:p.likedArtists,now:p.now,liked:p.liked,exclude:p.exclude,refresh:p.refresh});
@@ -580,6 +579,7 @@ async function fetchRecommendationBatch(extra={}){
   fresh.forEach(t=>recommendationSeen.add(t.id));
   playbackQueue.push(...fresh);
   recommendationContextKey=p.seed;
+  recommendationLastPrefetchIndex=queueIndex;
   preloadNext();
   return fresh;
  }catch(e){console.warn("Ok Music recommendations:",e);return []}
