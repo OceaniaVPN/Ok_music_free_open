@@ -585,10 +585,12 @@ async function initializeHomePlayer(){
    // Пользователю не требуется нажимать кнопку или выбирать трек вручную.
    const retryView=()=>{
     if(current)return;
-    playerEl.className="player on";
-    playerEl.innerHTML='<div class="pcover">♫</div><div class="pmeta"><strong>Ok Music</strong><span>Подбираю первый трек автоматически…</span></div><div class="pc"><button class="icon" disabled>⏮</button><button class="big" disabled>▶</button><button class="icon" disabled>⏭</button><button class="icon" disabled>EQ</button></div><input class="seek" type="range" min="0" max="100" value="0" disabled><span class="time">Загрузка…</span>';
+    drawPlayer();
     clearTimeout(window.__okHomeRetry);
-    window.__okHomeRetry=setTimeout(()=>{window.__okHomeRetry=null;void initializeHomePlayer()},2500);
+    window.__okHomeRetry=setTimeout(()=>{
+     window.__okHomeRetry=null;
+     void initializeHomePlayer();
+    },2500);
    };
    retryView();
   }catch(error){
