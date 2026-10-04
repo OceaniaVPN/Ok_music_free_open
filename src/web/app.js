@@ -520,6 +520,38 @@ const TASTE_GENRES=["Русский рэп","Поп","Рок","Электрон�
  document.querySelector("#editTaste").onclick=openTaste;
  const clear=document.querySelector("#clearOffline");if(clear)clear.onclick=clearOffline;
  await refreshOfflineButtons(view);
+ void initializeHomePlayer();
+}
+async function initializeHomePlayer(){
+ if(current||recommendationLoading)return;
+ try{
+  const hasTaste=Boolean(
+   state.taste.genres.length||
+   state.taste.moods.length||
+   String(state.taste.artists||"").trim()||
+   String(state.taste.now||"").trim()||
+   state.liked.length
+  );
+  if(hasTaste){
+   const batch=await fetchRecommendationBatch({refresh:String(Date.now())});
+   if(batch.length){
+    queueIndex=0;
+    play(batch[0],{keepQueue:true});
+    return;
+   }
+  }
+  const queries=["music","pop music","rock music","hip hop","electronic music"];
+  const q=queries[Math.floor(Math.random()*queries.length)];
+  const fallback=await fetch("/api/search?q="+encodeURIComponent(q)+"&limit=12",{cache:"no-store"}).then(r=>r.json());
+  const candidates=(fallback.tracks||[]).filter(playableAudio);
+  if(candidates.length){
+   const t=candidates[Math.floor(Math.random()*candidates.length)];
+   playbackQueue=[];
+   queueIndex=-1;
+   recommendationSeen=new Set();
+   play(t);
+  }
+ }catch(e){console.warn("Ok Music home player:",e)}
 }
 function mood(){
  const moodItems=[["🌙","Ночной вайб","Спокойное и атмосферное"],["⚡","Энергия","Больше ритма и движения"],["☁️","Chill","Расслабиться и выдохнуть"],["💜","Любовь","Мягкие и тёплые треки"],["🚗","В дорогу","Музыка для долгой поездки"],["🔥","Вечеринка","Ритм, который не отпускает"],["🖤","Фонк","Бас, дрифт и ночной вайб"]];
