@@ -634,11 +634,13 @@ export async function handleApi(request,env){
     const themeQuery=[...new Set([...genres.slice(0,3),...moods.slice(0,3),...now.slice(0,3)])].join(" ");
     const primaryArtist=preferredArtists[0]||currentArtist;
     const backupArtist=preferredArtists.find(x=>x!==primaryArtist)||"";
+    const discoveryQueries=["popular music","pop music","rock music","electronic music"];
     const queries=recommendationUnique([
       [primaryArtist,genres[0]||"",moods[0]||""].filter(Boolean).join(" "),
       [themeQuery,now.slice(0,2).join(" ")].filter(Boolean).join(" "),
-      seed
-    ]).slice(0,1);
+      seed,
+      ...((!primaryArtist&&!themeQuery&&!seed)?discoveryQueries:[])
+    ]).slice(0,2);
 
     const errors=[],providerHits={z:0,j:0,h:0};
     const pool=[],seenIds=new Set(),seenSongs=new Set();
