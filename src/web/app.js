@@ -1,4 +1,3 @@
-import { FON_IMAGES } from "../fon.js";
 export function renderApp(request, env) {
   const appName = env.APP_NAME || "Ok Music";
   const html = String.raw`<!doctype html>
