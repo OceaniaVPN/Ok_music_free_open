@@ -168,6 +168,10 @@ img{max-width:100%}
  border:1px solid rgba(166,255,205,.11);border-radius:21px;background:rgba(6,18,11,.88);backdrop-filter:blur(23px) saturate(1.15);
  box-shadow:0 22px 70px rgba(0,0,0,.45),inset 0 1px rgba(255,255,255,.06)
 }
+.player:before{content:"";position:absolute;inset:-55px -20px;z-index:-1;pointer-events:none;border-radius:34px;background:radial-gradient(circle at 18% 50%,rgba(141,139,255,.22),transparent 34%),radial-gradient(circle at 82% 45%,rgba(78,228,143,.18),transparent 38%);filter:blur(28px);opacity:.8;animation:playerGlow 7s ease-in-out infinite alternate}
+@keyframes playerGlow{from{transform:scale(.96);opacity:.55}to{transform:scale(1.04);opacity:.95}}
+.player-visual{position:absolute;inset:0;z-index:-1;width:100%;height:100%;border-radius:21px;opacity:.82;mix-blend-mode:screen;pointer-events:none}
+.player-visual-hint{position:absolute;left:78px;right:78px;top:-7px;height:3px;border-radius:99px;background:linear-gradient(90deg,transparent,var(--green3),transparent);filter:blur(1px);opacity:.7;pointer-events:none}
 .player.on{display:grid}.pcover{width:49px;height:49px;border-radius:13px;overflow:hidden;display:grid;place-items:center;background:#12311f}.pcover img{width:100%;height:100%;object-fit:cover}.pmeta{min-width:0;overflow:hidden}.pmeta strong,.pmeta span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pmeta strong{font-size:12px}.pmeta span{font-size:10px;color:var(--muted);margin-top:3px}
 .pc{display:flex;align-items:center;gap:6px}.pc .big{width:45px;height:45px;padding:0;border:0;border-radius:50%;background:#effff5;color:#06120a}.seek{grid-column:1/-1;width:100%;accent-color:var(--green)}.time{grid-column:1/-1;color:var(--muted);font-size:9px;margin-top:-5px}
 .fx-panel{grid-column:1/-1;border-top:1px solid rgba(166,255,205,.07);padding:11px 3px 2px}.eq-switch{display:inline-flex;align-items:center;gap:7px;font-size:9px;color:var(--muted);cursor:pointer}.eq-switch input{width:34px;height:18px;margin:0;accent-color:var(--green)}.eq-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.eq-band{text-align:center;min-width:0}.eq-band input{width:100%;accent-color:var(--green)}.eq-band small{display:block;color:var(--muted);font-size:8px;margin-top:3px}.spatial3d{margin-top:12px;padding:10px 11px;border:1px solid rgba(166,255,205,.08);border-radius:14px;background:rgba(78,228,143,.035)}.spatial3d-head{display:flex;align-items:center;justify-content:space-between;font-size:11px;margin-bottom:5px}.spatial3d-head span{color:var(--green);font-variant-numeric:tabular-nums}.spatial3d input{width:100%;accent-color:var(--green)}.spatial3d>small{display:block;color:var(--muted);font-size:8px;margin-top:3px}
@@ -196,7 +200,7 @@ img{max-width:100%}
  .moods{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.mood-card{min-height:125px;padding:13px}
  .result{align-items:flex-start;padding:8px}.mini{width:52px;height:52px;flex-basis:52px}.meta{padding-top:1px}.actions{max-width:145px}.icon,.actions .offline-btn,.track-actions .offline-btn{width:34px;height:34px;border-radius:10px}
  .track-profile{padding:13px;border-radius:21px}.track-head{grid-template-columns:90px minmax(0,1fr);gap:11px;align-items:start}.track-cover{width:90px;height:90px;border-radius:16px}.track-profile h2{font-size:21px}.profile-grid{grid-template-columns:repeat(2,1fr);gap:7px}.track-stat{padding:10px}
- .player{left:5px;right:5px;width:auto;transform:none;bottom:calc(79px + env(safe-area-inset-bottom));padding:8px;border-radius:18px;grid-template-columns:44px minmax(0,1fr) auto}
+ .player{left:5px;right:5px;width:auto;transform:none;bottom:calc(79px + env(safe-area-inset-bottom));padding:8px;border-radius:18px;grid-template-columns:44px minmax(0,1fr) auto}.player-visual{border-radius:18px}.player-visual-hint{left:52px;right:52px}
  .pcover{width:44px;height:44px}.pc{gap:3px}.pc .big{width:40px;height:40px}.pc .icon{flex:0 0 35px}.eq-grid{gap:3px}.eq-band input{height:88px;writing-mode:vertical-lr;direction:rtl}
  .nav{left:5px;right:5px;width:auto;transform:none;bottom:max(6px,env(safe-area-inset-bottom));border-radius:19px}.nav button{min-height:48px;font-size:18px}
  .taste-grid{grid-template-columns:1fr}
@@ -285,7 +289,7 @@ const AUDIO_KEY="okmusic:audio";
 const eqBands=["60","250","1K","4K","12K"];
 let audioFx={eq:[0,0,0,0,0]};
 try{audioFx={...audioFx,...JSON.parse(localStorage.getItem(AUDIO_KEY)||"{}")}}catch{}
-let audioCtx=null,audioSource=null,eqPreGain=null,eqNodes=[],fxReady=false,showEq=false,eqEnabled=audioFx.eqEnabled!==false;
+let audioCtx=null,audioSource=null,eqPreGain=null,eqNodes=[],fxReady=false,showEq=false,eqEnabled=audioFx.eqEnabled!==false,visualAnalyser=null,visualData=null,visualFrame=0;
 function saveAudioFx(){localStorage.setItem(AUDIO_KEY,JSON.stringify(audioFx))}
 let eqLimiter=null,spatial3dNode=null,spatial3dFrame=0;
 let spatial3d=0;
@@ -339,7 +343,12 @@ function initAudioFx(){
   spatial3dNode.maxDistance=8;
   spatial3dNode.rolloffFactor=0.35;
   spatial3dNode.positionX.value=0;spatial3dNode.positionY.value=0;spatial3dNode.positionZ.value=0;
-  eqLimiter.connect(spatial3dNode);
+  visualAnalyser=audioCtx.createAnalyser();
+  visualAnalyser.fftSize=128;
+  visualAnalyser.smoothingTimeConstant=0.84;
+  visualData=new Uint8Array(visualAnalyser.frequencyBinCount);
+  eqLimiter.connect(visualAnalyser);
+  visualAnalyser.connect(spatial3dNode);
   spatial3dNode.connect(audioCtx.destination);
   fxReady=true;
   updateEqHeadroom();
@@ -936,6 +945,26 @@ function updateMediaSession(){
  });
  navigator.mediaSession.playbackState=playing?"playing":"paused";
 }
+function drawPlayerVisual(){
+ const canvas=document.querySelector("#playerVisual");
+ if(!canvas)return;
+ const dpr=Math.min(window.devicePixelRatio||1,2),rect=canvas.getBoundingClientRect();
+ const w=Math.max(1,Math.floor(rect.width*dpr)),h=Math.max(1,Math.floor(rect.height*dpr));
+ if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}
+ const ctx=canvas.getContext("2d");ctx.clearRect(0,0,w,h);
+ if(!visualAnalyser||!visualData){
+  const t=performance.now()/1000;ctx.globalAlpha=.18;ctx.beginPath();
+  for(let i=0;i<56;i++){const x=i/55*w,y=h*.5+Math.sin(t*1.5+i*.42)*h*.12;i?ctx.lineTo(x,y):ctx.moveTo(x,y)}
+  ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue("--green3");ctx.lineWidth=2*dpr;ctx.stroke();
+ }else{
+  visualAnalyser.getByteFrequencyData(visualData);
+  const cs=getComputedStyle(document.documentElement),a=cs.getPropertyValue("--green3").trim()||"#8af7b5",b=cs.getPropertyValue("--green").trim()||"#4ee48f";
+  const bars=56,gap=Math.max(2*dpr,w/(bars*9));
+  for(let i=0;i<bars;i++){const idx=Math.floor(i/bars*visualData.length),v=visualData[idx]/255,x=i*w/bars+gap,y=h*.5,amp=5+v*h*.36,bw=Math.max(2*dpr,w/bars-gap*2);ctx.globalAlpha=.12+v*.55;ctx.fillStyle=i%3===0?a:b;ctx.fillRect(x,y-amp/2,bw,amp)}
+ }
+ if(current&&playing){visualFrame=requestAnimationFrame(drawPlayerVisual)}else visualFrame=0;
+}
+
 function drawPlayer(){if(!current){
  const busy=homeBootstrapBusy;
  playerEl.className="player on";
@@ -954,7 +983,7 @@ function drawPlayer(){if(!current){
   return;
  }
  playerEl.className="player on";
- playerEl.innerHTML='<div class="pcover" data-player-profile="1">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="prev" class="icon" title="Предыдущий">⏮</button><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button><button id="next" class="icon" title="Следующий">⏭</button><button id="eqToggle" class="icon eq-toggle" title="Эквалайзер">EQ</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>'+eqPanel();
+ playerEl.innerHTML='<canvas id="playerVisual" class="player-visual" aria-hidden="true"></canvas><div class="player-visual-hint"></div><div class="pcover" data-player-profile="1">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="prev" class="icon" title="Предыдущий">⏮</button><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button><button id="next" class="icon" title="Следующий">⏭</button><button id="eqToggle" class="icon eq-toggle" title="Эквалайзер">EQ</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>'+eqPanel();
  document.querySelector("#pause").onclick=()=>{
   if(playing){audio.pause();return}
   const promise=audio.play();
@@ -971,8 +1000,8 @@ function drawPlayer(){if(!current){
  const spatial=document.querySelector("[data-spatial3d]");
  if(spatial)spatial.oninput=e=>{setSpatial3d(e.target.value);const out=spatial.closest(".spatial3d")?.querySelector("span");if(out)out.textContent=Math.round(spatial3d*100)+"%"};
 }
-audio.onplay=()=>{playing=true;if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});if(spatial3d)updateSpatial3d();if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer()};audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
-audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer()};audio.onended=()=>{playing=false;if(autoNext)void playNext();else{if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()}};audio.onerror=()=>{
+audio.onplay=()=>{playing=true;if(!fxReady)initAudioFx();if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});if(spatial3d)updateSpatial3d();if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer();cancelAnimationFrame(visualFrame);visualFrame=requestAnimationFrame(drawPlayerVisual)};audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
+audio.onpause=()=>{playing=false;cancelAnimationFrame(visualFrame);visualFrame=0;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer()};audio.onended=()=>{playing=false;if(autoNext)void playNext();else{if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()}};audio.onerror=()=>{
  const code=audio.error?.code||0;
  console.warn("Ok Music audio error",{code,src:audio.src,current:current?.id,source:current?.source});
  playing=false;
