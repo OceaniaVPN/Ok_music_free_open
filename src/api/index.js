@@ -931,6 +931,9 @@ export async function handleApi(request,env){
         const songKey=trackDedupeKey(t);
         if(songKey&&seenSongs.has(songKey))continue;
         const artist=recommendationText(t.artist),title=recommendationText(t.title);
+        const trackGenre=recommendationText(t.genre);
+        const genreMismatch=genres.length&&trackGenre&&!recommendationOverlap(trackGenre,genres);
+        if(genreMismatch)continue;
         if(currentArtist&&currentTitle&&artist===currentArtist&&title===currentTitle)continue;
         seenIds.add(t.id);if(songKey)seenSongs.add(songKey);
         let score=0;
