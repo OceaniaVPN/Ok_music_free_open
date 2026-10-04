@@ -446,19 +446,45 @@ export async function handleApi(request,env){
 
   if(url.pathname==="/api/hitmotop/play"){
     const raw=(url.searchParams.get("url")||"").trim();
+    const page=(url.searchParams.get("page")||"").trim();
     try{
       const target=await hitmotopPlaybackUrl(raw);
       const range=request.headers.get("range")||"";
       const targetUrl=new URL(target);
+      let cookie="";
+      let referer=targetUrl.origin+"/";
+
+      // HitMoz may require the session cookie from the track page before
+      // accepting the direct /get/music/*.mp3 request.
+      if(page){
+        try{
+          const pageUrl=new URL(page);
+          const pageHost=pageUrl.hostname.toLowerCase();
+          const allowedPage=pageHost==="eu.hitmoz.com"||pageHost.endsWith(".eu.hitmoz.com")||
+            pageHost==="ru.hitmoz.org"||pageHost.endsWith(".ru.hitmoz.org")||
+            pageHost==="rus.hitmoz.org"||pageHost.endsWith(".rus.hitmoz.org")||
+            pageHost==="hitmos.me"||pageHost.endsWith(".hitmos.me")||
+            pageHost==="hitmos.fm"||pageHost.endsWith(".hitmos.fm");
+          if(allowedPage){
+            referer=pageUrl.href;
+            const pageResponse=await fetch(pageUrl.href,{headers:HITMOTOP_HEADERS,redirect:"follow"});
+            cookie=hitmotopCookieHeader(pageResponse);
+          }
+        }catch{}
+      }
+
       const baseHeaders={
         "accept":"*/*",
         "accept-language":"ru-RU,ru;q=0.9,en;q=0.7",
         "user-agent":HITMOTOP_HEADERS["user-agent"],
-        "referer":targetUrl.origin+"/"
+        "referer":referer
       };
+      if(cookie)baseHeaders.cookie=cookie;
       if(range)baseHeaders.range=range;
+
       let upstream=await fetch(target,{headers:baseHeaders,redirect:"follow"});
       let contentType=(upstream.headers.get("content-type")||"").toLowerCase();
+
       if(contentType.includes("text/html")||contentType.includes("application/xhtml")){
         const html=await upstream.text();
         const patterns=[
@@ -476,9 +502,10 @@ export async function handleApi(request,env){
           direct=hitmotopAbsoluteUrl(hitmotopExtractAttr(button?.[0],"href"),targetUrl.origin);
         }
         if(!direct)throw Error("Hitmotop audio URL not found");
-        upstream=await fetch(direct,{headers:{...baseHeaders,referer:targetUrl.origin+"/"},redirect:"follow"});
+        upstream=await fetch(direct,{headers:{...baseHeaders,referer},redirect:"follow"});
         contentType=(upstream.headers.get("content-type")||"").toLowerCase();
       }
+
       if(!upstream.ok&&upstream.status!==206)throw Error("Hitmotop audio HTTP "+upstream.status);
       if(contentType.includes("text/html"))throw Error("Hitmotop returned HTML instead of audio");
       const headers=new Headers(upstream.headers);
@@ -489,7 +516,6 @@ export async function handleApi(request,env){
       return new Response(upstream.body,{status:upstream.status,headers});
     }catch(e){return Response.json({ok:false,error:e?.message||"Hitmotop playback unavailable"},{status:502})}
   }
-
   if(url.pathname==="/api/zaycev/play"){
     const id=(url.searchParams.get("id")||"").trim();
     if(!/^\d+$/.test(id))return Response.json({ok:false,error:"Invalid Zaycev track id"},{status:400});
