@@ -1,4 +1,3 @@
-import { handleMegaLocalMusic } from "./api/mega-local.js";
 import { handleApi } from "./api/index.js";
 import { handleTelegramWebhook } from "./bot/telegram.js";
 import { renderApp } from "./web/app.js";
@@ -172,9 +171,8 @@ export default {
   async fetch(request,env,ctx) {
     const url=new URL(request.url);
 
-    if (url.pathname==="/api/local-music") return handleMegaLocalMusic(request,env,ctx);
     if (url.pathname.startsWith("/api/")) return handleApi(request,env);
-    if (env.ASSETS && (url.pathname === "/sw.js" || url.pathname.startsWith("/music/"))) return env.ASSETS.fetch(request);
+    if (env.ASSETS && url.pathname === "/sw.js") return env.ASSETS.fetch(request);
     if (url.pathname==="/telegram/webhook" && request.method==="POST") {
       return handleTelegramWebhook(request,env);
     }
