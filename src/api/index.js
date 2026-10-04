@@ -560,6 +560,19 @@ function recommendationArtistMatches(value,set){
   }
   return false;
 }
+function normalizeArtistName(value){
+  return recommendationText(String(value||""))
+    .replace(/\b(feat\.?|ft\.?|featuring|with)\b.*$/i,"")
+    .replace(/\s*[-–—]\s*(official|music|topic|vevo)\b.*$/i,"")
+    .trim();
+}
+function isLikelyTrackTitleAsArtist(artist,title){
+  const a=normalizeArtistName(artist), t=recommendationText(title);
+  if(!a||!t)return true;
+  if(a===t)return true;
+  if(t.length>2&&a.length>2&&t.includes(a)&&t!==a)return true;
+  return false;
+}
 
 function recommendationTerms(value){
   return String(value||"").split(/[,;]+/).map(recommendationText).filter(Boolean).flatMap(x=>{
@@ -934,10 +947,11 @@ export async function handleApi(request,env){
         const trackGenre=recommendationText(t.genre);
         const genreMismatch=genres.length&&trackGenre&&!recommendationOverlap(trackGenre,genres);
         if(genreMismatch)continue;
+        if(isLikelyTrackTitleAsArtist(t.artist,t.title))continue;
         if(currentArtist&&currentTitle&&artist===currentArtist&&title===currentTitle)continue;
         seenIds.add(t.id);if(songKey)seenSongs.add(songKey);
         let score=0;
-        const searchable=title+" "+artist+" "+recommendationText(t.genre);
+        const searchable=title+" "+normalizeArtistName(artist)+" "+recommendationText(t.genre);
         const queryTerms=recommendationText(query).split(/\s+/).filter(x=>x.length>2);
         const queryScore=recommendationOverlap(searchable,queryTerms);
         const knownArtist=recommendationArtistMatches(t.artist,knownArtists);
