@@ -691,12 +691,30 @@ export async function handleApi(request,env){
     try{
       const target=await zaycevPlay(id);
       const range=request.headers.get("range")||"";
-      const upstream=await fetch(target,{headers:{...(range?{range}:{}),"user-agent":ZAYCEV_HEADERS["user-agent"],"referer":ZAYCEV_BASE+"/"}});
+      const upstream=await fetch(target,{
+        headers:{
+          ...(range?{range}:{}),
+          accept:"audio/*,audio/mpeg,audio/mp4,*/*;q=0.8",
+          "user-agent":ZAYCEV_HEADERS["user-agent"],
+          "referer":ZAYCEV_BASE+"/"
+        },
+        redirect:"follow",
+        signal:AbortSignal.timeout(8_000)
+      });
       if(!upstream.ok&&upstream.status!==206)throw Error("Zaycev audio HTTP "+upstream.status);
-      const headers=new Headers(upstream.headers);
+      const contentType=(upstream.headers.get("content-type")||"").toLowerCase();
+      if(contentType.includes("text/html")||contentType.includes("application/json")||contentType.includes("text/plain")){
+        const sample=(await upstream.text()).slice(0,240).replace(/\\s+/g," ");
+        throw Error("Zaycev returned non-audio: "+sample);
+      }
+      const headers=new Headers();
+      for(const name of ["content-type","content-length","content-range","etag","last-modified"]){
+        const value=upstream.headers.get(name);if(value)headers.set(name,value);
+      }
       headers.set("cache-control","no-store");
       headers.set("access-control-allow-origin","*");
-      headers.set("accept-ranges",headers.get("accept-ranges")||"bytes");
+      headers.set("access-control-expose-headers","Content-Length,Content-Range,Accept-Ranges,Content-Type");
+      headers.set("accept-ranges","bytes");
       headers.set("content-type",headers.get("content-type")||"audio/mpeg");
       return new Response(upstream.body,{status:upstream.status,headers});
     }catch(e){return Response.json({ok:false,error:e?.message||"Zaycev playback unavailable"},{status:502})}
