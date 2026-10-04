@@ -54,7 +54,7 @@ function parseZaycevSearch(html,limit){
 }
 async function fetchZaycevSearch(q,limit){
   const u=new URL(ZAYCEV_SEARCH);u.searchParams.set("query_search",q);u.searchParams.set("type","track");
-  const r=await fetch(u,{headers:{"accept":"text/html,application/xhtml+xml","accept-language":"ru-RU,ru;q=0.9,en;q=0.7","referer":ZAYCEV_BASE+"/","user-agent":ZAYCEV_HEADERS["user-agent"]}});
+  const r=await fetch(u,{headers:{"accept":"text/html,application/xhtml+xml","accept-language":"ru-RU,ru;q=0.9,en;q=0.7","referer":ZAYCEV_BASE+"/","user-agent":ZAYCEV_HEADERS["user-agent"]},signal:AbortSignal.timeout(8000)});
   const html=await r.text();if(!r.ok)throw Error("Zaycev search HTTP "+r.status);
   const found=parseZaycevSearch(html,limit);if(!found.length)throw Error("Zaycev search returned no parsable tracks");
   return found.map(t=>({id:"zaycev-"+t.id,zaycevId:Number(t.id),title:t.title,artist:t.artist,album:"",image:t.image?(new URL(t.image,ZAYCEV_BASE).href):"",audio:"/api/zaycev/play?id="+encodeURIComponent(t.id),duration:t.duration||0,license:"",source:"Zaycev.net",sourceUrl:t.sourceUrl,genre:""}));
@@ -84,6 +84,28 @@ const HITMOTOP_BASES=["https://eu.hitmoz.com","https://ru.hitmoz.org","https://r
 // Public deployment of the open-source Shukurov777/hitmoz-parser project.
 // It runs the original Python + BeautifulSoup parser outside the Cloudflare Worker.
 const HITMOZ_PARSER_API_BASE="https://bakha.me/";
+const PROVIDER_CACHE=new Map();
+const PROVIDER_CACHE_TTL=45_000;
+function providerCacheKey(provider,q,limit){return provider+"|"+String(q||"").trim().toLowerCase()+"|"+String(limit||0)}
+async function cachedProviderSearch(provider,q,limit,loader){
+  const key=providerCacheKey(provider,q,limit),now=Date.now(),hit=PROVIDER_CACHE.get(key);
+  if(hit&&now-hit.time<PROVIDER_CACHE_TTL)return hit.value;
+  if(hit?.promise)return hit.promise;
+  const promise=(async()=>{
+    try{
+      const value=await loader();
+      PROVIDER_CACHE.set(key,{time:Date.now(),value});
+      if(PROVIDER_CACHE.size>48){
+        const oldest=[...PROVIDER_CACHE.entries()].sort((a,b)=>a[1].time-b[1].time)[0];
+        if(oldest)PROVIDER_CACHE.delete(oldest[0]);
+      }
+      return value;
+    }catch(error){PROVIDER_CACHE.delete(key);throw error}
+  })();
+  PROVIDER_CACHE.set(key,{time:now,promise});
+  return promise;
+}
+
 const HITMOTOP_HEADERS={
   "accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
   "accept-language":"ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3",
@@ -252,14 +274,14 @@ function normalizeHitmozParserSongs(data,limit){
 async function fetchHitmozPython(q,limit,env){
   const rpc=env?.HITMOZ_PYTHON;
   if(!rpc||typeof rpc.search!=="function")throw Error("HitMoz Python service is not configured");
-  const data=await rpc.search(q,limit);
+  const data=await Promise.race([rpc.search(q,limit),new Promise((_,reject)=>setTimeout(()=>reject(Error("HitMoz Python service timeout")),8000))]);
   return normalizeHitmozParserSongs(data,limit);
 }
 
 async function fetchHitmozParserApi(q,limit){
   const api=new URL(HITMOZ_PARSER_API_BASE);
   api.searchParams.set("search",q);
-  const response=await fetch(api.href,{headers:{
+  const response=await fetch(api.href,{signal:AbortSignal.timeout(8000),headers:{
     accept:"application/json",
     "accept-language":"ru-RU,ru;q=0.9,en;q=0.7",
     "user-agent":HITMOTOP_HEADERS["user-agent"]
@@ -494,7 +516,16 @@ export async function handleApi(request,env){
   if(url.pathname==="/api/search"){
     const q=(url.searchParams.get("q")||"").trim(),limit=Math.min(Math.max(Number(url.searchParams.get("limit")||24),1),50);
     if(!q)return Response.json({ok:true,query:"",tracks:[],providers:[]});
-    const [z,j,h]=await Promise.allSettled([fetchZaycevSearch(q,limit),searchJamendo(q,Math.max(6,Math.ceil(limit/3)),env),fetchHitmotopSearch(q,limit,env)]);
+    const jamLimit=Math.min(10,Math.max(6,Math.ceil(limit/3)));
+    const [z,j]=await Promise.allSettled([
+      cachedProviderSearch("zaycev",q,limit,()=>fetchZaycevSearch(q,limit)),
+      cachedProviderSearch("jamendo",q,jamLimit,()=>searchJamendo(q,jamLimit,env))
+    ]);
+    let h={status:"rejected",reason:Error("Hitmotop skipped until primary sources return too few tracks")};
+    const zTracks=z.status==="fulfilled"?z.value:[],jTracks=j.status==="fulfilled"?j.value:[];
+    if(zTracks.length+jTracks.length<Math.min(limit,6)){
+      try{h={status:"fulfilled",value:await cachedProviderSearch("hitmotop",q,limit,()=>fetchHitmotopSearch(q,limit,env))}}catch(error){h={status:"rejected",reason:error}}
+    }
     const zTracks=z.status==="fulfilled"?z.value:[],jTracks=j.status==="fulfilled"?j.value:[],hTracks=h.status==="fulfilled"?h.value:[],tracks=mergeProviderTracks([zTracks,jTracks,hTracks],limit);
     const errors=[...(z.status==="rejected"?["Zaycev.net: "+(z.reason?.message||"ошибка")]:[]),...(j.status==="rejected"?["Jamendo: "+(j.reason?.message||"ошибка")]:[]),...(h.status==="rejected"?["Hitmotop: "+(h.reason?.message||"ошибка")]:[])];
     if(!tracks.length)return Response.json({ok:false,error:errors.length?"Музыкальные каталоги недоступны":"Ничего не найдено",details:errors,query:q,tracks:[],diagnostics:{zaycevConfigured:true,jamendoConfigured:Boolean(String(env.JAMENDO_CLIENT_ID||"").trim()),hitmotopConfigured:true,errors}},{status:errors.length?502:200});
@@ -634,13 +665,13 @@ export async function handleApi(request,env){
     const themeQuery=[...new Set([...genres.slice(0,3),...moods.slice(0,3),...now.slice(0,3)])].join(" ");
     const primaryArtist=preferredArtists[0]||currentArtist;
     const backupArtist=preferredArtists.find(x=>x!==primaryArtist)||"";
-    const discoveryQueries=["popular music","pop music","rock music","electronic music","dance music","hip hop music"];
+    const discoveryQueries=["popular music","pop music"];
     const queries=recommendationUnique([
       [primaryArtist,genres[0]||"",moods[0]||""].filter(Boolean).join(" "),
       [themeQuery,now.slice(0,2).join(" ")].filter(Boolean).join(" "),
       seed,
       ...((!primaryArtist&&!themeQuery&&!seed)?discoveryQueries:[])
-    ]).filter(Boolean).slice(0,6);
+    ]).filter(Boolean).slice(0,2);
 
     const errors=[],providerHits={z:0,j:0,h:0};
     const pool=[],seenIds=new Set(),seenSongs=new Set();
@@ -678,14 +709,22 @@ export async function handleApi(request,env){
     for(let round=0;round<queries.length;round++){
       const q=queries[round];
       if(!q)continue;
-      const [z,j,h]=await Promise.allSettled([
-        fetchZaycevSearch(q,Math.min(8,Math.max(6,limit+2))),
-        searchJamendo(q,Math.min(8,Math.max(6,limit+2)),env),
-        fetchHitmotopSearch(q,Math.min(8,Math.max(6,limit+2)),env)
+      const providerLimit=Math.min(7,Math.max(5,limit+1));
+      const [z,j]=await Promise.allSettled([
+        cachedProviderSearch("zaycev",q,providerLimit,()=>fetchZaycevSearch(q,providerLimit)),
+        cachedProviderSearch("jamendo",q,providerLimit,()=>searchJamendo(q,providerLimit,env))
       ]);
       if(z.status==="fulfilled")addList(z.value,"z");else errors.push("Zaycev.net: "+(z.reason?.message||"ошибка"));
       if(j.status==="fulfilled")addList(j.value,"j");else errors.push("Jamendo: "+(j.reason?.message||"ошибка"));
-      if(h.status==="fulfilled")addList(h.value,"h");else errors.push("Hitmotop: "+(h.reason?.message||"ошибка"));
+      // Hitmotop is deliberately a fallback: it is much more expensive because
+      // it may establish sessions and try several mirrors. Only call it when
+      // the two fast providers did not produce enough playable tracks.
+      if(pool.length<Math.max(3,Math.min(limit,5))){
+        try{
+          const h=await cachedProviderSearch("hitmotop",q,providerLimit,()=>fetchHitmotopSearch(q,providerLimit,env));
+          addList(h,"h");
+        }catch(error){errors.push("Hitmotop: "+(error?.message||"ошибка"))}
+      }
       if(pool.length>=Math.max(limit,5))break;
     }
 
