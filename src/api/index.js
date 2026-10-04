@@ -334,6 +334,26 @@ function uniqueTracks(tracks, limit) {
   }).slice(0, limit);
 }
 
+function mergeProviderTracks(providerLists, limit) {
+  const out = [];
+  const seen = new Set();
+  const lists = providerLists.filter(Array.isArray);
+  let cursor = 0;
+
+  while (out.length < limit && lists.some(list => list.some(track => track?.id && !seen.has(track.id)))) {
+    const list = lists[cursor % lists.length];
+    cursor++;
+
+    const track = list.find(item => item?.id && !seen.has(item.id));
+    if (!track) continue;
+
+    seen.add(track.id);
+    out.push(track);
+  }
+
+  return out;
+}
+
 function normalizeJamendo(t) {
   return {
     id: "jamendo-" + t.id,
@@ -395,7 +415,7 @@ export async function handleApi(request,env){
     const q=(url.searchParams.get("q")||"").trim(),limit=Math.min(Math.max(Number(url.searchParams.get("limit")||24),1),50);
     if(!q)return Response.json({ok:true,query:"",tracks:[],providers:[]});
     const [z,j,h]=await Promise.allSettled([fetchZaycevSearch(q,limit),searchJamendo(q,Math.max(6,Math.ceil(limit/3)),env),fetchHitmotopSearch(q,limit,env)]);
-    const zTracks=z.status==="fulfilled"?z.value:[],jTracks=j.status==="fulfilled"?j.value:[],hTracks=h.status==="fulfilled"?h.value:[],tracks=uniqueTracks([...zTracks,...jTracks,...hTracks],limit);
+    const zTracks=z.status==="fulfilled"?z.value:[],jTracks=j.status==="fulfilled"?j.value:[],hTracks=h.status==="fulfilled"?h.value:[],tracks=mergeProviderTracks([zTracks,jTracks,hTracks],limit);
     const errors=[...(z.status==="rejected"?["Zaycev.net: "+(z.reason?.message||"ошибка")]:[]),...(j.status==="rejected"?["Jamendo: "+(j.reason?.message||"ошибка")]:[]),...(h.status==="rejected"?["Hitmotop: "+(h.reason?.message||"ошибка")]:[])];
     if(!tracks.length)return Response.json({ok:false,error:errors.length?"Музыкальные каталоги недоступны":"Ничего не найдено",details:errors,query:q,tracks:[],diagnostics:{zaycevConfigured:true,jamendoConfigured:Boolean(String(env.JAMENDO_CLIENT_ID||"").trim()),hitmotopConfigured:true,errors}},{status:errors.length?502:200});
     return Response.json({ok:true,query:q,providers:[...(zTracks.length?["Zaycev.net"]:[]),...(jTracks.length?["Jamendo"]:[]),...(hTracks.length?["Hitmotop"]:[])],tracks});
