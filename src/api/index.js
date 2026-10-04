@@ -560,12 +560,36 @@ function normalizeArtistName(value){
     .replace(/\s*[-–—]\s*(official|music|topic|vevo)\b.*$/i,"")
     .trim();
 }
-function isLikelyTrackTitleAsArtist(artist,title){
+function normalizeRecommendationTrack(track){
+  if(!track||typeof track!=="object")return track;
+  const artist=String(track.artist||"").trim();
+  let title=String(track.title||"").trim();
+  if(artist&&title){
+    const escaped=artist.replace(/[.*+?^${}()|[\\]\\\\]/g,"\\\\function isLikelyTrackTitleAsArtist(artist,title){
   const a=normalizeArtistName(artist), t=recommendationText(title);
   if(!a||!t)return false;
   if(a===t)return true;
   if(t.length>2&&a.length>2&&t.includes(a)&&t!==a)return true;
   return false;
+}
+
+function recommendationTerms");
+    const prefix=new RegExp("^\\\\s*"+escaped+"\\\\s*[-–—:|]\\\\s*","i");
+    title=title.replace(prefix,"").trim();
+  }
+  if(artist&&title&&recommendationText(artist)===recommendationText(title)&&track.source==="Hitmotop"&&track.downloadUrl){
+    try{
+      let filename=decodeURIComponent(new URL(track.downloadUrl).pathname.split("/").pop()||"").replace(/\\.mp3$/i,"").replace(/_\\d{6,}$/i,"");
+      const parts=filename.split(/_-_| - |—/).map(x=>x.replace(/_/g," ").trim()).filter(Boolean);
+      if(parts.length>=2)title=parts.slice(1).join(" - ").trim();
+    }catch{}
+  }
+  if(title)track.title=title;
+  return track;
+}
+function isLikelyTrackTitleAsArtist(artist,title){
+  const a=normalizeArtistName(artist), t=recommendationText(title);
+  return Boolean(a&&t&&a===t);
 }
 
 function recommendationTerms(value){
@@ -957,8 +981,9 @@ export async function handleApi(request,env){
     const addList=(list,key,query)=>{
       if(!Array.isArray(list))return;
       providerHits[key]+=list.length;
-      for(const t of list){
-        const hasAudio=Boolean(t?.zaycevId||String(t?.audio||"").trim()||String(t?.src||"").trim());
+      for(const rawTrack of list){
+        const t=normalizeRecommendationTrack(rawTrack);
+        const hasAudio=Boolean(t?.zaycevId||String(t?.audio||"").trim()||String(t?.downloadUrl||"").trim()||String(t?.src||"").trim());
         if(!hasAudio||!t?.id||isChartLikeTrack(t)||excluded.has(t.id)||seenIds.has(t.id))continue;
         const songKey=trackDedupeKey(t);
         if(songKey&&seenSongs.has(songKey))continue;
