@@ -831,51 +831,6 @@ function recommendationParams(extra={}){
   exclude:recommendationExcludeList().join(","),refresh:String(Date.now())
  };
 }
-async function fetchRecommendationBatch(extra={},signal){
- if(recommendationLoading)return [];
- if(queueIndex>=0&&recommendationLastPrefetchIndex===queueIndex)return [];
- recommendationLoading=true;
- try{
-  const p=recommendationParams(extra);
-  const qs=new URLSearchParams({limit:"5",seed:p.seed,artist:p.artist,title:p.title,mood:p.mood,genres:p.genres,moods:p.moods,artists:p.artists,likedArtists:p.likedArtists,now:p.now,liked:p.liked,exclude:p.exclude,refresh:p.refresh});
-  const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),8_500);
-  const onAbort=()=>controller.abort();
-  if(signal)signal.addEventListener("abort",onAbort,{once:true});
-  let r;
-  try{
-   r=await fetch("/api/recommendations?"+qs.toString(),{cache:"no-store",signal:controller.signal});
-  }finally{
-   clearTimeout(timer);
-   if(signal)signal.removeEventListener("abort",onAbort);
-  }
-  const d=await r.json();
-  if(!d.ok||!Array.isArray(d.tracks))throw Error(d.error||"Нет рекомендаций");
-  const existing=new Set(playbackQueue.map(t=>t?.id));
-  const fresh=d.tracks.filter(t=>t?.id&&playableAudio(t)&&!existing.has(t.id)&&!recommendationSeen.has(t.id));
-  fresh.forEach(t=>recommendationSeen.add(t.id));
-  playbackQueue.push(...fresh);
-  recommendationContextKey=p.seed;
-  recommendationLastPrefetchIndex=queueIndex;
-  preloadNext();
-  return fresh;
- }catch(e){
-  if(e?.name==="AbortError")throw e;
-  console.warn("Ok Music recommendations:",e);
-  return [];
- }finally{recommendationLoading=false}
-}
-async function ensureRecommendationWindow(extra={}){
- const remaining=playbackQueue.length-queueIndex-1;
- if(recommendationLoading||remaining>1)return;
- await fetchRecommendationBatch(extra);
-}
-async function startRecommendationFromContext(extra={}){
- playbackQueue=[];queueIndex=-1;recommendationSeen=new Set();recommendationLastPrefetchIndex=-1;
- const batch=await fetchRecommendationBatch(extra);
- if(batch.length)playbackQueue=[...batch];
- if(playbackQueue.length){queueIndex=0;play(playbackQueue[0],{keepQueue:true})}
-}
 function findTrackIndex(t){return playbackQueue.findIndex(x=>x?.id===t?.id)}
 function preloadNext(){
  const next=playbackQueue[queueIndex+1],token=++nextPreloadToken,src=playableAudio(next);
@@ -1022,23 +977,17 @@ function drawPlayer(){if(!current){
  playerEl.className="player on";
  playerEl.innerHTML='<div class="pcover">♫</div><div class="pmeta"><strong>Ok Music</strong><span>'+(busy?"Подбираю 5 треков со всех площадок…":"Нажми ▶ — начну искать музыку")+'</span></div><div class="pc"><button class="icon" disabled>⏮</button><button id="startAutoPlay" class="big" '+(busy?"disabled":"")+' title="Начать автоматический поиск">'+(busy?"…":"▶")+'</button><button class="icon" disabled>⏭</button><button class="icon" disabled>EQ</button></div><input class="seek" type="range" min="0" max="100" value="0" disabled><span class="time">'+(busy?"Жду ответы каталогов":"Готов к подбору")+'</span>';
  const start=document.querySelector("#startAutoPlay");
- if(start)start.onclick=()=>{
-  if(homeBootstrapBusy)return;
-  clearTimeout(window.__okHomeRetry);
-  if(playbackQueue.length&&queueIndex<0){
+  if(start)start.onclick=()=>{
+   if(homeBootstrapBusy)return;
+   clearTimeout(window.__okHomeRetry);
+   if(playbackQueue.length&&queueIndex<0){
+    queueIndex=0;
+    play(playbackQueue[0],{keepQueue:true,fromBootstrap:true});
+    return;
+   }
    initializeHomePlayer({force:true});
-   return;
-  }
-  // Same-origin emergency source keeps Play synchronous even if the catalog
-  // request has not finished yet.
-  const emergency={id:"key-emergency-pushnoy",title:"Локальный трек",artist:"Ключник",audio:"/music/%D0%90%D0%BB%D0%B5%D0%BA%D1%81%D0%B0%D0%BD%D0%B4%D1%80%20%D0%9F%D1%83%D1%88%D0%BD%D0%BE%D0%B9%20(10).mp3",duration:0,source:"🔐 Ключник"};
-  playbackQueue=[emergency];
-  queueIndex=0;
-  recommendationSeen=new Set([emergency.id]);
-  play(emergency,{keepQueue:true,fromBootstrap:true});
-  void prepareHomeQueue();
- };
- return}
+  };
+  return
  playerEl.className="player on";
  playerEl.innerHTML='<div class="pcover" data-player-profile="1">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="prev" class="icon" title="Предыдущий">⏮</button><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button><button id="next" class="icon" title="Следующий">⏭</button><button id="eqToggle" class="icon eq-toggle" title="Эквалайзер">EQ</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>'+eqPanel();
  document.querySelector("#pause").onclick=()=>{
