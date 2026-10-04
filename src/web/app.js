@@ -520,83 +520,79 @@ const TASTE_GENRES=["Русский рэп","Поп","Рок","Электрон�
  view.querySelectorAll("[data-quick-q]").forEach(b=>b.onclick=()=>doSearch(b.dataset.quickQ));
  document.querySelector("#editTaste").onclick=openTaste;
  const clear=document.querySelector("#clearOffline");if(clear)clear.onclick=clearOffline;
- void initializeHomePlayer();
  void refreshOfflineButtons(view);
 }
-let homeBootstrapPromise=null;
-async function initializeHomePlayer(){
+let homeBootstrapPromise=null,homeBootstrapController=null,homeBootstrapBusy=false;
+async function initializeHomePlayer({force=false}={}){
  if(current)return;
+ if(force){
+  homeBootstrapController?.abort();
+  homeBootstrapController=null;
+  homeBootstrapPromise=null;
+  recommendationLoading=false;
+ }
  if(homeBootstrapPromise)return homeBootstrapPromise;
+ const controller=new AbortController();
+ homeBootstrapController=controller;
+ homeBootstrapBusy=true;
+ drawPlayer();
  homeBootstrapPromise=(async()=>{
   try{
-   // Нормальный путь: первая скрытая пачка всегда ровно до 5 воспроизводимых треков.
-   let batch=await fetchRecommendationBatch({refresh:String(Date.now())});
+   // One bounded request asks all music catalogs for a 5-track batch.
+   const batch=await fetchRecommendationBatch({refresh:String(Date.now())},controller.signal);
+   if(controller.signal.aborted)throw new DOMException("Aborted","AbortError");
    if(batch.length){
     playbackQueue=batch.slice(0,5);
     queueIndex=0;
-    play(playbackQueue[0],{keepQueue:true});
+    recommendationSeen=new Set(playbackQueue.map(t=>String(t.id)));
+    play(playbackQueue[0],{keepQueue:true,fromBootstrap:true});
     return;
    }
 
-   // Первый fallback — обычный поиск по нескольким широким запросам.
-   const queries=["popular music","pop music","rock music","electronic music","music"];
-   for(const q of queries){
-    try{
-     const response=await fetch("/api/search?q="+encodeURIComponent(q)+"&limit=15",{cache:"no-store"});
-     if(!response.ok)continue;
-     const fallback=await response.json();
-     const candidates=(fallback.tracks||[]).filter(playableAudio);
-     if(!candidates.length)continue;
-     const unique=[...new Map(candidates.map(t=>[String(t.id),t])).values()].slice(0,5);
+   // Fast emergency fallback: the same three providers through /api/search.
+   const response=await fetch("/api/search?q="+encodeURIComponent("popular music")+"&limit=9",{cache:"no-store",signal:controller.signal});
+   if(response.ok){
+    const fallback=await response.json();
+    const candidates=(fallback.tracks||[]).filter(playableAudio);
+    const unique=[...new Map(candidates.map(t=>[String(t.id),t])).values()].slice(0,5);
+    if(unique.length){
      playbackQueue=unique;
      queueIndex=0;
      recommendationSeen=new Set(unique.map(t=>String(t.id)));
-     play(unique[0],{keepQueue:true});
-     if(unique.length<5)void fetchRecommendationBatch({refresh:String(Date.now())});
+     play(unique[0],{keepQueue:true,fromBootstrap:true});
      return;
-    }catch(error){console.warn("Ok Music search bootstrap:",error)}
+    }
    }
 
-   // Второй fallback — собственный каталог, включая уже готовые MEGA-треки.
-   for(let attempt=0;attempt<4;attempt++){
-    try{
-     const response=await fetch("/api/local-music?bootstrap="+Date.now(),{cache:"no-store"});
-     if(response.ok){
-      const data=await response.json();
-      const local=(data.tracks||[]).filter(playableAudio);
-      if(local.length){
-       const unique=[...new Map(local.map(t=>[String(t.id),t])).values()].slice(0,5);
-       playbackQueue=unique;
-       queueIndex=0;
-       recommendationSeen=new Set(unique.map(t=>String(t.id)));
-       play(unique[0],{keepQueue:true});
-       if(unique.length<5){
-        // После первого трека всё равно продолжаем пытаться наполнить очередь.
-        void fetchRecommendationBatch({refresh:String(Date.now())});
-       }
-       return;
-      }
-     }
-    }catch(error){console.warn("Ok Music local bootstrap:",error)}
-    await new Promise(resolve=>setTimeout(resolve,[250,500,900,1400][attempt]||1400));
+   // Last local fallback so Play never leaves an empty player when remote
+   // catalogs are temporarily unavailable.
+   const localResponse=await fetch("/api/local-music?bootstrap="+Date.now(),{cache:"no-store",signal:controller.signal});
+   if(localResponse.ok){
+    const data=await localResponse.json();
+    const local=[...new Map((data.tracks||[]).filter(playableAudio).map(t=>[String(t.id),t])).values()].slice(0,5);
+    if(local.length){
+     playbackQueue=local;
+     queueIndex=0;
+     recommendationSeen=new Set(local.map(t=>String(t.id)));
+     play(local[0],{keepQueue:true,fromBootstrap:true});
+     toast("Онлайн-каталоги недоступны — включаю локальный трек");
+     return;
+    }
    }
 
-   // Если все источники временно недоступны — автоматически повторяем bootstrap.
-   // Пользователю не требуется нажимать кнопку или выбирать трек вручную.
-   const retryView=()=>{
-    if(current)return;
-    drawPlayer();
-    clearTimeout(window.__okHomeRetry);
-    window.__okHomeRetry=setTimeout(()=>{
-     window.__okHomeRetry=null;
-     void initializeHomePlayer();
-    },2500);
-   };
-   retryView();
+   toast("Не удалось подобрать музыку");
   }catch(error){
-   console.error("Ok Music home bootstrap:",error);
+   if(error?.name!=="AbortError"){
+    console.warn("Ok Music home bootstrap:",error);
+    toast("Поиск музыки не ответил вовремя");
+   }
   }finally{
-   homeBootstrapPromise=null;
+   if(homeBootstrapController===controller){
+    homeBootstrapController=null;
+    homeBootstrapPromise=null;
+    homeBootstrapBusy=false;
+    drawPlayer();
+   }
   }
  })();
  return homeBootstrapPromise;
@@ -644,14 +640,24 @@ function recommendationParams(extra={}){
   exclude:recommendationExcludeList().join(","),refresh:String(Date.now())
  };
 }
-async function fetchRecommendationBatch(extra={}){
+async function fetchRecommendationBatch(extra={},signal){
  if(recommendationLoading)return [];
  if(queueIndex>=0&&recommendationLastPrefetchIndex===queueIndex)return [];
  recommendationLoading=true;
  try{
   const p=recommendationParams(extra);
   const qs=new URLSearchParams({limit:"5",seed:p.seed,artist:p.artist,title:p.title,mood:p.mood,genres:p.genres,moods:p.moods,artists:p.artists,likedArtists:p.likedArtists,now:p.now,liked:p.liked,exclude:p.exclude,refresh:p.refresh});
-  const r=await fetch("/api/recommendations?"+qs.toString(),{cache:"no-store"});
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),8_500);
+  const onAbort=()=>controller.abort();
+  if(signal)signal.addEventListener("abort",onAbort,{once:true});
+  let r;
+  try{
+   r=await fetch("/api/recommendations?"+qs.toString(),{cache:"no-store",signal:controller.signal});
+  }finally{
+   clearTimeout(timer);
+   if(signal)signal.removeEventListener("abort",onAbort);
+  }
   const d=await r.json();
   if(!d.ok||!Array.isArray(d.tracks))throw Error(d.error||"Нет рекомендаций");
   const existing=new Set(playbackQueue.map(t=>t?.id));
@@ -662,8 +668,11 @@ async function fetchRecommendationBatch(extra={}){
   recommendationLastPrefetchIndex=queueIndex;
   preloadNext();
   return fresh;
- }catch(e){console.warn("Ok Music recommendations:",e);return []}
- finally{recommendationLoading=false}
+ }catch(e){
+  if(e?.name==="AbortError")throw e;
+  console.warn("Ok Music recommendations:",e);
+  return [];
+ }finally{recommendationLoading=false}
 }
 async function ensureRecommendationWindow(extra={}){
  const remaining=playbackQueue.length-queueIndex-1;
@@ -761,20 +770,34 @@ function updateMediaSession(){
  });
  navigator.mediaSession.playbackState=playing?"playing":"paused";
 }
+let mediaGestureUnlocked=false;
+function unlockMediaFromGesture(){
+ if(mediaGestureUnlocked)return;
+ try{
+  const unlock=new Audio("data:audio/wav;base64,UklGRnQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YVAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==");
+  unlock.volume=0.001;
+  const promise=unlock.play();
+  Promise.resolve(promise).then(()=>{
+   mediaGestureUnlocked=true;
+   setTimeout(()=>{try{unlock.pause();unlock.removeAttribute("src");unlock.load()}catch{}},80);
+  }).catch(()=>{});
+ }catch{}
+}
 function drawPlayer(){if(!current){
+ const busy=homeBootstrapBusy;
  playerEl.className="player on";
- playerEl.innerHTML='<div class="pcover">♫</div><div class="pmeta"><strong>Ok Music</strong><span>Нажми ▶ — начну искать музыку</span></div><div class="pc"><button class="icon" disabled>⏮</button><button id="startAutoPlay" class="big" title="Начать автоматический поиск">▶</button><button class="icon" disabled>⏭</button><button class="icon" disabled>EQ</button></div><input class="seek" type="range" min="0" max="100" value="0" disabled><span class="time">Готов к подбору</span>';
+ playerEl.innerHTML='<div class="pcover">♫</div><div class="pmeta"><strong>Ok Music</strong><span>'+(busy?"Подбираю 5 треков со всех площадок…":"Нажми ▶ — начну искать музыку")+'</span></div><div class="pc"><button class="icon" disabled>⏮</button><button id="startAutoPlay" class="big" '+(busy?"disabled":"")+' title="Начать автоматический поиск">'+(busy?"…":"▶")+'</button><button class="icon" disabled>⏭</button><button class="icon" disabled>EQ</button></div><input class="seek" type="range" min="0" max="100" value="0" disabled><span class="time">'+(busy?"Жду ответы каталогов":"Готов к подбору")+'</span>';
  const start=document.querySelector("#startAutoPlay");
  if(start)start.onclick=()=>{
-  start.disabled=true;
-  start.textContent="…";
+  if(homeBootstrapBusy)return;
+  unlockMediaFromGesture();
   clearTimeout(window.__okHomeRetry);
-  void initializeHomePlayer();
+  void initializeHomePlayer({force:true});
  };
  return}
  playerEl.className="player on";
  playerEl.innerHTML='<div class="pcover" data-player-profile="1">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="prev" class="icon" title="Предыдущий">⏮</button><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button><button id="next" class="icon" title="Следующий">⏭</button><button id="eqToggle" class="icon eq-toggle" title="Эквалайзер">EQ</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>'+eqPanel();
- document.querySelector("#pause").onclick=()=>{if(playing)audio.pause();else{if(showEq&&audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});audio.play().catch(()=>toast("Браузер не разрешил воспроизведение"))}};
+ document.querySelector("#pause").onclick=()=>{if(playing)audio.pause();else{unlockMediaFromGesture();if(showEq&&audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});audio.play().catch(()=>toast("Браузер не разрешил воспроизведение"))}};
  document.querySelector("#prev").onclick=playPrevious;
  document.querySelector("#next").onclick=playNext;
  document.querySelector("#eqToggle").onclick=toggleEq;
@@ -786,7 +809,6 @@ function drawPlayer(){if(!current){
  const spatial=document.querySelector("[data-spatial3d]");
  if(spatial)spatial.oninput=e=>{setSpatial3d(e.target.value);const out=spatial.closest(".spatial3d")?.querySelector("span");if(out)out.textContent=Math.round(spatial3d*100)+"%"};
 }
-
 audio.onplay=()=>{playing=true;if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});if(spatial3d)updateSpatial3d();if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer()};audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
 audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer()};audio.onended=()=>{playing=false;if(autoNext)playNext();else{if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()}};audio.onerror=()=>{toast("Не удалось загрузить аудио");playing=false;drawPlayer()};
 nextAudio.onerror=()=>{nextAudio.removeAttribute("src")};
@@ -798,13 +820,9 @@ document.querySelector("#nav").addEventListener("click",e=>{const b=e.target.clo
 render("home");
 const initialPlay=document.querySelector("#initialPlay");
 if(initialPlay)initialPlay.onclick=()=>{
- initialPlay.disabled=true;
- initialPlay.textContent="…";
+ unlockMediaFromGesture();
  clearTimeout(window.__okHomeRetry);
- void initializeHomePlayer().finally(()=>{
-  const b=document.querySelector("#initialPlay");
-  if(b&&!current){b.disabled=false;b.textContent="▶"}
- });
+ void initializeHomePlayer({force:true});
 };
 function initTelegram(){if(!window.Telegram?.WebApp)return;window.Telegram.WebApp.ready();window.Telegram.WebApp.expand();const id=document.documentElement.dataset.theme||"default",t=MUSIC_THEMES.find(x=>x.id===id)||MUSIC_THEMES[0];window.Telegram.WebApp.setHeaderColor(t.telegram);window.Telegram.WebApp.setBackgroundColor(t.telegram)}
 initTelegram();window.addEventListener("DOMContentLoaded",initTelegram,{once:true});
