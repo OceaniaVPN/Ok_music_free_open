@@ -788,18 +788,35 @@ function updateMediaSession(){
  });
  navigator.mediaSession.playbackState=playing?"playing":"paused";
 }
-let mediaGestureUnlocked=false;
+const SILENT_AUDIO="data:audio/wav;base64,UklGRnQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YVAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==";
+let mediaGestureUnlocked=false,mediaUnlocking=null;
 function unlockMediaFromGesture(){
- if(mediaGestureUnlocked)return;
- try{
-  const unlock=new Audio("data:audio/wav;base64,UklGRnQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YVAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==");
-  unlock.volume=0.001;
-  const promise=unlock.play();
-  Promise.resolve(promise).then(()=>{
+ if(mediaGestureUnlocked)return Promise.resolve(true);
+ if(mediaUnlocking)return mediaUnlocking;
+ mediaUnlocking=(async()=>{
+  try{
+   // Use the SAME media element as the real player. A separate Audio() element
+   // does not reliably transfer the browser's user-gesture permission.
+   audio.pause();
+   audio.src=SILENT_AUDIO;
+   audio.volume=0.001;
+   audio.muted=false;
+   audio.load();
+   await audio.play();
    mediaGestureUnlocked=true;
-   setTimeout(()=>{try{unlock.pause();unlock.removeAttribute("src");unlock.load()}catch{}},80);
-  }).catch(()=>{});
- }catch{}
+   audio.pause();
+   audio.removeAttribute("src");
+   audio.load();
+   return true;
+  }catch(error){
+   console.warn("Ok Music media unlock:",error);
+   return false;
+  }finally{
+   audio.volume=1;
+  }
+ })();
+ mediaUnlocking=mediaUnlocking.finally(()=>{mediaUnlocking=null});
+ return mediaUnlocking;
 }
 function drawPlayer(){if(!current){
  const busy=homeBootstrapBusy;
@@ -808,9 +825,8 @@ function drawPlayer(){if(!current){
  const start=document.querySelector("#startAutoPlay");
  if(start)start.onclick=()=>{
   if(homeBootstrapBusy)return;
-  unlockMediaFromGesture();
   clearTimeout(window.__okHomeRetry);
-  void initializeHomePlayer({force:true});
+  void unlockMediaFromGesture().then(()=>initializeHomePlayer({force:true}));
  };
  return}
  playerEl.className="player on";
@@ -851,9 +867,8 @@ document.querySelector("#nav").addEventListener("click",e=>{const b=e.target.clo
 render("home");
 const initialPlay=document.querySelector("#initialPlay");
 if(initialPlay)initialPlay.onclick=()=>{
- unlockMediaFromGesture();
  clearTimeout(window.__okHomeRetry);
- void initializeHomePlayer({force:true});
+ void unlockMediaFromGesture().then(()=>initializeHomePlayer({force:true}));
 };
 function initTelegram(){if(!window.Telegram?.WebApp)return;window.Telegram.WebApp.ready();window.Telegram.WebApp.expand();const id=document.documentElement.dataset.theme||"default",t=MUSIC_THEMES.find(x=>x.id===id)||MUSIC_THEMES[0];window.Telegram.WebApp.setHeaderColor(t.telegram);window.Telegram.WebApp.setBackgroundColor(t.telegram)}
 initTelegram();window.addEventListener("DOMContentLoaded",initTelegram,{once:true});
