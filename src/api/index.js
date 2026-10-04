@@ -80,10 +80,11 @@ async function zaycevPlay(id){
   throw Error("Zaycev playback URL missing");
 }
 
-const HITMOTOP_BASES=["https://hitmos.fm","https://rus.hitmos.fm"];
+const HITMOTOP_BASES=["https://hitmos.me"];
 const HITMOTOP_HEADERS={
-  "accept":"text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
-  "accept-language":"ru-RU,ru;q=0.9,en;q=0.7",
+  "accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "accept-language":"ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3",
+  "cache-control":"no-cache",
   "user-agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36"
 };
 
@@ -92,105 +93,116 @@ function hitmotopAbsoluteUrl(value,base){
   if(!raw)return "";
   try{return new URL(raw,base).href}catch{return ""}
 }
-function hitmotopExtractSid(response){
-  const raw=response.headers.get("set-cookie")||"";
-  const m=raw.match(/(?:^|[;,]\s*)sid=([^;,\s]+)/i);
-  return m?m[1]:"";
+
+function hitmotopCookieHeader(response){
+  try{
+    const values=typeof response.headers.getSetCookie==="function"?response.headers.getSetCookie():[response.headers.get("set-cookie")||""];
+    return values
+      .flatMap(value=>String(value||"").split(/,(?=[^;,=]+=[^;,]+)/))
+      .map(value=>value.trim().split(";",1)[0])
+      .filter(value=>/^[^=;]+=[^=;]*$/.test(value))
+      .join("; ");
+  }catch{return ""}
 }
+
 function hitmotopExtractAttr(tag,name){
   const wanted=String(name||"").toLowerCase();
-  const attrs=String(tag||"");
-  for(const match of attrs.matchAll(/([A-Za-z0-9:-]+)\s*=\s*["']([^"']+)["']/g)){
+  for(const match of String(tag||"").matchAll(/([A-Za-z0-9:-]+)\\s*=\\s*["']([^"']+)["']/g)){
     if(String(match[1]).toLowerCase()===wanted)return match[2];
   }
   return "";
 }
 
-function hitmotopExtractImage(chunk,base){
-  const tag=String(chunk||"").match(/<(?:div|img|source)\b[^>]*(?:track__img|src=|style=)[^>]*>/i);
-  const attrs=tag?tag[0]:String(chunk||"");
-  const style=hitmotopExtractAttr(attrs,"style");
-  const direct=hitmotopExtractAttr(attrs,"src")||hitmotopExtractAttr(attrs,"data-src")||hitmotopExtractAttr(attrs,"data-original");
-  const fromStyle=style.match(/url\(\s*["']?([^"')]+)["']?\s*\)/i);
+function hitmotopExtractImageFromTag(tag,base){
+  const style=hitmotopExtractAttr(tag,"style");
+  const direct=hitmotopExtractAttr(tag,"src")||hitmotopExtractAttr(tag,"data-src")||hitmotopExtractAttr(tag,"data-original");
+  const fromStyle=style.match(/url\\(\\s*["']?([^"')]+)["']?\\s*\\)/i);
   const image=fromStyle?.[1]||direct;
   return image?hitmotopAbsoluteUrl(image,base):"";
 }
+
 function parseHitmotopSearch(html,base,limit){
-  const out=[],seen=new Set(),source=String(html||"");
-  const items=source.match(/<li\b[^>]*class=["'][^"']*tracks__item[^"']*["'][^>]*>[\s\S]*?<\/li>/gi)||[];
-  const chunks=items.length?items:(source.match(/<div\b[^>]*class=["'][^"']*track__title[^"']*["'][^>]*>[\s\S]{0,12000}?<\/(?:li|article|div)>/gi)||[]);
-  for(const chunk of chunks){
-    const titleMatch=chunk.match(/<div\b[^>]*class=["'][^"']*track__title[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
-    const artistMatch=chunk.match(/<div\b[^>]*class=["'][^"']*track__desc[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
-    const durationMatch=chunk.match(/<div\b[^>]*class=["'][^"']*track__fulltime[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
-    const downloadMatch=chunk.match(/<a\b[^>]*class=["'][^"']*track__download-btn[^"']*["'][^>]*>/i);
-    const infoMatch=chunk.match(/<a\b[^>]*class=["'][^"']*track__info-l[^"']*["'][^>]*>/i);
-    const downloadHref=hitmotopExtractAttr(downloadMatch?.[0],"href");
-    const infoHref=hitmotopExtractAttr(infoMatch?.[0],"href");
-    if(!downloadHref)continue;
+  const source=String(html||"");
+  const collect=(re)=>[...source.matchAll(re)].map(match=>match[1]);
+  const titles=collect(/<div\\b[^>]*class=["'][^"']*\\btrack__title\\b[^"']*["'][^>]*>([\\s\\S]*?)<\\/div>/gi);
+  const artists=collect(/<div\\b[^>]*class=["'][^"']*\\btrack__desc\\b[^"']*["'][^>]*>([\\s\\S]*?)<\\/div>/gi);
+  const durations=collect(/<div\\b[^>]*class=["'][^"']*\\btrack__fulltime\\b[^"']*["'][^>]*>([\\s\\S]*?)<\\/div>/gi);
+  const images=collect(/<div\\b[^>]*class=["'][^"']*\\btrack__img\\b[^"']*["'][^>]*>/gi);
+  const downloads=collect(/<a\\b[^>]*class=["'][^"']*\\btrack__download-btn\\b[^"']*["'][^>]*>/gi);
+  const infoLinks=collect(/<a\\b[^>]*class=["'][^"']*\\btrack__info-l\\b[^"']*["'][^>]*>/gi);
+  const count=Math.min(limit,titles.length,artists.length,durations.length,downloads.length,infoLinks.length);
+  const out=[];
+  const seen=new Set();
+
+  for(let i=0;i<count;i++){
+    const downloadHref=hitmotopExtractAttr(downloads[i],"href");
+    const infoHref=hitmotopExtractAttr(infoLinks[i],"href");
     const urlDown=hitmotopAbsoluteUrl(downloadHref,base);
+    const pageUrl=hitmotopAbsoluteUrl(infoHref,base);
     if(!urlDown)continue;
-    const pageUrl=hitmotopAbsoluteUrl(infoHref||downloadHref,base);
-    const title=stripHtml(titleMatch?.[1]||"")||"Без названия";
-    const artist=stripHtml(artistMatch?.[1]||"")||"Неизвестный исполнитель";
-    const durationText=stripHtml(durationMatch?.[1]||"");
-    const duration=parseDuration(durationText.match(/\b\d{1,2}:\d{2}(?::\d{2})?\b/)?.[0]||"");
-    const image=hitmotopExtractImage(chunk,base);
+
+    const title=stripHtml(titles[i]).replace(/[/\\:*?"<>|]/g,"").trim()||"Без названия";
+    const artist=stripHtml(artists[i])||"Неизвестный исполнитель";
+    const durationText=stripHtml(durations[i]);
+    const duration=parseDuration(durationText.match(/\\b\\d{1,2}:\\d{2}(?::\\d{2})?\\b/)?.[0]||"");
+    const image=hitmotopExtractImageFromTag(images[i]||"",base);
     const key=pageUrl||urlDown;
-    const idPart=(key.match(/\/([^/?#]+)(?:[?#]|$)/)?.[1]||key).replace(/[^a-zA-Z0-9_-]/g,"-").slice(-140);
+    const idPart=(key.match(/\\/([^/?#]+)(?:[?#]|$)/)?.[1]||key).replace(/[^a-zA-Z0-9_-]/g,"-").slice(-140);
     const id="hitmotop-"+idPart;
     if(seen.has(id))continue;
     seen.add(id);
     out.push({
-      id,title,artist,album:"",image,audio:"/api/hitmotop/play?url="+encodeURIComponent(urlDown),
-      duration,license:"",source:"Hitmotop",sourceUrl:pageUrl||urlDown,genre:"",downloadUrl:urlDown
+      id,
+      title,
+      artist,
+      album:"",
+      image,
+      audio:"/api/hitmotop/play?url="+encodeURIComponent(urlDown),
+      duration,
+      license:"",
+      source:"Hitmotop",
+      sourceUrl:pageUrl||urlDown,
+      genre:"",
+      downloadUrl:urlDown
     });
-    if(out.length>=limit)break;
   }
   return out;
 }
+
+async function hitmotopSearchRequest(searchUrl,headers,limit){
+  const response=await fetch(searchUrl,{headers,redirect:"follow"});
+  const html=await response.text();
+  if(!response.ok)throw Error("Hitmo search HTTP "+response.status);
+  const finalBase=new URL(response.url||searchUrl).origin;
+  const tracks=parseHitmotopSearch(html,finalBase,limit);
+  if(!tracks.length)throw Error("Hitmo search returned no parsable tracks");
+  return tracks;
+}
+
 async function fetchHitmotopSearch(q,limit){
   let lastError=null;
   for(const configuredBase of HITMOTOP_BASES){
     try{
-      const base=new URL(configuredBase).origin;
-      const search=new URL("/search",base);
-      search.searchParams.set("q",q);
-      const response=await fetch(search,{headers:{...HITMOTOP_HEADERS,referer:base+"/"},redirect:"follow"});
-      if(response.ok){
-        const html=await response.text();
-        const finalBase=new URL(response.url||base).origin;
-        const tracks=parseHitmotopSearch(html,finalBase,limit);
-        if(tracks.length)return tracks;
-        lastError=Error("Hitmo search returned no parsable tracks");
-        continue;
-      }
-      lastError=Error("Hitmo search HTTP "+response.status);
-    }catch(error){
-      lastError=error;
-    }
-  }
-
-  // Some deployments issue a session cookie on the home page before allowing search.
-  for(const configuredBase of HITMOTOP_BASES){
-    try{
+      // Mirror the pars-hitmotop package flow: open hitmos.me first,
+      // keep the session cookie, then request /search?q=...
       const home=await fetch(configuredBase,{headers:HITMOTOP_HEADERS,redirect:"follow"});
-      if(!home.ok)continue;
       const base=new URL(home.url||configuredBase).origin;
-      const sid=hitmotopExtractSid(home);
+      const cookie=hitmotopCookieHeader(home);
+      const headers={...HITMOTOP_HEADERS,referer:base+"/"};
+      if(cookie)headers.cookie=cookie;
+
       const search=new URL("/search",base);
       search.searchParams.set("q",q);
-      const headers={...HITMOTOP_HEADERS,referer:base+"/"};
-      if(sid)headers.cookie="sid="+sid;
-      const response=await fetch(search,{headers,redirect:"follow"});
-      if(!response.ok){
-        lastError=Error("Hitmo search HTTP "+response.status);
-        continue;
+      try{
+        return await hitmotopSearchRequest(search.href,headers,limit);
+      }catch(error){
+        lastError=error;
       }
-      const html=await response.text();
-      const tracks=parseHitmotopSearch(html,new URL(response.url||base).origin,limit);
-      if(tracks.length)return tracks;
-      lastError=Error("Hitmo search returned no parsable tracks");
+
+      // The reference package retries the main site when the first request
+      // does not establish a usable session, so make one fresh request too.
+      const retryHeaders={...HITMOTOP_HEADERS,referer:base+"/"};
+      return await hitmotopSearchRequest(search.href,retryHeaders,limit);
     }catch(error){
       lastError=error;
     }
@@ -202,7 +214,7 @@ async function hitmotopPlaybackUrl(rawUrl){
   let target;
   try{target=new URL(rawUrl)}catch{throw Error("Invalid Hitmotop audio URL")}
   const host=target.hostname.toLowerCase();
-  const allowed=host==="hitmos.fm"||host.endsWith(".hitmos.fm");
+  const allowed=host==="hitmos.me"||host.endsWith(".hitmos.me")||host==="hitmos.fm"||host.endsWith(".hitmos.fm")||host==="hitmotop.com"||host.endsWith(".hitmotop.com");
   if(!allowed||!/^https?:$/.test(target.protocol))throw Error("Hitmotop audio host is not allowed");
   return target.href;
 }
@@ -287,12 +299,12 @@ export async function handleApi(request,env){
     let target;
     try{target=new URL(raw)}catch{return Response.json({ok:false,error:"Invalid artwork URL"},{status:400})}
     const host=target.hostname.toLowerCase();
-    const allowed=host==="zaycev.net"||host.endsWith(".zaycev.net")||host==="jamendo.com"||host.endsWith(".jamendo.com")||host==="hitmos.fm"||host.endsWith(".hitmos.fm");
+    const allowed=host==="zaycev.net"||host.endsWith(".zaycev.net")||host==="jamendo.com"||host.endsWith(".jamendo.com")||host==="hitmos.me"||host.endsWith(".hitmos.me")||host==="static.hitmos.fm"||host==="hitmos.fm"||host.endsWith(".hitmos.fm");
     if(!allowed||!/^https?:$/.test(target.protocol))return Response.json({ok:false,error:"Artwork host is not allowed"},{status:403});
     try{
       const upstream=await fetch(target,{headers:{
         accept:"image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-        referer:host.endsWith("zaycev.net")?ZAYCEV_BASE+"/":host.endsWith("jamendo.com")?"https://www.jamendo.com/":"https://hitmos.fm/",
+        referer:host.endsWith("zaycev.net")?ZAYCEV_BASE+"/":host.endsWith("jamendo.com")?"https://www.jamendo.com/":"https://hitmos.me/",
         "user-agent":ZAYCEV_HEADERS["user-agent"]
       }});
       if(!upstream.ok)throw Error("Artwork HTTP "+upstream.status);
