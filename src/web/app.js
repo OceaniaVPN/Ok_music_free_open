@@ -540,65 +540,6 @@ const TASTE_GENRES=["Русский рэп","Поп","Рок","Электрон�
  void refreshOfflineButtons(view);
 }
 let homeBootstrapPromise=null,homeBootstrapController=null,homeBootstrapBusy=false,homePrefetchPromise=null;
-let localCatalog=[],localCatalogPromise=null,localCatalogCursor=0;
-let recommendationPromise=null;
-
-async function loadLocalCatalog(signal){
- if(localCatalog.length)return localCatalog;
- if(localCatalogPromise)return localCatalogPromise;
- localCatalogPromise=(async()=>{
-  let last=[];
-  for(let attempt=0;attempt<4;attempt++){
-   const controller=new AbortController();
-   const timer=setTimeout(()=>controller.abort(),Math.min(6000,3500+attempt*700));
-   const onAbort=()=>controller.abort();
-   if(signal)signal.addEventListener("abort",onAbort,{once:true});
-   try{
-    const r=await fetch("/api/local-music?player="+Date.now()+"&attempt="+attempt,{cache:"no-store",signal:controller.signal});
-    if(!r.ok)throw Error("Локальный каталог HTTP "+r.status);
-    const d=await r.json();
-    last=Array.isArray(d.tracks)?d.tracks:[];
-    const unique=[...new Map(last.filter(t=>t?.id&&playableAudio(t)).map(t=>[String(t.id),t])).values()];
-    if(unique.length||!d?.mega?.warming){
-     localCatalog=unique;
-     localCatalogCursor=0;
-     return localCatalog;
-    }
-    if(signal?.aborted)throw new DOMException("Aborted","AbortError");
-    await new Promise(resolve=>setTimeout(resolve,700));
-   }catch(error){
-    if(error?.name==="AbortError")throw error;
-    console.warn("Ok Music local catalog:",error);
-    if(attempt>=3)break;
-    await new Promise(resolve=>setTimeout(resolve,600));
-   }finally{
-    clearTimeout(timer);
-    if(signal)signal.removeEventListener("abort",onAbort);
-   }
-  }
-  localCatalog=[...new Map(last.filter(t=>t?.id&&playableAudio(t)).map(t=>[String(t.id),t])).values()];
-  localCatalogCursor=0;
-  return localCatalog;
- })().finally(()=>{localCatalogPromise=null});
- return localCatalogPromise;
-}
-
-function addLocalTracksToQueue(limit=3){
- if(!localCatalog.length||limit<=0)return 0;
- const ids=new Set(playbackQueue.map(t=>String(t?.id||"")));
- let added=0,scanned=0;
- while(scanned<localCatalog.length&&added<limit){
-  const t=localCatalog[localCatalogCursor%localCatalog.length];
-  localCatalogCursor=(localCatalogCursor+1)%localCatalog.length;
-  scanned++;
-  if(!t?.id||!playableAudio(t)||ids.has(String(t.id)))continue;
-  playbackQueue.push(t);
-  ids.add(String(t.id));
-  added++;
- }
- return added;
-}
-
 async function fetchRecommendationBatch(extra={},signal,options={}){
  const force=Boolean(options?.force);
  if(recommendationPromise)return recommendationPromise;
@@ -784,14 +725,14 @@ function mood(){
  });
 }
 function searchView(){
- view.innerHTML='<div class="section"><h2>Поиск музыки</h2><small>Zaycev.net · Jamendo · Hitmotop · 🔐 Ключник</small></div><div class="searchbar"><input id="q" class="input" placeholder="Исполнитель, название, жанр…"><button id="go" class="primary">Искать</button></div><div id="results" class="results" style="margin-top:18px"><div class="empty">Начни с названия трека или исполнителя.</div></div>';
+ view.innerHTML='<div class="section"><h2>Поиск музыки</h2><small>Zaycev.net · Jamendo · Hitmotop</small></div><div class="searchbar"><input id="q" class="input" placeholder="Исполнитель, название, жанр…"><button id="go" class="primary">Искать</button></div><div id="results" class="results" style="margin-top:18px"><div class="empty">Начни с названия трека или исполнителя.</div></div>';
  document.querySelector("#go").onclick=()=>doSearch(document.querySelector("#q").value);document.querySelector("#q").onkeydown=e=>{if(e.key==="Enter")doSearch(e.target.value)}
 }
 async function doSearch(q){
  q=String(q||"").trim(); if(!q){toast("Введи запрос");return}
  if(!document.querySelector("#results")){render("search");document.querySelector("#q").value=q}
  const box=document.querySelector("#results");box.innerHTML='<div class="empty">Ищу музыку…<br><small>Подбираю совпадения и обложки</small></div>';
- try{const [remote,local]=await Promise.all([fetch("/api/search?q="+encodeURIComponent(q)+"&limit=30").then(x=>x.json()),Promise.resolve(localTracks.length?localTracks:(await fetch("/api/local-music").then(x=>x.json())).tracks||[])]);if(!remote.ok)throw Error(remote.error||"Ошибка");localTracks=local;const ql=q.toLowerCase();const localMatches=local.filter(t=>(t.title+" "+t.artist+" "+(t.album||"")).toLowerCase().includes(ql));tracks=[...(remote.tracks||[]),...localMatches.filter(t=>!(remote.tracks||[]).some(x=>x.id===t.id))];box.innerHTML=tracks.length?tracks.map(result).join(""):'<div class="empty">Ничего не нашлось. Попробуй другой запрос.</div>';bind(box)}catch(e){box.innerHTML='<div class="empty">Поиск временно недоступен.<br><small>'+esc(e.message)+'</small></div>'}
+ try{const remote=await fetch("/api/search?q="+encodeURIComponent(q)+"&limit=30",{cache:"no-store"}).then(x=>x.json());if(!remote.ok)throw Error(remote.error||"Ошибка");tracks=Array.isArray(remote.tracks)?remote.tracks:[];box.innerHTML=tracks.length?tracks.map(result).join(""):'<div class="empty">Ничего не нашлось. Попробуй другой запрос.</div>';bind(box)}catch(e){box.innerHTML='<div class="empty">Поиск временно недоступен.<br><small>'+esc(e.message)+'</small></div>'}
 }
 function library(){
  view.innerHTML='<div class="section"><h2>Моя музыка</h2><button id="newPlaylist" class="primary">＋ Плейлист</button></div><div class="offline-panel"><div><strong>◉ Офлайн-хранилище</strong><span>Скачанные треки доступны без сети.</span></div><button id="clearOffline">Очистить</button></div><div class="section"><h2>♥ Понравившиеся</h2><small>'+state.liked.length+' треков</small></div><div id="liked" class="results"></div><div class="section"><h2>Мои плейлисты</h2></div><div id="playlists"></div>';
