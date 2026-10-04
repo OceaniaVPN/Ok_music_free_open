@@ -442,14 +442,14 @@ function mergeProviderTracks(providerLists, limit) {
 }
 
 function normalizeJamendo(t) {
-  const rawAudio=String(t.audio||"").trim();
   return {
     id: "jamendo-" + t.id,
+    jamendoId: Number(t.id)||0,
     title: t.name || "Без названия",
     artist: t.artist_name || "Неизвестный исполнитель",
     album: t.album_name || "",
     image: t.image || t.album_image || "",
-    audio: rawAudio?"/api/jamendo/play?url="+encodeURIComponent(rawAudio):"",
+    audio: t.id?"/api/jamendo/play?id="+encodeURIComponent(String(t.id)):"",
     duration: Number(t.duration || 0),
     license: t.license_ccurl || "",
     source: "Jamendo",
@@ -597,21 +597,23 @@ export async function handleApi(request,env){
     });
   }
   if(url.pathname==="/api/jamendo/play"){
-    const raw=(url.searchParams.get("url")||"").trim();
-    let target;
-    try{target=new URL(raw)}catch{return Response.json({ok:false,error:"Invalid Jamendo audio URL"},{status:400})}
-    const host=target.hostname.toLowerCase();
-    const allowed=host==="jamendo.com"||host.endsWith(".jamendo.com");
-    if(!allowed||!/^https?:$/.test(target.protocol))return Response.json({ok:false,error:"Jamendo audio host is not allowed"},{status:403});
+    const id=(url.searchParams.get("id")||"").trim();
+    if(!/^\d+$/.test(id))return Response.json({ok:false,error:"Invalid Jamendo track id"},{status:400});
     try{
+      const clientId=String(env.JAMENDO_CLIENT_ID||"").trim();
+      if(!clientId)throw Error("Jamendo client id is not configured");
+      const api=new URL("https://api.jamendo.com/v3.0/tracks/file/");
+      api.searchParams.set("client_id",clientId);
+      api.searchParams.set("id",id);
+      api.searchParams.set("action","stream");
+      api.searchParams.set("audioformat","mp31");
       const range=request.headers.get("range")||"";
-      const headers={
+      const upstream=await fetch(api.href,{headers:{
         ...(range?{range}:{}),
-        accept:"audio/*,audio/mpeg,audio/mp4,*/*;q=0.8",
+        accept:"audio/*,audio/mpeg,*/*;q=0.8",
         "user-agent":ZAYCEV_HEADERS["user-agent"],
         referer:"https://www.jamendo.com/"
-      };
-      const upstream=await fetch(target,{headers,redirect:"follow",signal:AbortSignal.timeout(8_000)});
+      },redirect:"follow",signal:AbortSignal.timeout(10_000)});
       if(!upstream.ok&&upstream.status!==206)throw Error("Jamendo audio HTTP "+upstream.status);
       const contentType=(upstream.headers.get("content-type")||"").toLowerCase();
       if(contentType.includes("text/html")||contentType.includes("application/json")||contentType.includes("text/plain"))throw Error("Jamendo returned non-audio");
