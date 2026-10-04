@@ -1,4 +1,5 @@
 import { LOCAL_MUSIC } from "../local-music.js";
+import recommendationArtists from "../data/recommendation-artists.json" with { type: "json" };
 const LOCAL_MUSIC_CATALOG=Array.isArray(LOCAL_MUSIC)?LOCAL_MUSIC:[];
 
 const ZAYCEV_BASE="https://zaycev.net";
@@ -514,23 +515,7 @@ const RECOMMENDATION_VOCAB={
   "вечеринка":["party","dance"],
   "фонк":["phonk","drift"]
 };
-const RECOMMENDATION_ARTIST_POOLS={
-  "рок":["Александр Пушной","План Ломоносова","Влом","Кино","Король и Шут"],
-  "метал":["Slipknot","Metallica","Rammstein","System of a Down","Linkin Park"],
-  "поп":["Taylor Swift","The Weeknd","Dua Lipa","Lady Gaga","Adele"],
-  "русский рэп":["Oxxxymiron","Баста","Noize MC","Miyagi","ЕГОР КРИД"],
-  "хип-хоп":["Eminem","Kendrick Lamar","Dr. Dre","2Pac","Snoop Dogg"],
-  "электроника":["The Prodigy","Daft Punk","The Chemical Brothers","Skrillex","deadmau5"],
-  "инди":["Arctic Monkeys","Tame Impala","The Strokes","The 1975","Florence + The Machine"],
-  "джаз":["Miles Davis","John Coltrane","Ella Fitzgerald","Louis Armstrong","Nina Simone"],
-  "классика":["Ludovico Einaudi","Yiruma","Max Richter","Ólafur Arnalds","Hans Zimmer"],
-  "k-pop":["BTS","BLACKPINK","TWICE","Stray Kids","NewJeans"],
-  "фонк":["Kordhell","INTERWORLD","DVRST","LXST CXNTURY","Ghostface Playa"],
-  "r&b":["The Weeknd","SZA","Alicia Keys","Frank Ocean","Bruno Mars"],
-  "lo-fi":["L'indécis","Jinsang","eevee","idealism","Nymano"],
-  "альтернатива":["Linkin Park","Nirvana","Foo Fighters","Muse","Twenty One Pilots"]
-};
-function recommendationGenreKey(value){
+const RECOMMENDATION_ARTIST_POOLS=recommendationArtists&&typeof recommendationArtists==="object"?recommendationArtists:{};function recommendationGenreKey(value){
   const text=recommendationText(value);
   if(!text)return "";
   if(RECOMMENDATION_ARTIST_POOLS[text])return text;
