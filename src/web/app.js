@@ -699,6 +699,7 @@ function play(t,{fromEnded=false,keepQueue=false,fromBootstrap=false}={}){
  let idx=playbackQueue.findIndex(x=>x?.id===t.id);
  if(!keepQueue||idx<0){
   playbackQueue=[t];idx=0;recommendationSeen=new Set([String(t.id)]);recommendationContextKey="";
+  recommendationLastPrefetchIndex=-1;
  }
  queueIndex=idx;currentIndex=idx;current=t;updateMediaSession();
  drawPlayer();
