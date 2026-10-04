@@ -65,17 +65,47 @@ async function zaycevFileMeta(ids){
   let d;try{d=JSON.parse(text)}catch{throw Error("Zaycev filezmeta returned invalid JSON")}
   return Array.isArray(d?.tracks)?d.tracks:[];
 }
+function zaycevValue(value){
+  if(value==null)return "";
+  if(typeof value==="string")return value.trim();
+  if(typeof value==="number")return String(value);
+  if(Array.isArray(value)){for(const item of value){const found=zaycevValue(item);if(found)return found}return ""}
+  if(typeof value==="object"){
+    for(const key of ["url","href","download","streaming","stream","file","src","path","value"]){
+      const found=zaycevValue(value[key]);if(found)return found;
+    }
+  }
+  return "";
+}
+async function zaycevResolveResponse(response,label){
+  const body=(await response.text()).trim();
+  if(!response.ok)throw Error("Zaycev "+label+" HTTP "+response.status);
+  if(/^https?:\/\//i.test(body))return body;
+  try{
+    const data=JSON.parse(body);
+    const target=zaycevValue(data);
+    if(/^https?:\/\//i.test(target))return target;
+  }catch{}
+  return "";
+}
 async function zaycevPlay(id){
   const meta=(await zaycevFileMeta([id]))[0];if(!meta)throw Error("Zaycev track metadata not found");
-  if(meta.download){
-    const r=await fetch(ZAYCEV_TRACK_API+"/download/"+encodeURIComponent(meta.download),{headers:{accept:"text/plain,application/json,*/*","user-agent":ZAYCEV_HEADERS["user-agent"],referer:ZAYCEV_BASE+"/"},signal:AbortSignal.timeout(5_500)});
-    const target=(await r.text()).trim();if(r.ok&&/^https?:\/\//i.test(target))return target;
+  const download=zaycevValue(meta.download);
+  if(download){
+    const r=await fetch(ZAYCEV_TRACK_API+"/download/"+encodeURIComponent(download),{
+      headers:{accept:"text/plain,application/json,*/*","user-agent":ZAYCEV_HEADERS["user-agent"],referer:ZAYCEV_BASE+"/"},
+      redirect:"follow",signal:AbortSignal.timeout(5_500)
+    });
+    const target=await zaycevResolveResponse(r,"download");
+    if(target)return target;
   }
-  if(meta.streaming){
-    const r=await fetch(ZAYCEV_TRACK_API+"/play/"+encodeURIComponent(meta.streaming),{headers:ZAYCEV_HEADERS,signal:AbortSignal.timeout(5_500)});
-    const text=await r.text();if(!r.ok)throw Error("Zaycev stream HTTP "+r.status);
-    let d;try{d=JSON.parse(text)}catch{throw Error("Zaycev stream returned invalid JSON")}
-    if(d?.url)return d.url;
+  const streaming=zaycevValue(meta.streaming);
+  if(streaming){
+    const r=await fetch(ZAYCEV_TRACK_API+"/play/"+encodeURIComponent(streaming),{
+      headers:ZAYCEV_HEADERS,redirect:"follow",signal:AbortSignal.timeout(5_500)
+    });
+    const target=await zaycevResolveResponse(r,"stream");
+    if(target)return target;
   }
   throw Error("Zaycev playback URL missing");
 }
