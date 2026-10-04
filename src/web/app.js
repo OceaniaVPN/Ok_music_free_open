@@ -389,8 +389,8 @@ function fmt(n){return Number.isFinite(n)&&n>0?Math.floor(n/60)+":"+String(Math.
 function playableAudio(t){
  if(!t)return "";
  if(t.zaycevId)return "/api/zaycev/play?id="+encodeURIComponent(String(t.zaycevId));
- if(t.audio&&!String(t.audio).startsWith("mega://"))return String(t.audio);
- if(t.src&&!String(t.src).startsWith("mega://"))return String(t.src);
+ if(t.audio)return String(t.audio);
+ if(t.src)return String(t.src);
  return "";
 }
 const OK_OFFLINE_CACHE="okmusic-audio-v2";
@@ -409,7 +409,8 @@ window.__okOfflineHas=async function(id){
 };
 window.__okOfflineSave=async function(t){
   const raw=playableAudio(t);
-  if(!raw)throw Error(String(t?.audio||"").startsWith("mega://")?"Этот трек из MEGA пока нельзя сохранить":"У трека нет аудиопотока");
+  if(!raw)throw Error("У трека нет аудиопотока");
+  if(String(raw).startsWith("mega://"))throw Error("Этот трек из MEGA пока нельзя сохранить");
   const url=new URL(raw,location.href).href;
   const response=await fetch(url,{credentials:"same-origin",cache:"no-store"});
   if(!response.ok)throw Error("Аудио HTTP "+response.status);
@@ -522,35 +523,85 @@ const TASTE_GENRES=["Русский рэп","Поп","Рок","Электрон�
  void initializeHomePlayer();
  void refreshOfflineButtons(view);
 }
+let homeBootstrapPromise=null;
 async function initializeHomePlayer(){
- if(current||recommendationLoading)return;
- try{
-  // Первый запуск всегда получает скрытую пачку из 5 треков.
-  const batch=await fetchRecommendationBatch({refresh:String(Date.now())});
-  if(batch.length){
-   queueIndex=0;
-   play(batch[0],{keepQueue:true});
-   return;
-  }
+ if(current)return;
+ if(homeBootstrapPromise)return homeBootstrapPromise;
+ homeBootstrapPromise=(async()=>{
+  try{
+   // Нормальный путь: первая скрытая пачка всегда ровно до 5 воспроизводимых треков.
+   let batch=await fetchRecommendationBatch({refresh:String(Date.now())});
+   if(batch.length){
+    playbackQueue=batch.slice(0,5);
+    queueIndex=0;
+    play(playbackQueue[0],{keepQueue:true});
+    return;
+   }
 
-  // Крайний fallback: даже при временно пустых рекомендациях пробуем поиск.
-  const queries=["popular music","pop music","rock music","electronic music"];
-  for(const q of queries){
-   const response=await fetch("/api/search?q="+encodeURIComponent(q)+"&limit=12",{cache:"no-store"});
-   if(!response.ok)continue;
-   const fallback=await response.json();
-   const candidates=(fallback.tracks||[]).filter(playableAudio);
-   if(!candidates.length)continue;
-   const t=candidates[Math.floor(Math.random()*candidates.length)];
-   playbackQueue=[t];
+   // Первый fallback — обычный поиск по нескольким широким запросам.
+   const queries=["popular music","pop music","rock music","electronic music","music"];
+   for(const q of queries){
+    try{
+     const response=await fetch("/api/search?q="+encodeURIComponent(q)+"&limit=15",{cache:"no-store"});
+     if(!response.ok)continue;
+     const fallback=await response.json();
+     const candidates=(fallback.tracks||[]).filter(playableAudio);
+     if(!candidates.length)continue;
+     const unique=[...new Map(candidates.map(t=>[String(t.id),t])).values()].slice(0,5);
+     playbackQueue=unique;
+     queueIndex=0;
+     recommendationSeen=new Set(unique.map(t=>String(t.id)));
+     play(unique[0],{keepQueue:true});
+     if(unique.length<5)void fetchRecommendationBatch({refresh:String(Date.now())});
+     return;
+    }catch(error){console.warn("Ok Music search bootstrap:",error)}
+   }
+
+   // Второй fallback — собственный каталог, включая уже готовые MEGA-треки.
+   for(let attempt=0;attempt<4;attempt++){
+    try{
+     const response=await fetch("/api/local-music?bootstrap="+Date.now(),{cache:"no-store"});
+     if(response.ok){
+      const data=await response.json();
+      const local=(data.tracks||[]).filter(playableAudio);
+      if(local.length){
+       const unique=[...new Map(local.map(t=>[String(t.id),t])).values()].slice(0,5);
+       playbackQueue=unique;
+       queueIndex=0;
+       recommendationSeen=new Set(unique.map(t=>String(t.id)));
+       play(unique[0],{keepQueue:true});
+       if(unique.length<5){
+        // После первого трека всё равно продолжаем пытаться наполнить очередь.
+        void fetchRecommendationBatch({refresh:String(Date.now())});
+       }
+       return;
+      }
+     }
+    }catch(error){console.warn("Ok Music local bootstrap:",error)}
+    await new Promise(resolve=>setTimeout(resolve,[250,500,900,1400][attempt]||1400));
+   }
+
+   // Последняя гарантия интерфейса: не оставляем «Выбери трек» после успешного ответа страницы.
+   const emergency={
+    id:"okmusic-emergency",
+    title:"Музыка готовится",
+    artist:"Ok Music",
+    album:"",
+    image:"",
+    audio:"",
+    source:"Ok Music"
+   };
+   playbackQueue=[emergency];
    queueIndex=0;
-   recommendationSeen=new Set([String(t.id)]);
-   play(t,{keepQueue:true});
-   // Сразу догружаем скрытое окно рекомендаций.
-   void fetchRecommendationBatch({refresh:String(Date.now())});
-   return;
+   recommendationSeen=new Set([emergency.id]);
+   play(emergency,{keepQueue:true});
+  }catch(error){
+   console.error("Ok Music home bootstrap:",error);
+  }finally{
+   homeBootstrapPromise=null;
   }
- }catch(e){console.warn("Ok Music home player:",e)}
+ })();
+ return homeBootstrapPromise;
 }
 function mood(){
  const moodItems=[["🌙","Ночной вайб","Спокойное и атмосферное"],["⚡","Энергия","Больше ритма и движения"],["☁️","Chill","Расслабиться и выдохнуть"],["💜","Любовь","Мягкие и тёплые треки"],["🚗","В дорогу","Музыка для долгой поездки"],["🔥","Вечеринка","Ритм, который не отпускает"],["🖤","Фонк","Бас, дрифт и ночной вайб"]];
