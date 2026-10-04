@@ -222,7 +222,7 @@ html,body,.app,.top,.hero,.card,.taste-panel,.track-profile,.result,.playlist,.p
 <div id="player" class="player on"><div class="pcover">♫</div><div class="pmeta"><strong>Ok Music</strong><span>Выбери трек — плеер готов</span></div><div class="pc"><button class="icon" disabled>⏮</button><button id="initialPlay" class="big" type="button" title="Начать автоподбор">▶</button><button class="icon" disabled>⏭</button><button class="icon" disabled>EQ</button></div><input class="seek" type="range" min="0" max="100" value="0" disabled><span class="time">0:00 / 0:00</span></div>
 <nav class="nav" id="nav"><button data-view="home" class="active">⌂<span>Главная</span></button><button data-view="mood">◈<span>Настроение</span></button><button data-view="search">⌕<span>Поиск</span></button><button data-view="library">♫<span>Плейлисты</span></button></nav>
 <div id="modal" class="modal"><div class="dialog"><h3>Новый плейлист</h3><p>Придумай название — треки можно будет добавлять из поиска.</p><input id="playlistName" class="input" placeholder="Например: Ночная поездка"><div class="row"><button id="closeModal">Отмена</button><button id="createPlaylist" class="primary">Создать</button></div></div></div>
-<div id="toast" class="toast"></div><div id="tasteModal" class="modal"><div class="dialog"><h3>🎧 Мой музыкальный вкус</h3><p>Выбери любимые направления и настроение — Ok Music будет учитывать их в каждом миксе.</p><div class="taste-grid"><div class="taste-field"><label>Любимые жанры</label><div id="genreChips" class="chips"></div></div><div class="taste-field"><label>Настроение</label><div id="moodChips" class="chips"></div></div></div><div style="margin-top:14px"><label style="display:block;font-size:11px;color:var(--muted);margin-bottom:7px">Любимые исполнители</label><input id="tasteArtists" class="input" placeholder="Например: Miyagi, The Weeknd, Кино"></div><div style="margin-top:14px"><label style="display:block;font-size:11px;color:var(--muted);margin-bottom:7px">Что хочется сейчас</label><input id="tasteNow" class="input" placeholder="Например: спокойный русский рэп для дороги"></div><div class="taste-actions"><button id="tasteCancel">Отмена</button><button id="tasteSave" class="primary" style="flex:1">Сохранить вкус ✨</button></div></div></div>
+<audio id="okAudio" preload="auto" playsinline></audio><div id="toast" class="toast"></div><div id="tasteModal" class="modal"><div class="dialog"><h3>🎧 Мой музыкальный вкус</h3><p>Выбери любимые направления и настроение — Ok Music будет учитывать их в каждом миксе.</p><div class="taste-grid"><div class="taste-field"><label>Любимые жанры</label><div id="genreChips" class="chips"></div></div><div class="taste-field"><label>Настроение</label><div id="moodChips" class="chips"></div></div></div><div style="margin-top:14px"><label style="display:block;font-size:11px;color:var(--muted);margin-bottom:7px">Любимые исполнители</label><input id="tasteArtists" class="input" placeholder="Например: Miyagi, The Weeknd, Кино"></div><div style="margin-top:14px"><label style="display:block;font-size:11px;color:var(--muted);margin-bottom:7px">Что хочется сейчас</label><input id="tasteNow" class="input" placeholder="Например: спокойный русский рэп для дороги"></div><div class="taste-actions"><button id="tasteCancel">Отмена</button><button id="tasteSave" class="primary" style="flex:1">Сохранить вкус ✨</button></div></div></div>
 <script>
 const FON_IMAGES=["/fon/Picsart_26-10-03_20-41-00-386.png"];
 const view=document.querySelector("#view"), playerEl=document.querySelector("#player"), modal=document.querySelector("#modal"), toastEl=document.querySelector("#toast");
@@ -239,9 +239,14 @@ state.taste.genres=Array.isArray(state.taste.genres)?state.taste.genres:[];
 state.taste.moods=Array.isArray(state.taste.moods)?state.taste.moods:[];
 state.taste.artists=typeof state.taste.artists==="string"?state.taste.artists:"";
 state.taste.now=typeof state.taste.now==="string"?state.taste.now:"";
-let tracks=[], localTracks=[], current=null, currentIndex=-1, audio=new Audio(), nextAudio=new Audio(), playing=false, autoNext=true, nextPreloadToken=0;
-let playbackQueue=[], queueIndex=-1, recommendationLoading=false, recommendationSeen=new Set(), recommendationContextKey="", recommendationLastPrefetchIndex=-1;
+let tracks=[], localTracks=[], current=null, currentIndex=-1, audio=document.querySelector("#okAudio"), nextAudio=document.createElement("audio"), playing=false, autoNext=true, nextPreloadToken=0;
+audio.setAttribute("playsinline","");
 audio.preload="auto";
+audio.autoplay=false;
+audio.muted=false;
+audio.volume=1;
+nextAudio.setAttribute("playsinline","");
+let playbackQueue=[], queueIndex=-1, recommendationLoading=false, recommendationSeen=new Set(), recommendationContextKey="", recommendationLastPrefetchIndex=-1;
 audio.removeAttribute("crossorigin");
 nextAudio.preload="auto";
 nextAudio.removeAttribute("crossorigin");
