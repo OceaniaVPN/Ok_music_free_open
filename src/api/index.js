@@ -624,7 +624,7 @@ function chooseRecommendations(pool,limit,context){
     const isKnown=recommendationArtistMatches(t.artist,knownArtists);
     let score=Number(t.__score||0);
     const ac=artistCounts.get(artist)||0,sc=sourceCounts.get(source)||0;
-    score-=ac*24+sc*3;
+    score-=ac*24+sc*8;
     if(ac>=2)score-=70;
     if(selected.length&&recommendationText(selected[selected.length-1]?.artist)===artist)score-=28;
     if(context.currentArtist&&artist===context.currentArtist)score+=4;
@@ -807,19 +807,38 @@ export async function handleApi(request,env){
         }catch{}
       }
 
-      const baseHeaders={
-        "accept":"*/*",
-        "accept-language":"ru-RU,ru;q=0.9,en;q=0.7",
-        "user-agent":HITMOTOP_HEADERS["user-agent"],
-        "referer":referer
+      const makeAudioHeaders=(withCookie=true)=>{
+        const headers={
+          "accept":"audio/mpeg,audio/*;q=0.9,*/*;q=0.8",
+          "accept-language":"ru-RU,ru;q=0.9,en;q=0.7",
+          "user-agent":HITMOTOP_HEADERS["user-agent"],
+          "referer":referer,
+          "sec-fetch-dest":"audio",
+          "sec-fetch-mode":"no-cors",
+          "sec-fetch-site":"same-origin"
+        };
+        if(withCookie&&cookie)headers.cookie=cookie;
+        if(range)headers.range=range;
+        return headers;
       };
-      if(cookie)baseHeaders.cookie=cookie;
-      if(range)baseHeaders.range=range;
 
-      let upstream=await fetch(target,{headers:baseHeaders,redirect:"follow"});
+      const isAudioResponse=response=>{
+        const type=(response.headers.get("content-type")||"").toLowerCase();
+        return Boolean(type.startsWith("audio/"))||type.includes("mpeg")||type.includes("octet-stream");
+      };
+
+      // Try the direct MP3 first with the track-page session, then retry without
+      // the cookie. Some HitMoz mirrors reject one of these two request shapes.
+      let upstream=await fetch(target,{headers:makeAudioHeaders(true),redirect:"follow"});
       let contentType=(upstream.headers.get("content-type")||"").toLowerCase();
 
-      if(contentType.includes("text/html")||contentType.includes("application/xhtml")){
+      if(!isAudioResponse(upstream)||!upstream.ok){
+        if(upstream.body)try{await upstream.body.cancel()}catch{}
+        upstream=await fetch(target,{headers:makeAudioHeaders(false),redirect:"follow"});
+        contentType=(upstream.headers.get("content-type")||"").toLowerCase();
+      }
+
+      if(!isAudioResponse(upstream)&&contentType.includes("text/html")){
         const html=await upstream.text();
         const patterns=[
           /["'](\/get\/[^"']+\.mp3(?:\?[^"']*)?)["']/i,
@@ -836,12 +855,14 @@ export async function handleApi(request,env){
           direct=hitmotopAbsoluteUrl(hitmotopExtractAttr(button?.[0],"href"),targetUrl.origin);
         }
         if(!direct)throw Error("Hitmotop audio URL not found");
-        upstream=await fetch(direct,{headers:{...baseHeaders,referer},redirect:"follow"});
+        upstream=await fetch(direct,{headers:makeAudioHeaders(false),redirect:"follow"});
         contentType=(upstream.headers.get("content-type")||"").toLowerCase();
       }
 
       if(!upstream.ok&&upstream.status!==206)throw Error("Hitmotop audio HTTP "+upstream.status);
-      if(contentType.includes("text/html"))throw Error("Hitmotop returned HTML instead of audio");
+      if(!isAudioResponse(upstream)){
+        throw Error("Hitmotop returned non-audio content-type: "+(contentType||"unknown"));
+      }
       const headers=new Headers(upstream.headers);
       headers.set("cache-control","no-store");
       headers.set("access-control-allow-origin","*");
@@ -914,17 +935,19 @@ export async function handleApi(request,env){
     const genreKeys=recommendationGenreKeys(rawGenres);
     const knownArtists=recommendationKnownArtists(genreKeys,String(url.searchParams.get("refresh")||Date.now()),2);
     const knownArtistQueries=knownArtists.map(artist=>artist);
-    const discoveryQueries=["rock metal","electronic","party energetic"];
-    // Keep broad discovery queries as fallback so good tracks are not
-    // discarded just because the known-artist queries filled the first slots.
-    // Two known-artist queries reserve roughly 40% of a five-track batch
-    // for recognizable genre anchors; the remaining queries stay mixed.
+    const hasPersonalContext=Boolean(knownArtists.length||preferredArtists.length||genres.length||moods.length||now.length);
+    // Autoplay must stay inside the user's context. Generic genre soup is only
+    // useful for a true discovery request with no artist/genre/mood signal.
+    const discoveryQueries=hasPersonalContext?[]:["rock","electronic","party"];
+    // Reserve the first queries for known genre anchors and the user's preferred
+    // artist. Do not put the current track title into provider search when we have
+    // a stronger genre/artist signal; song titles are noisy recommendation seeds.
+    const remoteContextQueries=hasPersonalContext
+      ? [primaryArtist,...genreQueries.slice(0,1),...moodQueries.slice(0,1)]
+      : [contextQuery,primaryArtist,...genreQueries.slice(0,1),...moodQueries.slice(0,1)];
     const queries=recommendationUnique([
       ...knownArtistQueries,
-      contextQuery,
-      ...genreQueries.slice(0,1),
-      ...moodQueries.slice(0,1),
-      primaryArtist
+      ...remoteContextQueries
     ]).filter(q=>q.length>1).slice(0,5);
 
     const errors=[],providerHits={z:0,j:0,h:0,l:0};
