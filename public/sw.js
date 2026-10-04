@@ -1,5 +1,5 @@
-const CACHE_NAME="okmusic-shell-v2";
-const AUDIO_CACHE="okmusic-audio-v2";
+const CACHE_NAME="okmusic-shell-v3";
+const AUDIO_CACHE="okmusic-audio-v3";
 
 self.addEventListener("install",event=>{
   self.skipWaiting();
