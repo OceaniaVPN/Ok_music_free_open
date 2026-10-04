@@ -239,6 +239,9 @@ state.taste.genres=Array.isArray(state.taste.genres)?state.taste.genres:[];
 state.taste.moods=Array.isArray(state.taste.moods)?state.taste.moods:[];
 state.taste.artists=typeof state.taste.artists==="string"?state.taste.artists:"";
 state.taste.now=typeof state.taste.now==="string"?state.taste.now:"";
+state.artistScores=state.artistScores&&typeof state.artistScores==="object"?state.artistScores:{};
+state.genreScores=state.genreScores&&typeof state.genreScores==="object"?state.genreScores:{};
+state.playHistory=Array.isArray(state.playHistory)?state.playHistory:[];
 let tracks=[], localTracks=[], current=null, currentIndex=-1, audio=document.querySelector("#okAudio"), nextAudio=document.createElement("audio"), playing=false, autoNext=true, nextPreloadToken=0;
 audio.setAttribute("playsinline","");
 audio.preload="auto";
@@ -544,43 +547,20 @@ function prepareHomeQueue(){
  if(current||playbackQueue.length||homePrefetchPromise)return homePrefetchPromise;
  homePrefetchPromise=(async()=>{
   try{
-   // First load the repository-hosted MP3 catalog. These files are copied to
-   // /public/music by the build, so playback stays same-origin and does not
-   // depend on an external stream being available at click time.
-   const response=await fetch("/api/local-music?bootstrap="+Date.now(),{cache:"no-store"});
-   if(response.ok){
-    const data=await response.json();
-    const local=[...new Map((data.tracks||[]).filter(playableAudio).map(t=>[String(t.id),t])).values()];
-    if(local.length){
-     playbackQueue=local.slice(0,5);
-     queueIndex=-1;
-     recommendationSeen=new Set(playbackQueue.map(t=>String(t.id)));
-     const first=playbackQueue[0],src=playableAudio(first);
-     if(src){
-      const absolute=new URL(src,location.href).href;
-      audio.src=absolute;
-      audio.load();
-     }
-     drawPlayer();
-     return playbackQueue;
-    }
-   }
-   // If the local catalog is unavailable, fall back to online recommendations.
-   await fetchRecommendationBatch({refresh:String(Date.now())});
-   if(!current&&playbackQueue.length){
+   const batch=await fetchRecommendationBatch({refresh:String(Date.now())});
+   if(batch.length){
+    playbackQueue=batch.slice(0,5);queueIndex=-1;recommendationSeen=new Set(playbackQueue.map(t=>String(t.id)));
     const first=playbackQueue[0],src=playableAudio(first);
-    if(src){
-     const absolute=new URL(src,location.href).href;
-     audio.src=absolute;
-     audio.load();
-    }
-    drawPlayer();
+    if(src){audio.src=new URL(src,location.href).href;audio.load()} drawPlayer();return playbackQueue;
    }
-  }catch(error){
-   if(error?.name!=="AbortError")console.warn("Ok Music home prefetch:",error);
-  }finally{homePrefetchPromise=null}
- })();
- return homePrefetchPromise;
+   const response=await fetch("/api/local-music?fallback="+Date.now(),{cache:"no-store"});
+   if(response.ok){
+    const data=await response.json(),local=[...new Map((data.tracks||[]).filter(playableAudio).map(t=>[String(t.id),t])).values()];
+    if(local.length){playbackQueue=local.slice(0,5);queueIndex=-1;recommendationSeen=new Set(playbackQueue.map(t=>String(t.id)));const first=playbackQueue[0],src=playableAudio(first);if(src){audio.src=new URL(src,location.href).href;audio.load()}drawPlayer()}
+   }
+  }catch(error){if(error?.name!=="AbortError")console.warn("Ok Music home prefetch:",error)}
+  finally{homePrefetchPromise=null}
+ })();return homePrefetchPromise;
 }
 async function initializeHomePlayer({force=false}={}){
  if(current)return;
@@ -705,13 +685,9 @@ function recommendationExcludeList(){return [...recommendationSeen].slice(-60)}
 function recommendationParams(extra={}){
  const explicitMood=Boolean(String(extra.mood||"").trim());
  const artist=String(extra.artist||(explicitMood?"":current?.artist)||"").trim(),title=String(extra.title||(explicitMood?"":current?.title)||"").trim();
- return {
-  seed:[artist,title,...state.liked.slice(0,8).map(t=>t.artist),...state.taste.genres,...state.taste.moods,state.taste.artists,state.taste.now].filter(Boolean).join(", "),
-  artist,title,mood:String(extra.mood||""),genres:state.taste.genres.join(", "),moods:state.taste.moods.join(", "),
-  artists:state.taste.artists,likedArtists:[...new Set(state.liked.slice(0,20).map(t=>t.artist).filter(Boolean))].join(", "),
-  now:state.taste.now,liked:state.liked.slice(0,10).map(t=>t.artist+" "+t.title).join(", "),
-  exclude:recommendationExcludeList().join(","),refresh:String(Date.now())
- };
+ const topArtists=Object.entries(state.artistScores).sort((a,b)=>Number(b[1])-Number(a[1])).slice(0,12).map(([name,score])=>name+"="+score);
+ const topGenres=Object.entries(state.genreScores).sort((a,b)=>Number(b[1])-Number(a[1])).slice(0,10).map(([name,score])=>name+"="+score);
+ return {seed:[artist,title,...state.liked.slice(0,8).map(t=>t.artist),...state.taste.genres,...state.taste.moods,state.taste.artists,state.taste.now,topArtists.join(",")].filter(Boolean).join(", "),artist,title,mood:String(extra.mood||""),genres:state.taste.genres.join(", "),moods:state.taste.moods.join(", "),artists:state.taste.artists,likedArtists:[...new Set(state.liked.slice(0,20).map(t=>t.artist).filter(Boolean))].join(", "),artistScores:topArtists.join(", "),genreScores:topGenres.join(", "),now:state.taste.now,liked:state.liked.slice(0,10).map(t=>t.artist+" "+t.title).join(", "),exclude:recommendationExcludeList().join(","),refresh:String(Date.now())};
 }
 async function fetchRecommendationBatch(extra={},signal){
  if(recommendationLoading)return [];
@@ -719,7 +695,7 @@ async function fetchRecommendationBatch(extra={},signal){
  recommendationLoading=true;
  try{
   const p=recommendationParams(extra);
-  const qs=new URLSearchParams({limit:"5",seed:p.seed,artist:p.artist,title:p.title,mood:p.mood,genres:p.genres,moods:p.moods,artists:p.artists,likedArtists:p.likedArtists,now:p.now,liked:p.liked,exclude:p.exclude,refresh:p.refresh});
+  const qs=new URLSearchParams({limit:"5",seed:p.seed,artist:p.artist,title:p.title,mood:p.mood,genres:p.genres,moods:p.moods,artists:p.artists,likedArtists:p.likedArtists,artistScores:p.artistScores,genreScores:p.genreScores,now:p.now,liked:p.liked,exclude:p.exclude,refresh:p.refresh});
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),8_500);
   const onAbort=()=>controller.abort();
