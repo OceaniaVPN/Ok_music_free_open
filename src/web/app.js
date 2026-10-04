@@ -392,13 +392,23 @@ function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&l
 function save(){localStorage.setItem(KEY,JSON.stringify(state))}
 function toast(s){toastEl.textContent=s;toastEl.classList.add("show");clearTimeout(window._toast);window._toast=setTimeout(()=>toastEl.classList.remove("show"),1800)}
 function fmt(n){return Number.isFinite(n)&&n>0?Math.floor(n/60)+":"+String(Math.floor(n%60)).padStart(2,"0"):"0:00"}
-function playableAudio(t){
- if(!t)return "";
- if(t.zaycevId)return "/api/zaycev/play?id="+encodeURIComponent(String(t.zaycevId));
- if(t.audio)return String(t.audio);
- if(t.src)return String(t.src);
- return "";
+function playableAudioCandidates(t){
+ if(!t)return [];
+ const out=[];
+ const add=value=>{
+  const src=String(value||"").trim();
+  if(src&&!out.includes(src))out.push(src);
+ };
+ // Hitmotop exposes a direct MP3 URL in its parser response. Prefer it for autoplay,
+ // but keep the Worker proxy as a fallback in case the direct file is unavailable.
+ if(String(t.source||"")==="Hitmotop")add(t.downloadUrl);
+ if(t.zaycevId)add("/api/zaycev/play?id="+encodeURIComponent(String(t.zaycevId)));
+ add(t.audio);
+ add(t.src);
+ if(String(t.source||"")==="Hitmotop")add(t.downloadUrl);
+ return out;
 }
+function playableAudio(t){return playableAudioCandidates(t)[0]||"";}
 const OK_OFFLINE_CACHE="okmusic-audio-v2";
 const OK_OFFLINE_META="okmusic:offline:v2";
 function __okOfflineMeta(){
@@ -779,47 +789,67 @@ function play(t,{fromEnded=false,keepQueue=false,fromBootstrap=false}={}){
  playing=false;
  updateMediaSession();
  drawPlayer();
- const src=playableAudio(t);
- if(!src){
+ const candidates=playableAudioCandidates(t);
+ if(!candidates.length){
   toast("У этого трека нет аудиопотока — пропускаю");
   void playNext();
   return;
  }
  const token=++window.__okPlayToken;
- try{
-  const absolute=new URL(src,location.href).href;
-  audio.pause();
-  if(audio.src!==absolute){
-   audio.src=src;
+ let candidateIndex=0;
+ const tryCandidate=()=>{
+  if(token!==window.__okPlayToken||current?.id!==t.id)return;
+  const src=candidates[candidateIndex];
+  try{
+   const absolute=new URL(src,location.href).href;
+   audio.pause();
+   audio.src=absolute;
    audio.load();
-  }
-  const promise=audio.play();
-  Promise.resolve(promise).then(()=>{
-   if(token!==window.__okPlayToken||current?.id!==t.id)return;
-   playing=true;
-   updateMediaSession();
-   drawPlayer();
-   preloadNext();
-   void ensureRecommendationWindow();
-  }).catch(async error=>{
-   if(token!==window.__okPlayToken)return;
-   console.warn("Ok Music playback:",{error,current:t});
-   if(error?.name==="NotAllowedError"){
-    toast("Браузер запретил автозапуск — нажми ▶");
-    return;
-   }
-   const failedIndex=playbackQueue.findIndex(x=>String(x?.id||"")===String(t.id||""));
-   if(failedIndex>=0){
-    playbackQueue.splice(failedIndex,1);
-    recommendationSeen.delete(String(t.id||""));
-    queueIndex=Math.max(-1,failedIndex-1);
-   }
+   const promise=audio.play();
+   Promise.resolve(promise).then(()=>{
+    if(token!==window.__okPlayToken||current?.id!==t.id)return;
+    playing=true;
+    updateMediaSession();
+    drawPlayer();
+    preloadNext();
+    void ensureRecommendationWindow();
+   }).catch(async error=>{
+    if(token!==window.__okPlayToken)return;
+    if(error?.name==="NotAllowedError"){
+     toast("Браузер запретил автозапуск — нажми ▶");
+     return;
+    }
+    // Hitmotop can reject the direct file in one context while the same
+    // track remains playable through the Worker proxy, so try the next URL.
+    if(candidateIndex<candidates.length-1){
+     candidateIndex++;
+     tryCandidate();
+     return;
+    }
+    console.warn("Ok Music playback:",{error,current:t,candidates});
+    const failedIndex=playbackQueue.findIndex(x=>String(x?.id||"")===String(t.id||""));
+    if(failedIndex>=0){
+     playbackQueue.splice(failedIndex,1);
+     recommendationSeen.delete(String(t.id||""));
+     queueIndex=Math.max(-1,failedIndex-1);
+    }
+    current=null;
+    playing=false;
+    toast("Поток не ответил — переключаюсь");
+    setTimeout(()=>void playNext(),60);
+   });
+  }catch(error){
+   if(candidateIndex<candidates.length-1){candidateIndex++;tryCandidate();return;}
+   console.warn("Ok Music playback:",error);
    current=null;
    playing=false;
-   toast("Поток не ответил — переключаюсь");
    setTimeout(()=>void playNext(),60);
-  });
- }catch(error){
+  }
+ };
+ tryCandidate();
+}
+
+function playLegacyUnused(t){
   console.warn("Ok Music playback:",error);
   current=null;
   playing=false;
