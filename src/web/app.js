@@ -554,7 +554,8 @@ function openPlaylist(id){const p=state.playlists.find(x=>x.id===id);if(!p)retur
 function like(t){if(!t)return;const i=state.liked.findIndex(x=>x.id===t.id);if(i>=0){state.liked.splice(i,1);toast("Убрано из любимого")}else{state.liked.unshift(t);toast("♥ Добавлено в любимое")}save();render(document.querySelector(".nav button.active").dataset.view)}
 function recommendationExcludeList(){return [...recommendationSeen].slice(-60)}
 function recommendationParams(extra={}){
- const artist=String(extra.artist||current?.artist||"").trim(),title=String(extra.title||current?.title||"").trim();
+ const explicitMood=Boolean(String(extra.mood||"").trim());
+ const artist=String(extra.artist||(explicitMood?"":current?.artist)||"").trim(),title=String(extra.title||(explicitMood?"":current?.title)||"").trim();
  return {
   seed:[artist,title,...state.liked.slice(0,8).map(t=>t.artist),...state.taste.genres,...state.taste.moods,state.taste.artists,state.taste.now].filter(Boolean).join(", "),
   artist,title,mood:String(extra.mood||""),genres:state.taste.genres.join(", "),moods:state.taste.moods.join(", "),
@@ -617,7 +618,7 @@ function play(t,{fromEnded=false,keepQueue=false}){
   const promise=audio.play();
   Promise.resolve(promise).then(()=>{
    if(token===window.__okPlayToken&&current?.id===t.id){
-    playing=true;updateMediaSession();drawPlayer();preloadNext();void fetchRecommendationBatch();
+    playing=true;updateMediaSession();drawPlayer();preloadNext();void ensureRecommendationWindow();
    }
   }).catch(error=>{console.warn("Ok Music playback:",error);toast(error?.name==="NotAllowedError"?"Нажми ▶ ещё раз для запуска":"Не удалось воспроизвести трек")});
  }catch(error){console.warn("Ok Music playback:",error);toast("Не удалось воспроизвести трек")}
