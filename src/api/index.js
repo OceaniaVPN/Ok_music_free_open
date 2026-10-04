@@ -107,7 +107,7 @@ function hitmotopCookieHeader(response){
 
 function hitmotopExtractAttr(tag,name){
   const wanted=String(name||"").toLowerCase();
-  for(const match of String(tag||"").matchAll(/([A-Za-z0-9:-]+)\\s*=\\s*["']([^"']+)["']/g)){
+  for(const match of String(tag||"").matchAll(/([A-Za-z0-9:-]+)\s*=\s*["']([^"']+)["']/g)){
     if(String(match[1]).toLowerCase()===wanted)return match[2];
   }
   return "";
@@ -116,7 +116,7 @@ function hitmotopExtractAttr(tag,name){
 function hitmotopExtractImageFromTag(tag,base){
   const style=hitmotopExtractAttr(tag,"style");
   const direct=hitmotopExtractAttr(tag,"src")||hitmotopExtractAttr(tag,"data-src")||hitmotopExtractAttr(tag,"data-original");
-  const fromStyle=style.match(/url\\(\\s*["']?([^"')]+)["']?\\s*\\)/i);
+  const fromStyle=style.match(/url\(\s*["']?([^"')]+)["']?\s*\)/i);
   const image=fromStyle?.[1]||direct;
   return image?hitmotopAbsoluteUrl(image,base):"";
 }
@@ -124,12 +124,12 @@ function hitmotopExtractImageFromTag(tag,base){
 function parseHitmotopSearch(html,base,limit){
   const source=String(html||"");
   const collect=(re)=>[...source.matchAll(re)].map(match=>match[1]);
-  const titles=collect(/<div\\b[^>]*class=["'][^"']*\\btrack__title\\b[^"']*["'][^>]*>([\\s\\S]*?)<\\/div>/gi);
-  const artists=collect(/<div\\b[^>]*class=["'][^"']*\\btrack__desc\\b[^"']*["'][^>]*>([\\s\\S]*?)<\\/div>/gi);
-  const durations=collect(/<div\\b[^>]*class=["'][^"']*\\btrack__fulltime\\b[^"']*["'][^>]*>([\\s\\S]*?)<\\/div>/gi);
-  const images=collect(/<div\\b[^>]*class=["'][^"']*\\btrack__img\\b[^"']*["'][^>]*>/gi);
-  const downloads=collect(/<a\\b[^>]*class=["'][^"']*\\btrack__download-btn\\b[^"']*["'][^>]*>/gi);
-  const infoLinks=collect(/<a\\b[^>]*class=["'][^"']*\\btrack__info-l\\b[^"']*["'][^>]*>/gi);
+  const titles=collect(/<div\b[^>]*class=["'][^"']*\btrack__title\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi);
+  const artists=collect(/<div\b[^>]*class=["'][^"']*\btrack__desc\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi);
+  const durations=collect(/<div\b[^>]*class=["'][^"']*\btrack__fulltime\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi);
+  const images=collect(/<div\b[^>]*class=["'][^"']*\btrack__img\b[^"']*["'][^>]*>/gi);
+  const downloads=collect(/<a\b[^>]*class=["'][^"']*\btrack__download-btn\b[^"']*["'][^>]*>/gi);
+  const infoLinks=collect(/<a\b[^>]*class=["'][^"']*\btrack__info-l\b[^"']*["'][^>]*>/gi);
   const count=Math.min(limit,titles.length,artists.length,durations.length,downloads.length,infoLinks.length);
   const out=[];
   const seen=new Set();
@@ -144,10 +144,10 @@ function parseHitmotopSearch(html,base,limit){
     const title=stripHtml(titles[i]).replace(/[/\\:*?"<>|]/g,"").trim()||"Без названия";
     const artist=stripHtml(artists[i])||"Неизвестный исполнитель";
     const durationText=stripHtml(durations[i]);
-    const duration=parseDuration(durationText.match(/\\b\\d{1,2}:\\d{2}(?::\\d{2})?\\b/)?.[0]||"");
+    const duration=parseDuration(durationText.match(/\b\d{1,2}:\d{2}(?::\d{2})?\b/)?.[0]||"");
     const image=hitmotopExtractImageFromTag(images[i]||"",base);
     const key=pageUrl||urlDown;
-    const idPart=(key.match(/\\/([^/?#]+)(?:[?#]|$)/)?.[1]||key).replace(/[^a-zA-Z0-9_-]/g,"-").slice(-140);
+    const idPart=(key.match(/\/([^/?#]+)(?:[?#]|$)/)?.[1]||key).replace(/[^a-zA-Z0-9_-]/g,"-").slice(-140);
     const id="hitmotop-"+idPart;
     if(seen.has(id))continue;
     seen.add(id);
