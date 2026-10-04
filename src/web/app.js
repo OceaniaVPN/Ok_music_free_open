@@ -519,37 +519,36 @@ const TASTE_GENRES=["Русский рэп","Поп","Рок","Электрон�
  view.querySelectorAll("[data-quick-q]").forEach(b=>b.onclick=()=>doSearch(b.dataset.quickQ));
  document.querySelector("#editTaste").onclick=openTaste;
  const clear=document.querySelector("#clearOffline");if(clear)clear.onclick=clearOffline;
- await refreshOfflineButtons(view);
  void initializeHomePlayer();
+ void refreshOfflineButtons(view);
 }
 async function initializeHomePlayer(){
  if(current||recommendationLoading)return;
  try{
-  const hasTaste=Boolean(
-   state.taste.genres.length||
-   state.taste.moods.length||
-   String(state.taste.artists||"").trim()||
-   String(state.taste.now||"").trim()||
-   state.liked.length
-  );
-  if(hasTaste){
-   const batch=await fetchRecommendationBatch({refresh:String(Date.now())});
-   if(batch.length){
-    queueIndex=0;
-    play(batch[0],{keepQueue:true});
-    return;
-   }
+  // Первый запуск всегда получает скрытую пачку из 5 треков.
+  const batch=await fetchRecommendationBatch({refresh:String(Date.now())});
+  if(batch.length){
+   queueIndex=0;
+   play(batch[0],{keepQueue:true});
+   return;
   }
-  const queries=["music","pop music","rock music","hip hop","electronic music"];
-  const q=queries[Math.floor(Math.random()*queries.length)];
-  const fallback=await fetch("/api/search?q="+encodeURIComponent(q)+"&limit=12",{cache:"no-store"}).then(r=>r.json());
-  const candidates=(fallback.tracks||[]).filter(playableAudio);
-  if(candidates.length){
+
+  // Крайний fallback: даже при временно пустых рекомендациях пробуем поиск.
+  const queries=["popular music","pop music","rock music","electronic music"];
+  for(const q of queries){
+   const response=await fetch("/api/search?q="+encodeURIComponent(q)+"&limit=12",{cache:"no-store"});
+   if(!response.ok)continue;
+   const fallback=await response.json();
+   const candidates=(fallback.tracks||[]).filter(playableAudio);
+   if(!candidates.length)continue;
    const t=candidates[Math.floor(Math.random()*candidates.length)];
-   playbackQueue=[];
-   queueIndex=-1;
-   recommendationSeen=new Set();
-   play(t);
+   playbackQueue=[t];
+   queueIndex=0;
+   recommendationSeen=new Set([String(t.id)]);
+   play(t,{keepQueue:true});
+   // Сразу догружаем скрытое окно рекомендаций.
+   void fetchRecommendationBatch({refresh:String(Date.now())});
+   return;
   }
  }catch(e){console.warn("Ok Music home player:",e)}
 }
@@ -607,7 +606,7 @@ async function fetchRecommendationBatch(extra={}){
   const d=await r.json();
   if(!d.ok||!Array.isArray(d.tracks))throw Error(d.error||"Нет рекомендаций");
   const existing=new Set(playbackQueue.map(t=>t?.id));
-  const fresh=d.tracks.filter(t=>t?.id&&!existing.has(t.id)&&!recommendationSeen.has(t.id));
+  const fresh=d.tracks.filter(t=>t?.id&&playableAudio(t)&&!existing.has(t.id)&&!recommendationSeen.has(t.id));
   fresh.forEach(t=>recommendationSeen.add(t.id));
   playbackQueue.push(...fresh);
   recommendationContextKey=p.seed;
