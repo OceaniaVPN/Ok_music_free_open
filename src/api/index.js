@@ -98,7 +98,8 @@ function hitmotopExtractSid(response){
   return m?m[1]:"";
 }
 function hitmotopExtractAttr(tag,name){
-  const m=String(tag||"").match(new RegExp(name + "\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]", "i"));
+  const escaped=String(name||"").replace(/[.*+?^$\{\}()|[\]\\]/g,"\\  const m=String(tag||"").match(new RegExp(name + "\\s*=\\s*['\\\"]([^'\\\"]+)['\\\"]", "i"));");
+  const m=String(tag||"").match(new RegExp(`${escaped}\\s*=\\s*['"']([^'"']+)['"']`,"i"));
   return m?m[1]:"";
 }
 function hitmotopExtractImage(chunk,base){
