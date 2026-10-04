@@ -170,7 +170,7 @@ function parseHitmotopSearch(html,base,limit){
   // without the older track__download-btn markup. Parse those links as a fallback.
   if(out.length<limit){
     const seenUrls=new Set(out.map(t=>t.downloadUrl).filter(Boolean));
-    const links=[...source.matchAll(/<a\\b[^>]*href=[\"']([^\"']*\\/get\\/music\\/[^\\"']+\\.mp3(?:\\?[^\\"']*)?)[\"'][^>]*>([\\s\\S]*?)<\\/a>/gi)];
+    const links=[...source.matchAll(/<a\\b[^>]*href=[\"\']([^\"\']*\\/get\\/music\\/[^\"\']+\\.mp3(?:\\?[^\"\']*)?)[\"\'][^>]*>([\\s\\S]*?)<\\/a>/gi)];
     for(const match of links){
       if(out.length>=limit)break;
       const urlDown=hitmotopAbsoluteUrl(match[1],base);
