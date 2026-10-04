@@ -1,5 +1,5 @@
-const CACHE_NAME="okmusic-shell-v3";
-const AUDIO_CACHE="okmusic-audio-v3";
+const CACHE_NAME="okmusic-shell-v4";
+const AUDIO_CACHE="okmusic-audio-v4";
 
 self.addEventListener("install",event=>{
   self.skipWaiting();
@@ -22,7 +22,6 @@ function isAudio(request){
   const url=new URL(request.url);
   return request.method==="GET" &&
     (url.pathname.startsWith("/music/") ||
-     url.pathname.startsWith("/api/zaycev/play") ||
      /\.(mp3|m4a|ogg|opus|wav|aac|flac)(?:$|\?)/i.test(url.pathname));
 }
 
