@@ -643,6 +643,7 @@ function play(t,{fromEnded=false,keepQueue=false}){
   playbackQueue=[t];idx=0;recommendationSeen=new Set([String(t.id)]);recommendationContextKey="";
  }
  queueIndex=idx;currentIndex=idx;current=t;updateMediaSession();
+ drawPlayer();
  const src=playableAudio(t);
  if(!src){toast(String(t?.audio||"").startsWith("mega://")?"MEGA-трек пока не готов к воспроизведению":"У этого трека нет аудиопотока");return}
  const token=++window.__okPlayToken;
@@ -658,9 +659,11 @@ function play(t,{fromEnded=false,keepQueue=false}){
  }catch(error){console.warn("Ok Music playback:",error);toast("Не удалось воспроизвести трек")}
 }
 async function playNext(){
- const remaining=playbackQueue.length-queueIndex-1;
- if(remaining<=2)await fetchRecommendationBatch();
- const next=playbackQueue[queueIndex+1];
+ let next=playbackQueue[queueIndex+1];
+ if(!next){
+  await fetchRecommendationBatch();
+  next=playbackQueue[queueIndex+1];
+ }
  if(next){play(next,{fromEnded:true,keepQueue:true});return}
  playing=false;
  if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";
@@ -729,7 +732,7 @@ function drawPlayer(){if(!current){playerEl.className="player on";playerEl.inner
 audio.onplay=()=>{playing=true;if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});if(spatial3d)updateSpatial3d();if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer()};audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
 audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer()};audio.onended=()=>{playing=false;if(autoNext)playNext();else{if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()}};audio.onerror=()=>{toast("Не удалось загрузить аудио");playing=false;drawPlayer()};
 nextAudio.onerror=()=>{nextAudio.removeAttribute("src")};
-audio.addEventListener("canplay",()=>{preloadNext();const remaining=playbackQueue.length-queueIndex-1;if(remaining<=2)void fetchRecommendationBatch()});
+audio.addEventListener("canplay",()=>{preloadNext();const remaining=playbackQueue.length-queueIndex-1;if(remaining<=1)void fetchRecommendationBatch()});
 document.querySelector("#closeModal").onclick=()=>modal.classList.remove("open");modal.onclick=e=>{if(e.target===modal)modal.classList.remove("open")};
 document.querySelector("#createPlaylist").onclick=()=>{const name=document.querySelector("#playlistName").value.trim();if(!name)return toast("Введи название");state.playlists.unshift({id:"pl-"+Date.now(),name,tracks:[]});save();document.querySelector("#playlistName").value="";modal.classList.remove("open");library();toast("Плейлист создан ✨")}
 function render(name){document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));({home,mood,search:searchView,library}[name]||home)()}
