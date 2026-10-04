@@ -519,8 +519,8 @@ const TASTE_GENRES=["Русский рэп","Поп","Рок","Электрон�
  view.querySelectorAll("[data-quick-q]").forEach(b=>b.onclick=()=>doSearch(b.dataset.quickQ));
  document.querySelector("#editTaste").onclick=openTaste;
  const clear=document.querySelector("#clearOffline");if(clear)clear.onclick=clearOffline;
- await refreshOfflineButtons(view);
-}
+ await refreshOfflineButtons(view);\n void initializeHomePlayer();
+}\nasync function initializeHomePlayer(){\n if(current||recommendationLoading)return;\n try{\n  const batch=await fetchRecommendationBatch();\n  if(batch.length){queueIndex=0;play(batch[0],{keepQueue:true});return}\n  const fallback=await fetch("/api/search?q="+encodeURIComponent("random music")+"&limit=8",{cache:"no-store"}).then(r=>r.json());\n  const t=(fallback.tracks||[]).find(x=>playableAudio(x));\n  if(t)play(t);\n }catch(e){console.warn("Ok Music home player:",e)}\n}\n
 function mood(){
  const moodItems=[["🌙","Ночной вайб","Спокойное и атмосферное"],["⚡","Энергия","Больше ритма и движения"],["☁️","Chill","Расслабиться и выдохнуть"],["💜","Любовь","Мягкие и тёплые треки"],["🚗","В дорогу","Музыка для долгой поездки"],["🔥","Вечеринка","Ритм, который не отпускает"],["🖤","Фонк","Бас, дрифт и ночной вайб"]];
  view.innerHTML='<div class="section"><h2>Подбор по настроению</h2><small>Выбери атмосферу — песни не показываются заранее</small></div><div class="moods">'+moodItems.map((x,i)=>'<button class="mood-card" data-mood="'+i+'"><b>'+x[0]+'</b><strong>'+x[1]+'</strong><span>'+x[2]+'</span></button>').join("")+'</div><div class="empty" style="margin-top:16px">Выбранное настроение будет влиять на скрытую очередь автоподбора.</div>';
