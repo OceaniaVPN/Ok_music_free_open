@@ -921,6 +921,8 @@ export async function handleApi(request,env){
     const knownArtists=recommendationKnownArtists(genreKeys,String(url.searchParams.get("refresh")||Date.now()),2);
     const knownArtistQueries=knownArtists.map(artist=>artist);
     const discoveryQueries=["rock metal","electronic","party energetic"];
+    // Keep broad discovery queries as fallback so good tracks are not
+    // discarded just because the known-artist queries filled the first slots.
     // Two known-artist queries reserve roughly 40% of a five-track batch
     // for recognizable genre anchors; the remaining queries stay mixed.
     const queries=recommendationUnique([
