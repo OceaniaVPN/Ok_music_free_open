@@ -553,7 +553,6 @@ async function initializeHomePlayer({force=false}={}){
   play(playbackQueue[0],{keepQueue:true,fromBootstrap:true});
   return;
  }
- if(current)return;
  if(force){
   homeBootstrapController?.abort();
   homeBootstrapController=null;
