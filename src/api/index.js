@@ -533,32 +533,16 @@ function chooseRecommendations(pool,limit,context){
     const artist=recommendationText(t.artist),title=recommendationText(t.title),source=String(t.source||"");
     let score=Number(t.__score||0);
     const ac=artistCounts.get(artist)||0,sc=sourceCounts.get(source)||0;
-    score-=ac*24+sc*5;
-    if(ac>=2)score-=80;
+    // Catalog diversity is only a tie-breaker. Never force one track from
+    // every provider into a personalized queue.
+    score-=ac*24+sc*3;
+    if(ac>=2)score-=70;
     if(selected.length&&recommendationText(selected[selected.length-1]?.artist)===artist)score-=28;
     if(context.currentArtist&&artist===context.currentArtist)score+=4;
     if(context.currentTitle&&title===context.currentTitle)score-=1000;
     score+=(recommendationHash(context.salt+"|"+t.id)%1000)/1000;
     return score;
   };
-  // Prefer one playable track from every available catalog first, then fill
-  // the remaining slots by recommendation score.
-  for(const source of ["Jamendo","Zaycev.net","Hitmotop"]){
-    if(selected.length>=limit)break;
-    let best=null,bestScore=-Infinity;
-    for(const t of pool){
-      if(!t?.id||used.has(t.id)||String(t.source||"")!==source)continue;
-      const score=scoreTrack(t);
-      if(score>bestScore){bestScore=score;best=t}
-    }
-    if(!best)continue;
-    used.add(best.id);
-    const artist=recommendationText(best.artist),src=String(best.source||"");
-    artistCounts.set(artist,(artistCounts.get(artist)||0)+1);
-    sourceCounts.set(src,(sourceCounts.get(src)||0)+1);
-    delete best.__score;
-    selected.push(best);
-  }
   while(selected.length<limit){
     let best=null,bestScore=-Infinity;
     for(const t of pool){
@@ -572,6 +556,7 @@ function chooseRecommendations(pool,limit,context){
     artistCounts.set(artist,(artistCounts.get(artist)||0)+1);
     sourceCounts.set(source,(sourceCounts.get(source)||0)+1);
     delete best.__score;
+    delete best.__queryScore;
     selected.push(best);
   }
   return selected;
