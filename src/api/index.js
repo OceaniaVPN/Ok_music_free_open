@@ -60,7 +60,7 @@ async function fetchZaycevSearch(q,limit){
   return found.map(t=>({id:"zaycev-"+t.id,zaycevId:Number(t.id),title:t.title,artist:t.artist,album:"",image:t.image?(new URL(t.image,ZAYCEV_BASE).href):"",audio:"/api/zaycev/play?id="+encodeURIComponent(t.id),duration:t.duration||0,license:"",source:"Zaycev.net",sourceUrl:t.sourceUrl,genre:""}));
 }
 async function zaycevFileMeta(ids){
-  const r=await fetch(ZAYCEV_TRACK_API+"/filezmeta",{method:"POST",headers:ZAYCEV_HEADERS,body:JSON.stringify({trackIds:ids.map(String),subscription:false})});
+  const r=await fetch(ZAYCEV_TRACK_API+"/filezmeta",{method:"POST",headers:ZAYCEV_HEADERS,body:JSON.stringify({trackIds:ids.map(String),subscription:false}),signal:AbortSignal.timeout(5_500)});
   const text=await r.text();if(!r.ok)throw Error("Zaycev filezmeta HTTP "+r.status);
   let d;try{d=JSON.parse(text)}catch{throw Error("Zaycev filezmeta returned invalid JSON")}
   return Array.isArray(d?.tracks)?d.tracks:[];
@@ -68,11 +68,11 @@ async function zaycevFileMeta(ids){
 async function zaycevPlay(id){
   const meta=(await zaycevFileMeta([id]))[0];if(!meta)throw Error("Zaycev track metadata not found");
   if(meta.download){
-    const r=await fetch(ZAYCEV_TRACK_API+"/download/"+encodeURIComponent(meta.download),{headers:{accept:"text/plain,application/json,*/*","user-agent":ZAYCEV_HEADERS["user-agent"],referer:ZAYCEV_BASE+"/"}});
+    const r=await fetch(ZAYCEV_TRACK_API+"/download/"+encodeURIComponent(meta.download),{headers:{accept:"text/plain,application/json,*/*","user-agent":ZAYCEV_HEADERS["user-agent"],referer:ZAYCEV_BASE+"/"},signal:AbortSignal.timeout(5_500)});
     const target=(await r.text()).trim();if(r.ok&&/^https?:\/\//i.test(target))return target;
   }
   if(meta.streaming){
-    const r=await fetch(ZAYCEV_TRACK_API+"/play/"+encodeURIComponent(meta.streaming),{headers:ZAYCEV_HEADERS});
+    const r=await fetch(ZAYCEV_TRACK_API+"/play/"+encodeURIComponent(meta.streaming),{headers:ZAYCEV_HEADERS,signal:AbortSignal.timeout(5_500)});
     const text=await r.text();if(!r.ok)throw Error("Zaycev stream HTTP "+r.status);
     let d;try{d=JSON.parse(text)}catch{throw Error("Zaycev stream returned invalid JSON")}
     if(d?.url)return d.url;
