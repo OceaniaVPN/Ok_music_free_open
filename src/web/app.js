@@ -240,7 +240,7 @@ state.taste.moods=Array.isArray(state.taste.moods)?state.taste.moods:[];
 state.taste.artists=typeof state.taste.artists==="string"?state.taste.artists:"";
 state.taste.now=typeof state.taste.now==="string"?state.taste.now:"";
 let tracks=[], localTracks=[], current=null, currentIndex=-1, audio=new Audio(), nextAudio=new Audio(), playing=false, autoNext=true, nextPreloadToken=0;
-let playbackQueue=[], queueIndex=-1, recommendationLoading=false, recommendationSeen=new Set(), recommendationContextKey="";
+let playbackQueue=[], queueIndex=-1, recommendationLoading=false, recommendationSeen=new Set(), recommendationContextKey="", recommendationLastPrefetchIndex=-1;
 audio.preload="auto";
 audio.crossOrigin="anonymous";
 nextAudio.preload="auto";
@@ -566,7 +566,9 @@ function recommendationParams(extra={}){
 }
 async function fetchRecommendationBatch(extra={}){
  if(recommendationLoading)return [];
+ if(recommendationLastPrefetchIndex===queueIndex)return [];
  recommendationLoading=true;
+ recommendationLastPrefetchIndex=queueIndex;
  try{
   const p=recommendationParams(extra);
   const qs=new URLSearchParams({limit:"5",seed:p.seed,artist:p.artist,title:p.title,mood:p.mood,genres:p.genres,moods:p.moods,artists:p.artists,likedArtists:p.likedArtists,now:p.now,liked:p.liked,exclude:p.exclude,refresh:p.refresh});
@@ -589,7 +591,7 @@ async function ensureRecommendationWindow(extra={}){
  await fetchRecommendationBatch(extra);
 }
 async function startRecommendationFromContext(extra={}){
- playbackQueue=[];queueIndex=-1;recommendationSeen=new Set();
+ playbackQueue=[];queueIndex=-1;recommendationSeen=new Set();recommendationLastPrefetchIndex=-1;
  const batch=await fetchRecommendationBatch(extra);
  if(batch.length)playbackQueue=[...batch];
  if(playbackQueue.length){queueIndex=0;play(playbackQueue[0],{keepQueue:true})}
