@@ -791,15 +791,23 @@ export async function handleApi(request,env){
     const excluded=new Set((url.searchParams.get("exclude")||"").split(",").map(x=>x.trim()).filter(Boolean));
     if(currentArtist&&currentTitle)excluded.add(currentArtist+" | "+currentTitle);
 
-    const themeQuery=[...new Set([...genres.slice(0,4),...moods.slice(0,4),...now.slice(0,3)])].join(" ");
+    const rawGenres=recommendationUnique((url.searchParams.get("genres")||"").split(/[,;]+/).map(recommendationText).filter(Boolean));
+    const rawMoods=recommendationUnique((url.searchParams.get("moods")||mood||"").split(/[,;]+/).map(recommendationText).filter(Boolean));
+    const rawNow=recommendationUnique((url.searchParams.get("now")||"").split(/[,;]+/).map(recommendationText).filter(Boolean));
+    const mappedNow=rawNow.flatMap(x=>RECOMMENDATION_VOCAB[x]||[]).map(recommendationText);
+    const genreQueries=rawGenres.map(x=>(RECOMMENDATION_VOCAB[x]||[x]).slice(0,3).join(" "));
+    const moodQueries=rawMoods.map(x=>(RECOMMENDATION_VOCAB[x]||[x]).slice(0,2).join(" "));
     const primaryArtist=preferredArtists[0]||currentArtist;
-    const discoveryQueries=["indie music","electronic music","pop music"];
+    const discoveryQueries=["rock metal","electronic","party energetic"];
+    // Search selected directions separately so provider popularity cannot
+    // dominate a giant mixed query.
     const queries=recommendationUnique([
-      [primaryArtist,genres.slice(0,2).join(" "),moods.slice(0,2).join(" ")].filter(Boolean).join(" "),
-      [themeQuery,seed].filter(Boolean).join(" "),
-      preferredArtists.slice(1,3).join(" "),
-      ...((!primaryArtist&&!themeQuery&&!seed)?discoveryQueries:[])
-    ]).filter(q=>q.length>1).slice(0,3);
+      ...genreQueries.slice(0,3),
+      ...moodQueries.slice(0,2),
+      mappedNow.slice(0,3).join(" "),
+      primaryArtist,
+      ...((!primaryArtist&&!genreQueries.length&&!moodQueries.length&&!mappedNow.length)?discoveryQueries:[])
+    ]).filter(q=>q.length>1).slice(0,5);
 
     const errors=[],providerHits={z:0,j:0,h:0};
     const pool=[],seenIds=new Set(),seenSongs=new Set();
@@ -836,7 +844,7 @@ export async function handleApi(request,env){
       }
     };
 
-    for(let round=0;round<Math.min(2,queries.length);round++){
+    for(let round=0;round<Math.min(5,queries.length);round++){
       const q=queries[round];
       if(!q)continue;
       const providerLimit=Math.max(5,Math.min(10,limit+1));
