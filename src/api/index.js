@@ -527,8 +527,17 @@ const RECOMMENDATION_ARTIST_POOLS=recommendationArtists&&typeof recommendationAr
 function recommendationGenreKeys(values){
   return recommendationUnique(values.map(recommendationGenreKey).filter(Boolean));
 }
+function recommendationArtistName(value){
+  if(typeof value==="string")return value.trim();
+  if(!value||typeof value!=="object")return "";
+  return String(value.name||value.artist||"").trim();
+}
 function recommendationKnownArtists(keys,salt,count=2){
-  const pool=keys.flatMap(key=>RECOMMENDATION_ARTIST_POOLS[key]||[]);
+  const pool=keys.flatMap(key=>{
+    const value=RECOMMENDATION_ARTIST_POOLS[key];
+    const artists=Array.isArray(value)?value:(Array.isArray(value?.artists)?value.artists:[]);
+    return artists.map(recommendationArtistName).filter(Boolean);
+  });
   const unique=recommendationUnique(pool);
   return unique.sort((a,b)=>{
     const sa=recommendationHash(String(salt)+"|known|"+a);
@@ -537,10 +546,10 @@ function recommendationKnownArtists(keys,salt,count=2){
   }).slice(0,Math.max(0,count));
 }
 function recommendationArtistMatches(value,set){
-  const text=recommendationText(value);
+  const text=recommendationText(recommendationArtistName(value)||value);
   if(!text)return false;
   for(const artist of set){
-    const known=recommendationText(artist);
+    const known=recommendationText(recommendationArtistName(artist)||artist);
     if(text===known||text.includes(known)||known.includes(text))return true;
   }
   return false;
@@ -553,7 +562,7 @@ function normalizeArtistName(value){
 }
 function isLikelyTrackTitleAsArtist(artist,title){
   const a=normalizeArtistName(artist), t=recommendationText(title);
-  if(!a||!t)return true;
+  if(!a||!t)return false;
   if(a===t)return true;
   if(t.length>2&&a.length>2&&t.includes(a)&&t!==a)return true;
   return false;
