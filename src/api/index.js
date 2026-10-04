@@ -406,7 +406,13 @@ function mergeProviderTracks(providerLists, limit) {
   const out = [];
   const seenIds = new Set();
   const seenSongs = new Set();
+  // Prefer Jamendo for the first result because its stream is now served
+  // through our same-origin Worker proxy; keep all other providers available.
   const lists = providerLists.filter(Array.isArray);
+  if(lists.length===3){
+    // Incoming order: Zaycev, Jamendo, Hitmotop.
+    [lists[0],lists[1]]=[lists[1],lists[0]];
+  }
   let cursor = 0;
 
   const available = () => lists.some(list => list.some(track => {
@@ -508,7 +514,7 @@ function chooseRecommendations(pool,limit,context){
   };
   // Prefer one playable track from every available catalog first, then fill
   // the remaining slots by recommendation score.
-  for(const source of ["Zaycev.net","Jamendo","Hitmotop"]){
+  for(const source of ["Jamendo","Zaycev.net","Hitmotop"]){
     if(selected.length>=limit)break;
     let best=null,bestScore=-Infinity;
     for(const t of pool){
