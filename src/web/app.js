@@ -466,7 +466,18 @@ function result(t){
 function findTrack(id){return tracks.find(t=>t.id===id)||localTracks.find(t=>t.id===id)||state.liked.find(t=>t.id===id)||(current?.id===id?current:null)}
 function bind(container=view){
  container.querySelectorAll("[data-offline]").forEach(b=>b.onclick=e=>{e.stopPropagation();toggleOffline(findTrack(b.dataset.offline),b)});
- container.querySelectorAll("[data-play]").forEach(b=>b.onclick=e=>{e.stopPropagation();play(findTrack(b.dataset.play))});
+ container.querySelectorAll("[data-play]").forEach(b=>b.onclick=e=>{
+  e.stopPropagation();
+  const track=findTrack(b.dataset.play);
+  if(!track)return;
+  const candidates=Array.isArray(tracks)&&tracks.length?tracks:[track];
+  const idx=candidates.findIndex(x=>x?.id===track.id);
+  playbackQueue=idx>=0?[...candidates]:[track];
+  queueIndex=idx>=0?idx:0;
+  recommendationSeen=new Set(playbackQueue.map(x=>String(x?.id||"")).filter(Boolean));
+  recommendationLastPrefetchIndex=-1;
+  play(track,{keepQueue:true});
+ });
  container.querySelectorAll("[data-track-profile]").forEach(b=>b.onclick=e=>{if(e.target.closest("button"))return;openTrackProfile(b.dataset.trackProfile)});
  container.querySelectorAll("[data-artist]").forEach(b=>b.onclick=e=>{e.stopPropagation();openArtist(b.dataset.artist)});
  container.querySelectorAll("[data-album]").forEach(b=>b.onclick=e=>{e.stopPropagation();openAlbum(b.dataset.album)});
@@ -753,7 +764,18 @@ function play(t,{fromEnded=false,keepQueue=false,fromBootstrap=false}={}){
     if(next)setTimeout(()=>play(next,{keepQueue:true,fromBootstrap:true}),80);
     return;
    }
-   toast(error?.name==="NotAllowedError"?"Нажми ▶ ещё раз для запуска":"Не удалось воспроизвести трек");
+   if(error?.name==="NotAllowedError"){
+    toast("Браузер запретил автоматическое воспроизведение — нажми ▶");
+   }else{
+    const failedIndex=playbackQueue.findIndex(x=>x?.id===t.id);
+    const next=playbackQueue[failedIndex+1];
+    if(next){
+     toast("Этот поток не ответил — пробую следующий");
+     setTimeout(()=>play(next,{keepQueue:true,fromBootstrap:true}),80);
+     return;
+    }
+    toast("Не удалось воспроизвести трек");
+   }
   });
  }catch(error){
   console.warn("Ok Music playback:",error);
