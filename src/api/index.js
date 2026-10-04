@@ -226,27 +226,27 @@ async function searchJamendo(q, limit, env) {
 export async function handleApi(request,env){
   const url=new URL(request.url);
   if(url.pathname==="/api/local-music")return Response.json({ok:true,source:"🔐 Ключник",tracks:LOCAL_MUSIC});
-  if(url.pathname==="/api/health")return Response.json({ok:true,service:env.APP_NAME||"Ok Music",version:"7.0",providers:["Zaycev.net","Jamendo","🔐 Ключник"],zaycev:{configured:true,mode:"current-web-api"},jamendo:{configured:Boolean(String(env.JAMENDO_CLIENT_ID||"").trim())}});
+  if(url.pathname==="/api/health")return Response.json({ok:true,service:env.APP_NAME||"Ok Music",version:"7.0",providers:["Zaycev.net","Jamendo","Hitmotop","🔐 Ключник"],zaycev:{configured:true,mode:"current-web-api"},jamendo:{configured:Boolean(String(env.JAMENDO_CLIENT_ID||"").trim())},hitmotop:{configured:true,mode:"HTML parser"}});
   if(url.pathname==="/api/search"){
     const q=(url.searchParams.get("q")||"").trim(),limit=Math.min(Math.max(Number(url.searchParams.get("limit")||24),1),50);
     if(!q)return Response.json({ok:true,query:"",tracks:[],providers:[]});
-    const [z,j]=await Promise.allSettled([fetchZaycevSearch(q,limit),searchJamendo(q,Math.max(6,Math.ceil(limit/3)),env)]);
-    const zTracks=z.status==="fulfilled"?z.value:[],jTracks=j.status==="fulfilled"?j.value:[],tracks=uniqueTracks([...zTracks,...jTracks],limit);
-    const errors=[...(z.status==="rejected"?["Zaycev.net: "+(z.reason?.message||"ошибка")]:[]),...(j.status==="rejected"?["Jamendo: "+(j.reason?.message||"ошибка")]:[])];
-    if(!tracks.length)return Response.json({ok:false,error:errors.length?"Музыкальные каталоги недоступны":"Ничего не найдено",details:errors,query:q,tracks:[],diagnostics:{zaycevConfigured:true,jamendoConfigured:Boolean(String(env.JAMENDO_CLIENT_ID||"").trim()),errors}},{status:errors.length?502:200});
-    return Response.json({ok:true,query:q,providers:[...(zTracks.length?["Zaycev.net"]:[]),...(jTracks.length?["Jamendo"]:[])],tracks});
+    const [z,j,h]=await Promise.allSettled([fetchZaycevSearch(q,limit),searchJamendo(q,Math.max(6,Math.ceil(limit/3)),env),fetchHitmotopSearch(q,limit)]);
+    const zTracks=z.status==="fulfilled"?z.value:[],jTracks=j.status==="fulfilled"?j.value:[],hTracks=h.status==="fulfilled"?h.value:[],tracks=uniqueTracks([...zTracks,...jTracks,...hTracks],limit);
+    const errors=[...(z.status==="rejected"?["Zaycev.net: "+(z.reason?.message||"ошибка")]:[]),...(j.status==="rejected"?["Jamendo: "+(j.reason?.message||"ошибка")]:[]),...(h.status==="rejected"?["Hitmotop: "+(h.reason?.message||"ошибка")]:[])];
+    if(!tracks.length)return Response.json({ok:false,error:errors.length?"Музыкальные каталоги недоступны":"Ничего не найдено",details:errors,query:q,tracks:[],diagnostics:{zaycevConfigured:true,jamendoConfigured:Boolean(String(env.JAMENDO_CLIENT_ID||"").trim()),hitmotopConfigured:true,errors}},{status:errors.length?502:200});
+    return Response.json({ok:true,query:q,providers:[...(zTracks.length?["Zaycev.net"]:[]),...(jTracks.length?["Jamendo"]:[]),...(hTracks.length?["Hitmotop"]:[])],tracks});
   }
   if(url.pathname==="/api/artwork"){
     const raw=(url.searchParams.get("url")||"").trim();
     let target;
     try{target=new URL(raw)}catch{return Response.json({ok:false,error:"Invalid artwork URL"},{status:400})}
     const host=target.hostname.toLowerCase();
-    const allowed=host==="zaycev.net"||host.endsWith(".zaycev.net")||host==="jamendo.com"||host.endsWith(".jamendo.com");
+    const allowed=host==="zaycev.net"||host.endsWith(".zaycev.net")||host==="jamendo.com"||host.endsWith(".jamendo.com")||host==="hitmos.me"||host.endsWith(".hitmos.me")||host==="hitmotop.com"||host.endsWith(".hitmotop.com");
     if(!allowed||!/^https?:$/.test(target.protocol))return Response.json({ok:false,error:"Artwork host is not allowed"},{status:403});
     try{
       const upstream=await fetch(target,{headers:{
         accept:"image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-        referer:host.endsWith("zaycev.net")?ZAYCEV_BASE+"/":"https://www.jamendo.com/",
+        referer:host.endsWith("zaycev.net")?ZAYCEV_BASE+"/":host.endsWith("jamendo.com")?"https://www.jamendo.com/":"https://hitmos.me/",
         "user-agent":ZAYCEV_HEADERS["user-agent"]
       }});
       if(!upstream.ok)throw Error("Artwork HTTP "+upstream.status);
@@ -258,6 +258,52 @@ export async function handleApi(request,env){
     }catch(e){
       return Response.json({ok:false,error:e?.message||"Artwork unavailable"},{status:502});
     }
+  }
+
+  if(url.pathname==="/api/hitmotop/play"){
+    const raw=(url.searchParams.get("url")||"").trim();
+    try{
+      const target=await hitmotopPlaybackUrl(raw);
+      const range=request.headers.get("range")||"";
+      const targetUrl=new URL(target);
+      const baseHeaders={
+        "accept":"*/*",
+        "accept-language":"ru-RU,ru;q=0.9,en;q=0.7",
+        "user-agent":HITMOTOP_HEADERS["user-agent"],
+        "referer":targetUrl.origin+"/"
+      };
+      if(range)baseHeaders.range=range;
+      let upstream=await fetch(target,{headers:baseHeaders,redirect:"follow"});
+      let contentType=(upstream.headers.get("content-type")||"").toLowerCase();
+      if(contentType.includes("text/html")||contentType.includes("application/xhtml")){
+        const html=await upstream.text();
+        const patterns=[
+          /["'](\/get\/[^"']+\.mp3(?:\?[^"']*)?)["']/i,
+          /["'](https?:\/\/[^"']+\/get\/[^"']+\.mp3(?:\?[^"']*)?)["']/i,
+          /href=["']([^"']+\.mp3(?:\?[^"']*)?)["']/i
+        ];
+        let direct="";
+        for(const pattern of patterns){
+          const match=html.match(pattern);
+          if(match?.[1]){direct=hitmotopAbsoluteUrl(match[1],targetUrl.origin);if(direct)break;}
+        }
+        if(!direct){
+          const button=html.match(/<a\b[^>]*class=["'][^"']*track__download-btn[^"']*["'][^>]*>/i);
+          direct=hitmotopAbsoluteUrl(hitmotopExtractAttr(button?.[0],"href"),targetUrl.origin);
+        }
+        if(!direct)throw Error("Hitmotop audio URL not found");
+        upstream=await fetch(direct,{headers:{...baseHeaders,referer:targetUrl.origin+"/"},redirect:"follow"});
+        contentType=(upstream.headers.get("content-type")||"").toLowerCase();
+      }
+      if(!upstream.ok&&upstream.status!==206)throw Error("Hitmotop audio HTTP "+upstream.status);
+      if(contentType.includes("text/html"))throw Error("Hitmotop returned HTML instead of audio");
+      const headers=new Headers(upstream.headers);
+      headers.set("cache-control","no-store");
+      headers.set("access-control-allow-origin","*");
+      headers.set("accept-ranges",headers.get("accept-ranges")||"bytes");
+      headers.set("content-type",headers.get("content-type")||"audio/mpeg");
+      return new Response(upstream.body,{status:upstream.status,headers});
+    }catch(e){return Response.json({ok:false,error:e?.message||"Hitmotop playback unavailable"},{status:502})}
   }
 
   if(url.pathname==="/api/zaycev/play"){
@@ -298,15 +344,17 @@ export async function handleApi(request,env){
     const refreshQueries=refresh?[...queries,...artistQueries.map(a=>a+" "+genres+" "+refreshTail),genres+" "+moods+" "+refreshTail,now+" "+refreshTail]:queries;
     const uniqueQueries=[...new Set(refreshQueries)].filter(Boolean).slice(0,4);
     const fetchLimit=Math.min(24,Math.max(12,limit*2));
-    const [zr,jr]=await Promise.all([
+    const [zr,jr,hr]=await Promise.all([
       Promise.allSettled(uniqueQueries.map(q=>fetchZaycevSearch(q,fetchLimit))),
-      Promise.allSettled(uniqueQueries.slice(0,3).map(q=>searchJamendo(q,8,env)))
+      Promise.allSettled(uniqueQueries.slice(0,3).map(q=>searchJamendo(q,8,env))),
+      Promise.allSettled(uniqueQueries.slice(0,3).map(q=>fetchHitmotopSearch(q,Math.min(12,fetchLimit))))
     ]);
     const zaycev=zr.flatMap(r=>r.status==="fulfilled"?r.value:[]),
       jam=jr.flatMap(r=>r.status==="fulfilled"?r.value:[]),
+      hitmotop=hr.flatMap(r=>r.status==="fulfilled"?r.value:[]),
       local=Array.isArray(LOCAL_MUSIC)?LOCAL_MUSIC.filter(t=>t?.audio):[];
     const pool=[],seen=new Set();
-    for(const list of [zaycev,jam,local]) for(const t of list){
+    for(const list of [zaycev,jam,hitmotop,local]) for(const t of list){
       if(!t||!t.id||seen.has(t.id))continue;
       seen.add(t.id);pool.push(t);
     }
@@ -340,6 +388,7 @@ export async function handleApi(request,env){
     const preferred=ranked.filter(x=>wanted.some(a=>a&&String(x.t.artist||"").toLowerCase().includes(a)));
     const zaycevRanked=ranked.filter(x=>x.t.source==="Zaycev.net");
     const jamRanked=ranked.filter(x=>x.t.source==="Jamendo");
+    const hitmotopRanked=ranked.filter(x=>x.t.source==="Hitmotop");
     const localRanked=ranked.filter(x=>x.t.source==="🔐 Ключник");
     const rest=ranked.filter(x=>!wanted.some(a=>a&&String(x.t.artist||"").toLowerCase().includes(a)));
     const final=[];
@@ -349,13 +398,13 @@ export async function handleApi(request,env){
       used.add(t.id);final.push(t);return true;
     };
     // The wave is a cross-source mix: seed it with one track from every working provider.
-    for(const sourceList of [preferred,zaycevRanked,jamRanked,localRanked]){
+    for(const sourceList of [preferred,zaycevRanked,jamRanked,hitmotopRanked,localRanked]){
       const candidate=sourceList.find(x=>!used.has(x.t.id));
       if(candidate)add(candidate.t);
     }
     const preferredTarget=Math.min(Math.ceil(limit/2),preferred.length);
     for(const x of preferred.slice(0,preferredTarget))if(final.length<limit)add(x.t);
-    const sourceBuckets=[zaycevRanked,jamRanked,localRanked];
+    const sourceBuckets=[zaycevRanked,jamRanked,hitmotopRanked,localRanked];
     let sourceCursor=0;
     while(final.length<limit&&sourceBuckets.some(list=>list.some(x=>!used.has(x.t.id)))){
       const list=sourceBuckets[sourceCursor%sourceBuckets.length];sourceCursor++;
@@ -376,8 +425,8 @@ export async function handleApi(request,env){
       }
       if(!added)break;
     }
-    const errors=[...zr.filter(r=>r.status==="rejected").map(r=>"Zaycev.net: "+(r.reason?.message||"ошибка")),...jr.filter(r=>r.status==="rejected").map(r=>"Jamendo: "+(r.reason?.message||"ошибка"))];
-    return Response.json({ok:true,mode:base?"personalized":"discovery",profile:{genres,moods,artists:preferredArtists.join(", "),now},providers:[...(zaycev.length?["Zaycev.net"]:[]),...(jam.length?["Jamendo"]:[]),...(local.length?["🔐 Ключник"]:[])],tracks:final,errors});
+    const errors=[...zr.filter(r=>r.status==="rejected").map(r=>"Zaycev.net: "+(r.reason?.message||"ошибка")),...jr.filter(r=>r.status==="rejected").map(r=>"Jamendo: "+(r.reason?.message||"ошибка")),...hr.filter(r=>r.status==="rejected").map(r=>"Hitmotop: "+(r.reason?.message||"ошибка"))];
+    return Response.json({ok:true,mode:base?"personalized":"discovery",profile:{genres,moods,artists:preferredArtists.join(", "),now},providers:[...(zaycev.length?["Zaycev.net"]:[]),...(jam.length?["Jamendo"]:[]),...(hitmotop.length?["Hitmotop"]:[]),...(local.length?["🔐 Ключник"]:[])],tracks:final,errors});
   }
   return Response.json({ok:false,error:"Not found"},{status:404});
 }
