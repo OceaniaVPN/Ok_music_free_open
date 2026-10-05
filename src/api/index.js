@@ -372,8 +372,7 @@ const RECOMMENDATION_VOCAB={
   "романтично":["romantic","love","soft"],
   "ночью":["night","late night","dark"],
   "для дороги":["road trip","driving"],
-  "вечеринка":["party","dance"],
-  "фонк":["phonk","drift"]
+  "вечеринка":["party","dance"]
 };
 const RECOMMENDATION_ARTIST_POOLS=recommendationArtists&&typeof recommendationArtists==="object"?recommendationArtists:{};function recommendationGenreKey(value){
   const text=recommendationText(value);
