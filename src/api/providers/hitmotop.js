@@ -437,6 +437,55 @@ async function searchOnBase(base,q,limit){
     }
   }
 }
+async function searchHitmozParserApi(query,limit){
+  const endpoint=new URL("https://bakha.me/");
+  endpoint.searchParams.set("search",query);
+  const response=await fetch(endpoint.href,{
+    headers:{
+      accept:"application/json,text/plain,*/*",
+      "accept-language":"ru-RU,ru;q=0.9,en;q=0.7",
+      "user-agent":HITMOTOP_HEADERS["user-agent"]
+    },
+    redirect:"follow",
+    signal:AbortSignal.timeout(7_000)
+  });
+  const text=await response.text();
+  if(!response.ok)throw Error("HitMoz parser HTTP "+response.status);
+  let data;
+  try{data=JSON.parse(text)}catch{throw Error("HitMoz parser returned invalid JSON")}
+  const songs=Array.isArray(data?.songs)?data.songs:[];
+  if(!songs.length)throw Error("HitMoz parser returned no tracks");
+  const out=[];
+  const seen=new Set();
+  for(const song of songs){
+    const download=absoluteUrl(song?.download||"", "https://eu.hitmoz.com");
+    if(!download||seen.has(download))continue;
+    const page=absoluteUrl(song?.link||"", "https://eu.hitmoz.com");
+    const title=cleanTitle(song?.title)||filenameMeta(download,"https://eu.hitmoz.com").title||"Без названия";
+    const artist=stripHtml(song?.artist)||filenameMeta(download,"https://eu.hitmoz.com").artist||"Неизвестный исполнитель";
+    const duration=String(song?.duration||"");
+    const sourceUrl=page||download;
+    out.push({
+      id:"hitmotop-"+hashId(sourceUrl),
+      title,
+      artist,
+      album:"",
+      image:absoluteUrl(song?.cover||"", "https://eu.hitmoz.com"),
+      audio:"/api/hitmotop/play?url="+encodeURIComponent(download)+"&page="+encodeURIComponent(page),
+      duration:parseDuration(duration),
+      license:"",
+      source:"Hitmotop",
+      sourceUrl,
+      genre:"",
+      downloadUrl:download
+    });
+    seen.add(download);
+    if(out.length>=limit)break;
+  }
+  if(!out.length)throw Error("HitMoz parser returned unusable tracks");
+  return out;
+}
+
 export async function searchHitmotop(q,limit=10){
   const query=String(q||"").trim();
   if(!query)return [];
@@ -448,6 +497,12 @@ export async function searchHitmotop(q,limit=10){
     }catch(error){
       errors.push(new URL(base).hostname+": "+(error?.message||"request failed"));
     }
+  }
+  try{
+    const fallback=await searchHitmozParserApi(query,limit);
+    if(fallback.length)return fallback;
+  }catch(error){
+    errors.push("parser-api: "+(error?.message||"request failed"));
   }
   throw Error("Hitmo unavailable ("+errors.join("; ")+")");
 }
