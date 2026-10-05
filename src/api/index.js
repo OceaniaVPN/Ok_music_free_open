@@ -34,7 +34,7 @@ function zaycevExtractImage(source,base=ZAYCEV_BASE){
     if(!raw||/^data:/i.test(raw))return;
     try{
       const url=new URL(raw,base).href;
-      const isZaycevCdn=/cdnimg\\.zaycev\\.net\\//i.test(url);
+      const isZaycevCdn=/cdnimg\.zaycev\.net\//i.test(url);
       if(!/\\.(?:jpe?g|png|webp)(?:[?#]|$)/i.test(url)&&!isZaycevCdn)return;
       let bonus=score;
       if(/cdnimg\\.zaycev\\.net\\/commonImage\\/album\\//i.test(url))bonus+=100;
@@ -65,7 +65,8 @@ function zaycevExtractNearestImage(source,anchorIndex,base=ZAYCEV_BASE){
     if(!raw||/^data:/i.test(raw))return;
     try{
       const url=new URL(raw,base).href;
-      if(!/\.(?:jpe?g|png|webp)(?:[?#]|$)/i.test(url))return;
+      const isZaycevCdn=/cdnimg\.zaycev\.net\//i.test(url);
+      if(!/\.(?:jpe?g|png|webp)(?:[?#]|$)/i.test(url)&&!isZaycevCdn)return;
       let bonus=score;
       if(/cdnimg\.zaycev\.net\/commonImage\/album\//i.test(url))bonus+=1000;
       else if(/zaycev\.net\/.*(?:album|cover|image)/i.test(url))bonus+=500;
