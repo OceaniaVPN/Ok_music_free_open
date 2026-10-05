@@ -1,4 +1,4 @@
-const HITMOTOP_BASES=["https://hitmos.me","https://rus.hitmotop.com","https://hitmotop.com","https://hitmos.fm","https://eu.hitmoz.com","https://ru.hitmoz.org","https://rus.hitmoz.org"];
+const HITMOTOP_BASES=["https://hitmos.me"];
 export const HITMOTOP_HEADERS={
   accept:"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
   "accept-language":"ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3",
@@ -227,7 +227,7 @@ async function createHitmotopSession(base,{refresh=false}={}){
   if(cached)return cached;
 
   let lastError=null;
-  for(let attempt=0;attempt<10;attempt++){
+  for(let attempt=0;attempt<2;attempt++){
     const jar=new Map();
     const storedSid=HITMOTOP_SIDS.get(origin);
     if(storedSid)jar.set("sid",storedSid);
