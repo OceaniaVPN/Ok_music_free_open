@@ -58,6 +58,32 @@ async function __megaFile(payload){
   if(!file?.downloadBuffer)throw Error("MEGAJS не вернул файл из общей папки");
   return file;
 }
+const __MEGA_META_LIMIT=3500000;
+function __megaPersistMeta(){
+ try{
+  const store=window.__megaMetaStore||{};
+  const entries=Object.entries(store);
+  let payload=JSON.stringify(store);
+  if(payload.length>__MEGA_META_LIMIT){
+   for(const [key,value] of entries){
+    if(value&&value.imageData)delete value.imageData;
+    payload=JSON.stringify(store);
+    if(payload.length<=__MEGA_META_LIMIT)break;
+   }
+  }
+  if(payload.length>__MEGA_META_LIMIT){
+   for(const [key] of entries){
+    if(!Object.prototype.hasOwnProperty.call(store,key))continue;
+    delete store[key];
+    payload=JSON.stringify(store);
+    if(payload.length<=__MEGA_META_LIMIT)break;
+   }
+  }
+  localStorage.setItem("okmusic:mega-meta:v2",payload);
+ }catch(error){
+  console.warn("🔐 Ключник / metadata cache:",error?.message||error);
+ }
+}
 window.__megaEnrichLocalTracks=async function(input,options={}){
   const tracks=Array.isArray(input)?input:[],mega=tracks.filter(t=>String(t.audio||"").startsWith("mega://"));
   if(!mega.length)return tracks;
@@ -112,7 +138,7 @@ window.__megaEnrichLocalTracks=async function(input,options={}){
       }
       window.__megaMetaCache.set(key,patch);
       window.__megaMetaStore[key]=Object.fromEntries(Object.entries(patch).filter(([k])=>k!=="image"));
-      try{localStorage.setItem("okmusic:mega-meta:v2",JSON.stringify(window.__megaMetaStore))}catch{}
+      __megaPersistMeta();
       Object.assign(t,patch);
       options?.onTrack?.(t);
     }catch(error){
