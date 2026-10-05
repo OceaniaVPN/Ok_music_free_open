@@ -299,30 +299,58 @@ export async function getHitmotopSessionInfo(rawUrl){
   };
 }
 
-async function searchOnBase(base,q,limit){
+async function directHitmotopSearch(base,q,limit){
   const origin=new URL(base).origin;
-  let session=await createHitmotopSession(origin);
   const search=new URL("/search",origin);
   search.searchParams.set("q",q);
-
-  let response=await fetchHitmotopSession(search.href,session.jar,origin,{
-    headers:{...HITMOTOP_HEADERS,referer:session.referer},
+  const response=await fetch(search.href,{
+    headers:{...HITMOTOP_HEADERS,referer:origin+"/"},
+    redirect:"follow",
     signal:AbortSignal.timeout(6500)
   });
-
-  if(response.status===403){
-    session=await createHitmotopSession(origin,{refresh:true});
-    response=await fetchHitmotopSession(search.href,session.jar,origin,{
-      headers:{...HITMOTOP_HEADERS,referer:session.referer},
-      signal:AbortSignal.timeout(6500)
-    });
-  }
-
   const html=await response.text();
   if(!response.ok)throw Error("Hitmo search HTTP "+response.status);
   const tracks=parseHitmotopSearch(html,new URL(response.url||search.href).origin,limit);
   if(!tracks.length)throw Error("Hitmo search returned no parsable tracks");
   return tracks;
+}
+
+async function searchOnBase(base,q,limit){
+  const origin=new URL(base).origin;
+  const search=new URL("/search",origin);
+  search.searchParams.set("q",q);
+
+  // The Python parser uses a persistent requests.Session(), but a Cloudflare
+  // Worker may be unable to complete that bootstrap because Set-Cookie is
+  // hidden or the edge returns 403. Search itself does not need us to fail
+  // hard on that bootstrap, so try the direct search endpoint first.
+  try{
+    return await directHitmotopSearch(base,q,limit);
+  }catch(directError){
+    try{
+      let session=await createHitmotopSession(origin);
+      let response=await fetchHitmotopSession(search.href,session.jar,origin,{
+        headers:{...HITMOTOP_HEADERS,referer:session.referer},
+        signal:AbortSignal.timeout(6500)
+      });
+
+      if(response.status===403){
+        session=await createHitmotopSession(origin,{refresh:true});
+        response=await fetchHitmotopSession(search.href,session.jar,origin,{
+          headers:{...HITMOTOP_HEADERS,referer:session.referer},
+          signal:AbortSignal.timeout(6500)
+        });
+      }
+
+      const html=await response.text();
+      if(!response.ok)throw Error("Hitmo search HTTP "+response.status);
+      const tracks=parseHitmotopSearch(html,new URL(response.url||search.href).origin,limit);
+      if(!tracks.length)throw Error("Hitmo search returned no parsable tracks");
+      return tracks;
+    }catch(sessionError){
+      throw Error((directError?.message||"Hitmo direct search failed")+"; "+(sessionError?.message||"Hitmo session failed"));
+    }
+  }
 }
 export async function searchHitmotop(q,limit=10){
   const query=String(q||"").trim();
