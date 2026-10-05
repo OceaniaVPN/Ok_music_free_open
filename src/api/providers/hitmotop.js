@@ -213,34 +213,89 @@ async function fetchHitmotopSession(url,jar,allowedOrigin,options={}){
   throw Error("Hitmo redirect limit exceeded");
 }
 
-async function createHitmotopSession(base){
+const HITMOTOP_SESSIONS=new Map();
+const HITMOTOP_SIDS=new Map();
+
+function rememberHitmotopSid(origin,jar){
+  const sid=jar.get("sid");
+  if(sid)HITMOTOP_SIDS.set(origin,sid);
+}
+
+async function createHitmotopSession(base,{refresh=false}={}){
   const origin=new URL(base).origin;
-  const jar=new Map();
+  if(refresh)HITMOTOP_SESSIONS.delete(origin);
+  const cached=HITMOTOP_SESSIONS.get(origin);
+  if(cached)return cached;
 
-  // requests.Session() keeps cookies even when the first request is 403.
-  // Retry through the same session so a sid issued on that response is
-  // available to the next request.
-  const first=await fetchHitmotopSession(origin+"/",jar,origin,{
-    headers:HITMOTOP_HEADERS,
-    signal:AbortSignal.timeout(4500)
-  });
+  let lastError=null;
+  for(let attempt=0;attempt<10;attempt++){
+    const jar=new Map();
+    const storedSid=HITMOTOP_SIDS.get(origin);
+    if(storedSid)jar.set("sid",storedSid);
 
-  let last=first;
-  if(!first.ok){
-    last=await fetchHitmotopSession(origin+"/",jar,origin,{
-      headers:HITMOTOP_HEADERS,
-      signal:AbortSignal.timeout(4500)
-    });
+    try{
+      // Match BaseSessionHandlerInputTracks.create_session():
+      // create a fresh requests.Session(), open /, and keep its cookies.
+      let response=await fetchHitmotopSession(origin+"/",jar,origin,{
+        headers:HITMOTOP_HEADERS,
+        signal:AbortSignal.timeout(5000)
+      });
+
+      if(response.status===200){
+        // The Python implementation performs a second GET through the
+        // same requests.Session() and only succeeds once the session has
+        // actually received cookies.
+        response=await fetchHitmotopSession(response.url||origin+"/",jar,origin,{
+          headers:HITMOTOP_HEADERS,
+          signal:AbortSignal.timeout(5000)
+        });
+        if(jar.size===0)continue;
+        rememberHitmotopSid(origin,jar);
+        const session={
+          origin,
+          jar,
+          referer:new URL(response.url||origin+"/").href
+        };
+        HITMOTOP_SESSIONS.set(origin,session);
+        return session;
+      }
+
+      // For the 403/non-200 path Python retries / with the same Session,
+      // allowing the sid from the first response to be reused.
+      response=await fetchHitmotopSession(origin+"/",jar,origin,{
+        headers:HITMOTOP_HEADERS,
+        signal:AbortSignal.timeout(5000)
+      });
+      if(response.status===200){
+        rememberHitmotopSid(origin,jar);
+        const session={
+          origin,
+          jar,
+          referer:new URL(response.url||origin+"/").href
+        };
+        HITMOTOP_SESSIONS.set(origin,session);
+        return session;
+      }
+    }catch(error){
+      lastError=error;
+    }
   }
 
-  if(!last.ok&&jar.size===0){
-    throw Error("Hitmo session bootstrap HTTP "+last.status);
-  }
+  throw lastError||Error("Hitmo session bootstrap failed");
+}
 
+export async function getHitmotopSessionInfo(rawUrl){
+  let target;
+  try{target=new URL(rawUrl)}catch{throw Error("Invalid Hitmotop URL")}
+  const allowed=[
+    "rus.hitmotop.com","hitmotop.com","hitmos.me","hitmos.fm","eu.hitmoz.com","ru.hitmoz.org","rus.hitmoz.org"
+  ].some(base=>target.hostname.toLowerCase()===base||target.hostname.toLowerCase().endsWith("."+base));
+  if(!allowed||!/^https?:$/.test(target.protocol))throw Error("Hitmotop URL host is not allowed");
+  const session=await createHitmotopSession(target.origin);
   return {
-    origin,
-    jar,
-    referer:new URL(last.url||origin).origin+"/"
+    origin:session.origin,
+    cookie:hitmotopCookieHeaderFromJar(session.jar),
+    referer:session.referer
   };
 }
 
@@ -256,7 +311,7 @@ async function searchOnBase(base,q,limit){
   });
 
   if(response.status===403){
-    session=await createHitmotopSession(origin);
+    session=await createHitmotopSession(origin,{refresh:true});
     response=await fetchHitmotopSession(search.href,session.jar,origin,{
       headers:{...HITMOTOP_HEADERS,referer:session.referer},
       signal:AbortSignal.timeout(6500)
@@ -279,9 +334,7 @@ export async function searchHitmotop(q,limit=10){
       if(tracks.length)return tracks;
     }catch(error){lastError=error}
   }
-  throw lastError||Error("Hitmo unavailable");
-}
-export async function resolveHitmotopPlaybackUrl(rawUrl){
+  throw lastError||Error("Hitmo unexport async function resolveHitmotopPlaybackUrl(rawUrl){
   let target;
   try{target=new URL(rawUrl)}catch{throw Error("Invalid Hitmotop audio URL")}
   const host=target.hostname.toLowerCase();
@@ -304,7 +357,7 @@ export async function resolveHitmotopPlaybackUrl(rawUrl){
       signal:AbortSignal.timeout(4500)
     });
     if(probe.status===403){
-      session=await createHitmotopSession(target.origin);
+      session=await createHitmotopSession(target.origin,{refresh:true});
       probe=await fetchHitmotopSession(target.href,session.jar,target.origin,{
         method:"HEAD",
         headers:{...headers,referer:session.referer},
@@ -315,7 +368,6 @@ export async function resolveHitmotopPlaybackUrl(rawUrl){
   }catch{}
 
   try{
-    session=await createHitmotopSession(target.origin);
     const probe=await fetchHitmotopSession(target.href,session.jar,target.origin,{
       headers:{
         ...HITMOTOP_HEADERS,
