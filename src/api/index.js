@@ -697,7 +697,7 @@ export async function handleApi(request,env){
           "accept":"audio/mpeg,audio/*;q=0.9,*/*;q=0.8",
           "accept-language":"ru-RU,ru;q=0.9,en;q=0.7",
           "user-agent":HITMOTOP_HEADERS["user-agent"],
-          "referer",
+          "referer":referer,
           "sec-fetch-dest":"audio",
           "sec-fetch-mode":"no-cors",
           "sec-fetch-site":"cross-site"
