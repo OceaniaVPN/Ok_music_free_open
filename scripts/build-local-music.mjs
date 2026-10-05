@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { parseFile, selectCover } from "music-metadata";
+import { detectKnownArtist, stripKnownArtistPrefix } from "../src/data/artist-detector.js";
 
 const root=process.cwd();
 const musicDir=path.join(root,"music");
@@ -32,7 +33,13 @@ function encPath(p){return p.split(path.sep).map(encodeURIComponent).join("/")}
 function parseName(file){
   const base=path.basename(file,path.extname(file));
   const m=base.match(/^(.+?)\s+[-–—]\s+(.+)$/);
-  return m?{artist:m[1].trim(),title:m[2].trim()}:{artist:"Ключник",title:base.trim()};
+  if(m)return {artist:m[1].trim(),title:m[2].trim()};
+  const detected=detectKnownArtist(base);
+  if(detected){
+    const split=stripKnownArtistPrefix(base,detected);
+    return {artist:detected,title:split.title||base.trim()};
+  }
+  return {artist:"Ключник",title:base.trim()};
 }
 function findCoverFile(file){
   const dir=path.dirname(file),base=path.basename(file,path.extname(file));
