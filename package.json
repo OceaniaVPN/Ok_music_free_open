@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "build": "node scripts/build-local-music.mjs"
+    "build": "node scripts/build-local-music.mjs",
+    "test:hitmotop": "node scripts/test-hitmotop.mjs"
   },
   "dependencies": {
     "music-metadata": "^11.16.1",
