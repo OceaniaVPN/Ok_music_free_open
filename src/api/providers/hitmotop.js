@@ -376,12 +376,20 @@ export async function getHitmotopSessionInfo(rawUrl){
     "rus.hitmotop.com","hitmotop.com","hitmos.me","hitmos.fm","rus.hitmos.fm","eu.hitmoz.com","ru.hitmoz.org","rus.hitmoz.org"
   ].some(base=>target.hostname.toLowerCase()===base||target.hostname.toLowerCase().endsWith("."+base));
   if(!allowed||!/^https?:$/.test(target.protocol))throw Error("Hitmotop URL host is not allowed");
-  const session=await createHitmotopSession(target.origin);
-  return {
-    origin:session.origin,
-    cookie:hitmotopCookieHeaderFromJar(session.jar),
-    referer:session.referer
-  };
+  try{
+    const session=await createHitmotopSession(target.origin);
+    return {
+      origin:session.origin,
+      cookie:hitmotopCookieHeaderFromJar(session.jar),
+      referer:session.referer
+    };
+  }catch{
+    return {
+      origin:target.origin,
+      cookie:"",
+      referer:target.origin+"/"
+    };
+  }
 }
 
 async function directHitmotopSearch(base,q,limit){
@@ -515,40 +523,64 @@ export async function resolveHitmotopPlaybackUrl(rawUrl){
   ].some(base=>host===base||host.endsWith("."+base));
   if(!allowed||!/^https?:$/.test(target.protocol))throw Error("Hitmotop audio host is not allowed");
 
-  let session=await createHitmotopSession(target.origin);
+  let session=null;
+  try{session=await createHitmotopSession(target.origin)}catch{}
+
   const headers={
     ...HITMOTOP_HEADERS,
     accept:"audio/mpeg,audio/*,*/*;q=0.8",
-    referer:session.referer
+    referer:session?.referer||target.origin+"/"
   };
 
   try{
-    let probe=await fetchHitmotopSession(target.href,session.jar,target.origin,{
-      method:"HEAD",
-      headers,
-      signal:AbortSignal.timeout(4500)
-    });
-    if(probe.status===403){
-      session=await createHitmotopSession(target.origin,{refresh:true});
-      probe=await fetchHitmotopSession(target.href,session.jar,target.origin,{
-        method:"HEAD",
-        headers:{...headers,referer:session.referer},
-        signal:AbortSignal.timeout(4500)
-      });
+    let probe=session
+      ? await fetchHitmotopSession(target.href,session.jar,target.origin,{
+          method:"HEAD",
+          headers,
+          signal:AbortSignal.timeout(4500)
+        })
+      : await fetch(target.href,{
+          method:"HEAD",
+          headers,
+          redirect:"follow",
+          signal:AbortSignal.timeout(4500)
+        });
+
+    if(probe.status===403&&session){
+      try{session=await createHitmotopSession(target.origin,{refresh:true})}catch{}
+      if(session){
+        probe=await fetchHitmotopSession(target.href,session.jar,target.origin,{
+          method:"HEAD",
+          headers:{...headers,referer:session.referer},
+          signal:AbortSignal.timeout(4500)
+        });
+      }
     }
     if(probe.ok)return probe.url||target.href;
   }catch{}
 
   try{
-    const probe=await fetchHitmotopSession(target.href,session.jar,target.origin,{
-      headers:{
-        ...HITMOTOP_HEADERS,
-        accept:"audio/mpeg,audio/*,*/*;q=0.8",
-        range:"bytes=0-0",
-        referer:session.referer
-      },
-      signal:AbortSignal.timeout(4500)
-    });
+    const probe=session
+      ? await fetchHitmotopSession(target.href,session.jar,target.origin,{
+          headers:{
+            ...HITMOTOP_HEADERS,
+            accept:"audio/mpeg,audio/*,*/*;q=0.8",
+            range:"bytes=0-0",
+            referer:session.referer
+          },
+          signal:AbortSignal.timeout(4500)
+        })
+      : await fetch(target.href,{
+          headers:{
+            ...HITMOTOP_HEADERS,
+            accept:"audio/mpeg,audio/*,*/*;q=0.8",
+            range:"bytes=0-0",
+            referer:target.origin+"/"
+          },
+          redirect:"follow",
+          signal:AbortSignal.timeout(4500)
+        });
+
     const finalUrl=probe.url||target.href;
     const contentType=(probe.headers.get("content-type")||"").toLowerCase();
     const audioLike=probe.ok&&(
