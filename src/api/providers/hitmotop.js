@@ -109,20 +109,46 @@ function extractElementTags(source,tagName,className){
   const re=new RegExp("<"+tagName+"\\b[^>]*class=[\\\"']([^\\\"']*\\b"+className+"\\b[^\\\"']*)[\\\"'][^>]*>","gi");
   return [...String(source||"").matchAll(re)].map(match=>match[0]);
 }
+function extractElementTextsAny(source,className){
+  const re=new RegExp("<[a-z][a-z0-9:-]*\\b[^>]*class=[\\\"']([^\\\"']*\\b"+className+"\\b[^\\\"']*)[\\\"'][^>]*>([\\s\\S]*?)</[a-z][a-z0-9:-]*>","gi");
+  return [...String(source||"").matchAll(re)].map(match=>match[2]);
+}
+function extractElementTagsAny(source,className){
+  const re=new RegExp("<[a-z][a-z0-9:-]*\\b[^>]*class=[\\\"']([^\\\"']*\\b"+className+"\\b[^\\\"']*)[\\\"'][^>]*>","gi");
+  return [...String(source||"").matchAll(re)].map(match=>match[0]);
+}
+function extractFallbackDownloadTags(source){
+  const tagged=extractElementTags(source,"a","track__download-btn");
+  if(tagged.length)return tagged;
+  const out=[];
+  const re=/<a\\b[^>]*href=[\\\"']([^\\\"']+)[\\\"'][^>]*>/gi;
+  for(const match of String(source||"").matchAll(re)){
+    const href=String(match[1]||"");
+    if(/(?:^|\\/)get\\//i.test(href)||/\\.mp3(?:[?#]|$)/i.test(href))out.push(match[0]);
+  }
+  return out;
+}
 
 export function parseHitmotopSearch(html,base,limit=10){
   const source=String(html||"");
 
-  // Match the Python parser: collect the actual track fields by class name
-  // instead of depending on a particular parent element such as <li>.
-  const titles=extractElementTexts(source,"div","track__title");
-  const artists=extractElementTexts(source,"div","track__desc");
-  const durations=extractElementTexts(source,"div","track__fulltime");
-  const images=extractElementTags(source,"div","track__img");
-  const downloads=extractElementTags(source,"a","track__download-btn");
-  const infos=extractElementTags(source,"a","track__info-l");
+  let titles=extractElementTexts(source,"div","track__title");
+  let artists=extractElementTexts(source,"div","track__desc");
+  let durations=extractElementTexts(source,"div","track__fulltime");
+  let images=extractElementTags(source,"div","track__img");
+  const downloads=extractFallbackDownloadTags(source);
+  let infos=extractElementTags(source,"a","track__info-l");
 
-  const count=Math.min(limit,titles.length,downloads.length,infos.length);
+  // Mirrors occasionally change the tag name while keeping the class names.
+  if(!titles.length)titles=extractElementTextsAny(source,"track__title");
+  if(!artists.length)artists=extractElementTextsAny(source,"track__desc");
+  if(!durations.length)durations=extractElementTextsAny(source,"track__fulltime");
+  if(!images.length)images=extractElementTagsAny(source,"track__img");
+  if(!infos.length)infos=extractElementTagsAny(source,"track__info-l");
+
+  // The info link is optional: the Python parser uses it for metadata, but
+  // the download link itself is sufficient to return a playable track.
+  const count=Math.min(limit,titles.length,downloads.length);
   const out=[];
   const seen=new Set();
   for(let idx=0;idx<count;idx++){
