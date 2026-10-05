@@ -25,6 +25,27 @@ function parseDuration(value){
   if(parts.length===2)return parts[0]*60+parts[1];
   return parts[0]||0;
 }
+function zaycevExtractImage(source,base=ZAYCEV_BASE){
+  const text=String(source||"");
+  const candidates=[];
+  const push=value=>{
+    const raw=String(value||"").replace(/&amp;/gi,"&").replace(/\\\//g,"/").trim();
+    if(!raw)return;
+    try{candidates.push(new URL(raw,base).href)}catch{}
+  };
+  for(const tag of text.matchAll(/<(?:img|source|meta|div|span)\b[^>]*>/gi)){
+    const t=tag[0];
+    for(const m of t.matchAll(/(?:data-(?:src|original|lazy-src|image|cover)|poster|src|content)=["']([^"']+)["']/gi))push(m[1]);
+    const style=t.match(/style=["'][^"']*url\(\s*["']?([^"')]+)["']?\s*\)/i)?.[1];
+    if(style)push(style);
+  }
+  for(const m of text.matchAll(/https?:\/\/[^"'\s<>]+/gi))push(m[0]);
+  const preferred=candidates.find(url=>/cdnimg\.zaycev\.net\/commonImage\/album\//i.test(url))
+    ||candidates.find(url=>/zaycev\.net\/.*(?:album|cover|image)/i.test(url))
+    ||candidates.find(url=>/\.(?:jpe?g|png|webp)(?:[?#]|$)/i.test(url))
+    ||"";
+  return preferred;
+}
 function parseZaycevSearch(html,limit){
   const out=[],seen=new Set();
   const chunks=String(html||"").match(/<(?:li|article|div)\b[^>]*(?:class=["'][^"']*(?:track|song|search|music)[^"']*["'])?[^>]*>[\s\S]*?<\/(?:li|article|div)>/gi)||[String(html||"")];
@@ -51,7 +72,8 @@ function parseZaycevSearch(html,limit){
     const source=String(html||"");
     for(const m of source.matchAll(/href=["']([^"']*\/pages\/\d+\/\d+\.shtml[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi)){
       const idm=m[1].match(/\/(\d+)\.shtml/);if(!idm||seen.has(idm[1]))continue;
-      seen.add(idm[1]);out.push({id:idm[1],title:stripHtml(m[2])||"Без названия",artist:"Неизвестный исполнитель",image:"",duration:0,sourceUrl:new URL(m[1],ZAYCEV_BASE).href});
+      const nearby=String(html||"").slice(Math.max(0,m.index-900),Math.min(String(html||"").length,m.index+1800));
+      seen.add(idm[1]);out.push({id:idm[1],title:stripHtml(m[2])||"Без названия",artist:"Неизвестный исполнитель",image:zaycevExtractImage(nearby,ZAYCEV_BASE),duration:0,sourceUrl:new URL(m[1],ZAYCEV_BASE).href});
       if(out.length>=limit)break;
     }
   }

@@ -8,8 +8,8 @@ export const HITMOTOP_HEADERS={
 
 function stripHtml(value){
   return String(value||"")
-    .replace(/<script[\\s\\S]*?<\\/script>/gi," ")
-    .replace(/<style[\\s\\S]*?<\\/style>/gi," ")
+    .replace(/<script[\s\S]*?<\/script>/gi," ")
+    .replace(/<style[\s\S]*?<\/style>/gi," ")
     .replace(/<[^>]+>/g," ")
     .replace(/&nbsp;/gi," ")
     .replace(/&amp;/gi,"&")
@@ -17,11 +17,11 @@ function stripHtml(value){
     .replace(/&#39;/gi,"'")
     .replace(/&lt;/gi,"<")
     .replace(/&gt;/gi,">")
-    .replace(/\\s+/g," ")
+    .replace(/\s+/g," ")
     .trim();
 }
 function cleanTitle(value){
-  return stripHtml(value).replace(/[/\\\\:*?"<>|]/g,"").trim();
+  return stripHtml(value).replace(/[/\\:*?"<>|]/g,"").trim();
 }
 function parseDuration(value){
   const parts=String(value||"").trim().split(":").map(Number);
@@ -36,7 +36,7 @@ function absoluteUrl(value,base){
   try{return new URL(raw,base).href}catch{return ""}
 }
 function htmlAttr(tag,name){
-  for(const match of String(tag||"").matchAll(/([A-Za-z0-9:-]+)\\s*=\\s*(["'])(.*?)\\2/g)){
+  for(const match of String(tag||"").matchAll(/([A-Za-z0-9:-]+)\s*=\s*(["'])(.*?)\2/g)){
     if(String(match[1]).toLowerCase()===String(name).toLowerCase())return match[3];
   }
   return "";
@@ -56,7 +56,7 @@ export function hitmotopCookieHeader(response){
 function extractImage(tag,base){
   const style=htmlAttr(tag,"style");
   const direct=htmlAttr(tag,"src")||htmlAttr(tag,"data-src")||htmlAttr(tag,"data-original");
-  const candidate=style.match(/url\\(\\s*["']?([^"')]+)["']?\\s*\\)/i)?.[1]||direct;
+  const candidate=style.match(/url\(\s*["']?([^"')]+)["']?\s*\)/i)?.[1]||direct;
   return candidate?absoluteUrl(candidate,base):"";
 }
 function hashId(value){
@@ -67,13 +67,25 @@ function hashId(value){
   }
   return (hash>>>0).toString(16);
 }
+function filenameMeta(url,base){
+  try{
+    const pathname=new URL(url,base).pathname;
+    let name=decodeURIComponent(pathname.split("/").pop()||"").replace(/\.[a-z0-9]{2,5}$/i,"");
+    name=name.replace(/(?:[_-]?\d{6,})$/,"").replace(/_/g," ").trim();
+    const parts=name.split(/\s+-\s+|_-_|—/).map(x=>x.trim()).filter(Boolean);
+    if(parts.length<2)return {artist:"",title:name};
+    return {artist:parts[0],title:parts.slice(1).join(" - ").trim()};
+  }catch{return {artist:"",title:""}}
+}
 function buildTrack({title,artist,duration,image,download,info},base){
   const downloadUrl=absoluteUrl(htmlAttr(download,"href")||download,base);
   if(!downloadUrl)return null;
   const pageUrl=absoluteUrl(htmlAttr(info,"href")||info,base);
-  const trackTitle=cleanTitle(title)||"Без названия";
-  const trackArtist=stripHtml(artist)||"Неизвестный исполнитель";
-  const durationText=String(duration||"").match(/\\b\\d{1,2}:\\d{2}(?::\\d{2})?\\b/)?.[0]||"";
+  const fileMeta=filenameMeta(downloadUrl,base);
+  let trackTitle=cleanTitle(title)||fileMeta.title||"Без названия";
+  let trackArtist=stripHtml(artist)||fileMeta.artist||"Неизвестный исполнитель";
+  if(trackTitle===trackArtist&&fileMeta.title&&fileMeta.title!==fileMeta.artist)trackTitle=fileMeta.title;
+  const durationText=String(duration||"").match(/\b\d{1,2}:\d{2}(?::\d{2})?\b/)?.[0]||"";
   const sourceUrl=pageUrl||downloadUrl;
   return {
     id:"hitmotop-"+hashId(sourceUrl),
@@ -94,16 +106,16 @@ export function parseHitmotopSearch(html,base,limit=10){
   const source=String(html||"");
   const out=[];
   const seen=new Set();
-  const cards=[...source.matchAll(/<li\\b[^>]*class=["'][^"']*\\btracks__item\\b[^"']*["'][\\s\\S]*?<\\/li>/gi)].map(match=>match[0]);
+  const cards=[...source.matchAll(/<li\b[^>]*class=["'][^"']*\btracks__item\b[^"']*["'][\s\S]*?<\/li>/gi)].map(match=>match[0]);
   for(const card of cards){
     if(out.length>=limit)break;
     const track=buildTrack({
-      title:card.match(/<div\\b[^>]*class=["'][^"']*\\btrack__title\\b[^"']*["'][^>]*>([\\s\\S]*?)<\\/div>/i)?.[1],
-      artist:card.match(/<div\\b[^>]*class=["'][^"']*\\btrack__desc\\b[^"']*["'][^>]*>([\\s\\S]*?)<\\/div>/i)?.[1],
-      duration:card.match(/<div\\b[^>]*class=["'][^"']*\\btrack__fulltime\\b[^"']*["'][^>]*>([\\s\\S]*?)<\\/div>/i)?.[1],
-      image:card.match(/<div\\b[^>]*class=["'][^"']*\\btrack__img\\b[^"']*["'][^>]*>/i)?.[0],
-      download:card.match(/<a\\b[^>]*class=["'][^"']*\\btrack__download-btn\\b[^"']*["'][^>]*>/i)?.[0],
-      info:card.match(/<a\\b[^>]*class=["'][^"']*\\btrack__info-l\\b[^"']*["'][^>]*>/i)?.[0]
+      title:card.match(/<div\b[^>]*class=["'][^"']*\btrack__title\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)?.[1],
+      artist:card.match(/<div\b[^>]*class=["'][^"']*\btrack__desc\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)?.[1],
+      duration:card.match(/<div\b[^>]*class=["'][^"']*\btrack__fulltime\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)?.[1],
+      image:card.match(/<div\b[^>]*class=["'][^"']*\btrack__img\b[^"']*["'][^>]*>/i)?.[0],
+      download:card.match(/<a\b[^>]*class=["'][^"']*\btrack__download-btn\b[^"']*["'][^>]*>/i)?.[0],
+      info:card.match(/<a\b[^>]*class=["'][^"']*\btrack__info-l\b[^"']*["'][^>]*>/i)?.[0]
     },base);
     if(track&&!seen.has(track.id)){
       seen.add(track.id);
