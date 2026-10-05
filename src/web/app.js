@@ -1,3 +1,4 @@
+import recommendationArtistsCatalog from "../data/recommendation-artists.json";
 export function renderApp(request, env) {
   const appName = env.APP_NAME || "Ok Music";
   const html = String.raw`<!doctype html>
@@ -645,13 +646,16 @@ function library(){
 function openPlaylist(id){const p=state.playlists.find(x=>x.id===id);if(!p)return;tracks=p.tracks;view.innerHTML='<div class="section"><h2>'+esc(p.name)+'</h2><small>'+p.tracks.length+' треков</small></div><div class="results">'+(p.tracks.length?p.tracks.map(result).join(""):'<div class="empty">Добавляй треки из поиска.</div>')+'</div>';bind()}
 function like(t){if(!t)return;const i=state.liked.findIndex(x=>x.id===t.id);if(i>=0){state.liked.splice(i,1);toast("Убрано из любимого")}else{state.liked.unshift(t);toast("♥ Добавлено в любимое")}save();render(document.querySelector(".nav button.active").dataset.view)}
 function recommendationExcludeList(){return [...recommendationSeen].slice(-60)}
+const POPULAR_ARTISTS=Object.values(recommendationArtistsCatalog||{}).flatMap(group=>Array.isArray(group?.artists)?group.artists:[]).map(x=>String(x?.name||"").trim()).filter(Boolean);
+const POPULAR_ARTIST_NAMES=[...new Set(POPULAR_ARTISTS)];
+function popularArtistSeed(){return POPULAR_ARTIST_NAMES.slice(0,120).join(", ")}
 function recommendationParams(extra={}){
  const explicitMood=Boolean(String(extra.mood||"").trim());
  const artist=String(extra.artist||(explicitMood?"":current?.artist)||"").trim(),title=String(extra.title||(explicitMood?"":current?.title)||"").trim();
  return {
   seed:[artist,title,...state.liked.slice(0,8).map(t=>t.artist),...state.taste.genres,...state.taste.moods,state.taste.artists,state.taste.now].filter(Boolean).join(", "),
   artist,title,mood:String(extra.mood||""),genres:state.taste.genres.join(", "),moods:state.taste.moods.join(", "),
-  artists:state.taste.artists,likedArtists:[...new Set(state.liked.slice(0,20).map(t=>t.artist).filter(Boolean))].join(", "),
+  artists:[state.taste.artists,popularArtistSeed()].filter(Boolean).join(", "),likedArtists:[...new Set(state.liked.slice(0,20).map(t=>t.artist).filter(Boolean))].join(", "),
   now:state.taste.now,liked:state.liked.slice(0,10).map(t=>t.artist+" "+t.title).join(", "),
   exclude:recommendationExcludeList().join(","),refresh:String(Date.now())
  };
