@@ -24,7 +24,9 @@ function collect(value, out) {
   }
   if (typeof value.name === "string") out.push(value.name.trim());
   if (typeof value.artist === "string") out.push(value.artist.trim());
-  if (Array.isArray(value.artists)) collect(value.artists, out);
+  for (const item of Object.values(value)) {
+    if (item !== value) collect(item, out);
+  }
 }
 
 const rawArtists = [];
