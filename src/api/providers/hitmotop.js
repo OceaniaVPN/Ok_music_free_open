@@ -67,12 +67,24 @@ function hashId(value){
   }
   return (hash>>>0).toString(16);
 }
+function filenameMeta(url,base){
+  try{
+    const pathname=new URL(url,base).pathname;
+    let name=decodeURIComponent(pathname.split("/").pop()||"").replace(/\.[a-z0-9]{2,5}$/i,"");
+    name=name.replace(/(?:[_-]?\d{6,})$/,"").replace(/_/g," ").trim();
+    const parts=name.split(/\s+-\s+|_-_|—/).map(x=>x.trim()).filter(Boolean);
+    if(parts.length<2)return {artist:"",title:name};
+    return {artist:parts[0],title:parts.slice(1).join(" - ").trim()};
+  }catch{return {artist:"",title:""}}
+}
 function buildTrack({title,artist,duration,image,download,info},base){
   const downloadUrl=absoluteUrl(htmlAttr(download,"href")||download,base);
   if(!downloadUrl)return null;
   const pageUrl=absoluteUrl(htmlAttr(info,"href")||info,base);
-  const trackTitle=cleanTitle(title)||"Без названия";
-  const trackArtist=stripHtml(artist)||"Неизвестный исполнитель";
+  const fileMeta=filenameMeta(downloadUrl,base);
+  let trackTitle=cleanTitle(title)||fileMeta.title||"Без названия";
+  let trackArtist=stripHtml(artist)||fileMeta.artist||"Неизвестный исполнитель";
+  if(trackTitle===trackArtist&&fileMeta.title&&fileMeta.title!==fileMeta.artist)trackTitle=fileMeta.title;
   const durationText=String(duration||"").match(/\b\d{1,2}:\d{2}(?::\d{2})?\b/)?.[0]||"";
   const sourceUrl=pageUrl||downloadUrl;
   return {
