@@ -333,7 +333,7 @@ export async function searchHitmotop(q,limit=10){
       if(tracks.length)return tracks;
     }catch(error){lastError=error}
   }
-  throw lastError||Error("Hitmo unexport async function resolveHitmotopPlaybackUrl(rawUrl){
+  throw lastError||Error("Hitmo unavailable");\n}\nexport async function resolveHitmotopPlaybackUrl(rawUrl){
   let target;
   try{target=new URL(rawUrl)}catch{throw Error("Invalid Hitmotop audio URL")}
   const host=target.hostname.toLowerCase();
