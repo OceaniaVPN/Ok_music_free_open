@@ -287,7 +287,16 @@ state.taste.genres=Array.isArray(state.taste.genres)?state.taste.genres:[];
 state.taste.moods=Array.isArray(state.taste.moods)?state.taste.moods:[];
 state.taste.artists=typeof state.taste.artists==="string"?state.taste.artists:"";
 state.taste.now=typeof state.taste.now==="string"?state.taste.now:"";
-let tracks=[], localTracks=[], current=null, currentIndex=-1, audio=document.querySelector("#okAudio"), nextAudio=document.createElement("audio"), playing=false, autoNext=true, nextPreloadToken=0;
+function loadAutoNext(){
+ try{return localStorage.getItem("okmusic:auto-next")!=="false"}catch{return true}
+}
+function setAutoNext(value){
+ autoNext=Boolean(value);
+ try{localStorage.setItem("okmusic:auto-next",autoNext?"true":"false")}catch{}
+ drawPlayer();
+ toast(autoNext?"Автопереход включён":"Автопереход выключен");
+}
+let tracks=[], localTracks=[], current=null, currentIndex=-1, audio=document.querySelector("#okAudio"), nextAudio=document.createElement("audio"), playing=false, autoNext=loadAutoNext(), nextPreloadToken=0;
 audio.setAttribute("playsinline","");
 audio.preload="auto";
 audio.autoplay=false;
@@ -972,16 +981,20 @@ function openFullscreenPlayer(){
  const fs=document.querySelector("#fullscreenPlayer");
  if(!fs)return;
  const art=mediaArtworkUrl(current.image);
- fs.innerHTML='<div class="fs-inner"><div class="fs-top"><strong>NOW PLAYING</strong><button class="fs-close" id="fsClose" aria-label="Закрыть">✕</button></div><div class="fs-art-wrap">'+(art?'<img class="fs-art" src="'+esc(art)+'" alt="'+esc(current.title||"Обложка")+'">':'<div class="fs-art-fallback">♫</div>')+'</div><div class="fs-bottom"><div><div class="fs-title">'+esc(current.title||"Без названия")+'</div><div class="fs-artist">'+esc(current.artist||"Неизвестный исполнитель")+'</div></div><input id="fsSeek" class="fs-seek" type="range" min="0" max="100" value="0"><div class="fs-time"><span id="fsCur">0:00</span><span id="fsDur">'+fmt(audio.duration)+'</span></div><div class="fs-controls"><button id="fsPrev" title="Предыдущий">⏮</button><button id="fsPlay" class="fs-play">'+(playing?"Ⅱ":"▶")+'</button><button id="fsNext" title="Следующий">⏭</button></div></div></div>';
+ fs.innerHTML='<div class="fs-inner"><div class="fs-top"><strong>NOW PLAYING</strong><button class="fs-close" id="fsClose" aria-label="Закрыть">✕</button></div><div class="fs-art-wrap">'+(art?'<img class="fs-art" src="'+esc(art)+'" alt="'+esc(current.title||"Обложка")+'">':'<div class="fs-art-fallback">♫</div>')+'</div><div class="fs-bottom"><div><div class="fs-title">'+esc(current.title||"Без названия")+'</div><div class="fs-artist">'+esc(current.artist||"Неизвестный исполнитель")+'</div></div><input id="fsSeek" class="fs-seek" type="range" min="0" max="100" value="0"><div class="fs-time"><span id="fsCur">0:00</span><span id="fsDur">'+fmt(audio.duration)+'</span></div><div class="fs-controls"><button id="fsPrev" title="Предыдущий">⏮</button><button id="fsPlay" class="fs-play">'+(playing?"Ⅱ":"▶")+'</button><button id="fsNext" title="Следующий">⏭</button><button id="fsInfo" title="Информация о треке">ⓘ</button></div></div></div>';
  fs.classList.add("open");
  fs.setAttribute("aria-hidden","false");
  const close=fs.querySelector("#fsClose");if(close)close.onclick=closeFullscreenPlayer;
  const prev=fs.querySelector("#fsPrev");if(prev)prev.onclick=playPrevious;
  const next=fs.querySelector("#fsNext");if(next)next.onclick=playNext;
+ const info=fs.querySelector("#fsInfo");if(info)info.onclick=()=>openTrackProfile(current.id);
  const playButton=fs.querySelector("#fsPlay");if(playButton)playButton.onclick=()=>playing?audio.pause():audio.play().catch(()=>toast("Нажми ▶ ещё раз для запуска"));
  const seek=fs.querySelector("#fsSeek");if(seek)seek.oninput=e=>{if(audio.duration)audio.currentTime=audio.duration*Number(e.target.value)/100};
 }
-document.addEventListener("keydown",e=>{if(e.key==="Escape")closeFullscreenPlayer()});
+if(!window.__okFsKeyHandler){
+ window.__okFsKeyHandler=true;
+ document.addEventListener("keydown",e=>{if(e.key==="Escape")closeFullscreenPlayer()});
+}
 function syncFullscreenPlayer(){
  const fs=document.querySelector("#fullscreenPlayer");
  if(!fs||!fs.classList.contains("open"))return;
@@ -1015,7 +1028,7 @@ function drawPlayer(){if(!current){
   return;
  }
  playerEl.className="player on";
- playerEl.innerHTML='<div class="pcover" data-player-profile="1" title="Открыть плеер на весь экран">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="prev" class="icon" title="Предыдущий">⏮</button><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button><button id="next" class="icon" title="Следующий">⏭</button><button id="eqToggle" class="icon eq-toggle" title="Эквалайзер">EQ</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>'+eqPanel();
+ playerEl.innerHTML='<div class="pcover" data-player-profile="1" title="Открыть плеер на весь экран">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="prev" class="icon" title="Предыдущий">⏮</button><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button><button id="next" class="icon" title="Следующий">⏭</button><button id="eqToggle" class="icon eq-toggle" title="Эквалайзер">EQ</button><button id="autoNextToggle" class="icon" title="Автопереход">'+(autoNext?"AUTO":"A×")+'</button><button id="trackInfo" class="icon" title="Информация о треке">ⓘ</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>'+eqPanel();
  document.querySelector("#pause").onclick=()=>{
   if(playing){audio.pause();return}
   const promise=audio.play();
@@ -1024,6 +1037,8 @@ function drawPlayer(){if(!current){
  document.querySelector("#prev").onclick=playPrevious;
  document.querySelector("#next").onclick=playNext;
  document.querySelector("#eqToggle").onclick=toggleEq;
+ document.querySelector("#autoNextToggle").onclick=()=>setAutoNext(!autoNext);
+ document.querySelector("#trackInfo").onclick=()=>openTrackProfile(current.id);
  document.querySelector("[data-player-profile]").onclick=()=>openFullscreenPlayer();
  document.querySelector("#seek").oninput=e=>{if(audio.duration)audio.currentTime=audio.duration*e.target.value/100};
  document.querySelectorAll("[data-eq]").forEach(s=>s.oninput=e=>setEq(Number(e.target.dataset.eq),e.target.value));
