@@ -35,16 +35,18 @@ if(divTracks.length!==2||divTracks[0].title!=="Artist One — Track One"||divTra
 }
 
 
-import {resolveHitmotopPlaybackUrl} from "../src/api/providers/hitmotop.js";
+import {resolveHitmotopPlaybackUrl,getHitmotopSessionInfo} from "../src/api/providers/hitmotop.js";
 
 const realFetch=globalThis.fetch;
 const calls=[];
 globalThis.fetch=async (input,options={})=>{
   const href=String(input);
   const cookie=options.headers?.cookie||"";
-  calls.push({href,method:options.method||"GET",cookie});
+  const method=options.method||"GET";
+  calls.push({href,method,cookie});
   if(href==="https://hitmos.me/"){
-    if(calls.filter(call=>call.href===href).length===1){
+    const bootstrapCount=calls.filter(call=>call.href===href).length;
+    if(bootstrapCount===1){
       return new Response("",{
         status:403,
         headers:{"set-cookie":"sid=challenge123; Path=/"}
@@ -58,9 +60,9 @@ globalThis.fetch=async (input,options={})=>{
       headers:{"set-cookie":"sid=ready456; Path=/"}
     });
   }
-  if(href.includes("/get/music/")&&options.method==="HEAD"){
+  if(href.includes("/get/music/")&&method==="HEAD"){
     if(cookie!=="sid=ready456"){
-      throw new Error("final playback request did not receive the refreshed sid cookie");
+      throw new Error("playback HEAD did not receive the refreshed sid cookie");
     }
     const response=new Response("",{status:200,headers:{"content-type":"audio/mpeg"}});
     Object.defineProperty(response,"url",{value:"https://cdn.example/audio.mp3"});
@@ -73,10 +75,17 @@ const resolved=await resolveHitmotopPlaybackUrl(
   "https://hitmos.me/get/music/artist_one_-_track_one_123456.mp3"
 );
 if(resolved!=="https://cdn.example/audio.mp3")throw new Error("direct playback URL resolution failed");
-if(calls.length!==3)throw new Error("expected 403 bootstrap retry + playback probe");
+if(calls.length!==3)throw new Error("expected 403 bootstrap retry + HEAD playback probe");
 if(calls[0].method!=="GET"||calls[0].cookie!=="")throw new Error("unexpected initial session request");
-if(calls[1].method!=="GET"||calls[1].cookie!=="sid=challenge123")throw new Error("Hitmotop Session did not retry with sid from 403");
+if(calls[1].method!=="GET"||calls[1].cookie!=="sid=challenge123")throw new Error("Hitmotop session did not retry with sid from 403");
 if(calls[2].method!=="HEAD"||calls[2].cookie!=="sid=ready456")throw new Error("Hitmotop session cookie was not refreshed/forwarded");
+
+const sessionInfo=await getHitmotopSessionInfo(
+  "https://hitmos.me/get/music/artist_one_-_track_one_123456.mp3"
+);
+if(sessionInfo.cookie!=="sid=ready456")throw new Error("cached Hitmotop session was not reused between requests");
+if(calls.length!==3)throw new Error("session info unexpectedly created a second network session");
+
 globalThis.fetch=realFetch;
 
 console.log(JSON.stringify({
@@ -84,5 +93,5 @@ console.log(JSON.stringify({
   count:tracks.length,
   resolved,
   sessionBootstrapRetry:true,
-  sessionCookieForwarded:true
+  sessionCacheReused:true
 },null,2));
