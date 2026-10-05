@@ -1,4 +1,3 @@
-import recommendationArtistsCatalog from "../data/recommendation-artists.json" with { type: "json" };
 export function renderApp(request, env) {
   const appName = env.APP_NAME || "Ok Music";
   const html = String.raw`<!doctype html>
@@ -357,12 +356,12 @@ async function toggleOffline(t,button){
 async function clearOffline(){if(!window.__okOfflineClear)return;try{await window.__okOfflineClear();toast("Офлайн-кэш очищен");await refreshOfflineButtons(view)}catch{toast("Не удалось очистить кэш")}}
 function card(t){
  const pills=[Number(t.duration)>0?"◷ "+fmt(t.duration):"",t.genre?"♪ "+t.genre:"",t.year?"▣ "+t.year:""].filter(Boolean).slice(0,3);
- return '<article class="card" data-track-profile="'+esc(t.id)+'"><div class="cover">'+renderArtworkImage(t.image,'loading="lazy"')+'<button class="play" data-play="'+esc(t.id)+'" aria-label="Слушать">▶</button></div><div class="card-body"><div class="title-row"><div class="title">'+esc(t.title||"Без названия")+'</div>'+(t.source?'<span class="source-badge">'+esc(t.source)+'</span>':"")+'</div><div class="sub"><button class="artist-link" data-artist="'+esc(t.artist||"Неизвестный исполнитель")+'">'+esc(t.artist||"Неизвестный исполнитель")+'</button>'+(t.album?' · <button class="album-link" data-album="'+esc(t.album)+'">'+esc(t.album)+'</button>':"")+'</div>'+(pills.length?'<div class="track-meta">'+pills.map(x=>'<span class="meta-pill">'+esc(x)+'</span>').join("")+'</div>':"")+'<div class="card-actions"><button class="offline-btn" data-offline="'+esc(t.id)+'" aria-label="Офлайн" title="Сохранить для офлайн">⇩</button><button class="icon" data-like="'+esc(t.id)+'" aria-label="Любимое">'+(state.liked.some(x=>x.id===t.id)?"♥":"♡")+'</button></div></div></article>';
+ return '<article class="card" data-track-profile="'+esc(t.id)+'"><div class="cover">'+(t.image?'<img src="'+esc(t.image)+'" loading="lazy">':"♫")+'<button class="play" data-play="'+esc(t.id)+'" aria-label="Слушать">▶</button></div><div class="card-body"><div class="title-row"><div class="title">'+esc(t.title||"Без названия")+'</div>'+(t.source?'<span class="source-badge">'+esc(t.source)+'</span>':"")+'</div><div class="sub"><button class="artist-link" data-artist="'+esc(t.artist||"Неизвестный исполнитель")+'">'+esc(t.artist||"Неизвестный исполнитель")+'</button>'+(t.album?' · <button class="album-link" data-album="'+esc(t.album)+'">'+esc(t.album)+'</button>':"")+'</div>'+(pills.length?'<div class="track-meta">'+pills.map(x=>'<span class="meta-pill">'+esc(x)+'</span>').join("")+'</div>':"")+'<div class="card-actions"><button class="offline-btn" data-offline="'+esc(t.id)+'" aria-label="Офлайн" title="Сохранить для офлайн">⇩</button><button class="icon" data-like="'+esc(t.id)+'" aria-label="Любимое">'+(state.liked.some(x=>x.id===t.id)?"♥":"♡")+'</button></div></div></article>';
 }
 function result(t){
  const liked=state.liked.some(x=>x.id===t.id);
  const pills=[Number(t.duration)>0?"◷ "+fmt(t.duration):"",t.genre?"♪ "+t.genre:""].filter(Boolean).slice(0,2);
- return '<div class="result catalog-track" data-track-profile="'+esc(t.id)+'"><div class="mini">'+renderArtworkImage(t.image,'loading="lazy"')+'</div><div class="meta"><strong>'+esc(t.title||"Без названия")+'</strong><span><button class="artist-link" data-artist="'+esc(t.artist||"Неизвестный исполнитель")+'">'+esc(t.artist||"Неизвестный исполнитель")+'</button>'+(t.album?' · <button class="album-link" data-album="'+esc(t.album)+'">'+esc(t.album)+'</button>':"")+(t.source?" · "+esc(t.source):"")+'</span>'+(pills.length?'<div class="track-meta">'+pills.map(x=>'<span class="meta-pill">'+esc(x)+'</span>').join("")+'</div>':"")+'</div><div class="actions"><button class="icon" data-like="'+esc(t.id)+'">'+(liked?"♥":"♡")+'</button><button class="icon" data-add="'+esc(t.id)+'">＋</button><button class="offline-btn" data-offline="'+esc(t.id)+'" aria-label="Офлайн" title="Сохранить для офлайн">⇩</button><button class="icon" data-play="'+esc(t.id)+'">▶</button></div></div>';
+ return '<div class="result catalog-track" data-track-profile="'+esc(t.id)+'"><div class="mini">'+(t.image?'<img src="'+esc(t.image)+'" loading="lazy">':"♫")+'</div><div class="meta"><strong>'+esc(t.title||"Без названия")+'</strong><span><button class="artist-link" data-artist="'+esc(t.artist||"Неизвестный исполнитель")+'">'+esc(t.artist||"Неизвестный исполнитель")+'</button>'+(t.album?' · <button class="album-link" data-album="'+esc(t.album)+'">'+esc(t.album)+'</button>':"")+(t.source?" · "+esc(t.source):"")+'</span>'+(pills.length?'<div class="track-meta">'+pills.map(x=>'<span class="meta-pill">'+esc(x)+'</span>').join("")+'</div>':"")+'</div><div class="actions"><button class="icon" data-like="'+esc(t.id)+'">'+(liked?"♥":"♡")+'</button><button class="icon" data-add="'+esc(t.id)+'">＋</button><button class="offline-btn" data-offline="'+esc(t.id)+'" aria-label="Офлайн" title="Сохранить для офлайн">⇩</button><button class="icon" data-play="'+esc(t.id)+'">▶</button></div></div>';
 }
 function findTrack(id){return tracks.find(t=>t.id===id)||localTracks.find(t=>t.id===id)||state.liked.find(t=>t.id===id)||(current?.id===id?current:null)}
 function bind(container=view){
@@ -387,7 +386,7 @@ function bind(container=view){
  void refreshOfflineButtons(container)
 }
 function trackInfoHtml(t){
- const image=renderArtworkImage(t?.image,'loading="eager"');
+ const image=t?.image?'<img src="'+esc(t.image)+'" loading="eager">':"♫";
  const artist=esc(t?.artist||"Неизвестный исполнитель"),album=t?.album?esc(t.album):"";
  const stats=[Number(t?.duration)>0?["Длительность",fmt(t.duration)]:null,t?.source?["Источник",t.source]:null,t?.genre?["Жанр",t.genre]:null,t?.year?["Год",t.year]:null].filter(Boolean);
  return '<div class="profile-back"><button id="profileBack">← Назад</button></div><section class="track-profile"><div class="track-head"><div class="track-cover">'+image+'</div><div><div class="profile-kicker"><span>♫ ТРЕК</span>'+(t?.source?'<span>'+esc(t.source)+'</span>':"")+'</div><h2>'+esc(t?.title||"Без названия")+'</h2><div class="sub" style="margin-top:8px"><button class="artist-link" data-artist="'+artist+'">'+artist+'</button>'+(album?' · <button class="album-link" data-album="'+album+'">'+album+'</button>':"")+'</div><div class="track-actions"><button id="profilePlay" class="primary">▶ Слушать</button><button id="profileLike">'+(state.liked.some(x=>x.id===t.id)?"♥ В любимом":"♡ В любимое")+'</button><button id="profileOffline" data-offline="'+esc(t.id)+'">⇩ Офлайн</button></div></div></div>'+(stats.length?'<div class="profile-grid">'+stats.map(x=>'<div class="track-stat"><small>'+esc(x[0])+'</small><strong>'+esc(x[1])+'</strong></div>').join("")+'</div>':"")+'</section>';
@@ -646,16 +645,13 @@ function library(){
 function openPlaylist(id){const p=state.playlists.find(x=>x.id===id);if(!p)return;tracks=p.tracks;view.innerHTML='<div class="section"><h2>'+esc(p.name)+'</h2><small>'+p.tracks.length+' треков</small></div><div class="results">'+(p.tracks.length?p.tracks.map(result).join(""):'<div class="empty">Добавляй треки из поиска.</div>')+'</div>';bind()}
 function like(t){if(!t)return;const i=state.liked.findIndex(x=>x.id===t.id);if(i>=0){state.liked.splice(i,1);toast("Убрано из любимого")}else{state.liked.unshift(t);toast("♥ Добавлено в любимое")}save();render(document.querySelector(".nav button.active").dataset.view)}
 function recommendationExcludeList(){return [...recommendationSeen].slice(-60)}
-const POPULAR_ARTISTS=Object.values(recommendationArtistsCatalog||{}).flatMap(group=>Array.isArray(group?.artists)?group.artists:[]).map(x=>String(x?.name||"").trim()).filter(Boolean);
-const POPULAR_ARTIST_NAMES=[...new Set(POPULAR_ARTISTS)];
-function popularArtistSeed(){return POPULAR_ARTIST_NAMES.slice(0,120).join(", ")}
 function recommendationParams(extra={}){
  const explicitMood=Boolean(String(extra.mood||"").trim());
  const artist=String(extra.artist||(explicitMood?"":current?.artist)||"").trim(),title=String(extra.title||(explicitMood?"":current?.title)||"").trim();
  return {
   seed:[artist,title,...state.liked.slice(0,8).map(t=>t.artist),...state.taste.genres,...state.taste.moods,state.taste.artists,state.taste.now].filter(Boolean).join(", "),
   artist,title,mood:String(extra.mood||""),genres:state.taste.genres.join(", "),moods:state.taste.moods.join(", "),
-  artists:[state.taste.artists,popularArtistSeed()].filter(Boolean).join(", "),likedArtists:[...new Set(state.liked.slice(0,20).map(t=>t.artist).filter(Boolean))].join(", "),
+  artists:state.taste.artists,likedArtists:[...new Set(state.liked.slice(0,20).map(t=>t.artist).filter(Boolean))].join(", "),
   now:state.taste.now,liked:state.liked.slice(0,10).map(t=>t.artist+" "+t.title).join(", "),
   exclude:recommendationExcludeList().join(","),refresh:String(Date.now())
  };
@@ -795,17 +791,14 @@ async function playNext(){
 }
 function mediaArtworkUrl(image){
  if(!image)return "";
- const raw=String(image).trim();
- if(/^(?:data|blob):/i.test(raw))return raw;
  try{
-  const u=new URL(raw,location.href);
+  const u=new URL(image,location.href);
   if(u.origin===location.origin)return u.href;
   const proxy=new URL("/api/artwork",location.origin);
   proxy.searchParams.set("url",u.href);
   return proxy.href;
  }catch{return ""}
 }
-function renderArtworkImage(image,attrs=""){const src=mediaArtworkUrl(image);return src?'<img src="'+esc(src)+'" '+attrs+'>':"♫"}
 function setMediaAction(name,handler){
  try{navigator.mediaSession.setActionHandler(name,handler)}catch{}
 }
@@ -903,7 +896,7 @@ function drawPlayer(){if(!current){
   return;
  }
  playerEl.className="player on";
- playerEl.innerHTML='<div class="pcover" data-player-profile="1" title="Открыть плеер на весь экран">'+renderArtworkImage(current.image)+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="prev" class="icon" title="Предыдущий">⏮</button><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button><button id="next" class="icon" title="Следующий">⏭</button><button id="eqToggle" class="icon eq-toggle" title="Эквалайзер">EQ</button><button id="autoNextToggle" class="icon auto-toggle" title="Автопереход" aria-label="Автопереход">'+(autoNext?"↻":"×")+'</button><button id="trackInfo" class="icon" title="Информация о треке">ⓘ</button></div><div class="visualizer-strip"><canvas data-visualizer class="audio-visualizer" width="900" height="42"></canvas></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>'+eqPanel();
+ playerEl.innerHTML='<div class="pcover" data-player-profile="1" title="Открыть плеер на весь экран">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="prev" class="icon" title="Предыдущий">⏮</button><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button><button id="next" class="icon" title="Следующий">⏭</button><button id="eqToggle" class="icon eq-toggle" title="Эквалайзер">EQ</button><button id="autoNextToggle" class="icon auto-toggle" title="Автопереход" aria-label="Автопереход">'+(autoNext?"↻":"×")+'</button><button id="trackInfo" class="icon" title="Информация о треке">ⓘ</button></div><div class="visualizer-strip"><canvas data-visualizer class="audio-visualizer" width="900" height="42"></canvas></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>'+eqPanel();
  document.querySelector("#pause").onclick=()=>{
   if(playing){audio.pause();return}
   const promise=audio.play();
