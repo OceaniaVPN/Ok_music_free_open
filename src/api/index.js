@@ -113,7 +113,7 @@ async function zaycevPlay(id){
   throw Error("Zaycev playback URL missing");
 }
 
-const HITMOTOP_BASES=["https://eu.hitmoz.com","https://ru.hitmoz.org","https://rus.hitmoz.org","https://hitmos.fm","https://hitmos.me"];
+const HITMOTOP_BASES=["https://hitmos.me","https://hitmos.fm","https://eu.hitmoz.com","https://ru.hitmoz.org","https://rus.hitmoz.org"];
 // Public deployment of the open-source Shukurov777/hitmoz-parser project.
 // It runs the original Python + BeautifulSoup parser outside the Cloudflare Worker.
 const HITMOZ_PARSER_API_BASE="https://bakha.me/";
@@ -200,20 +200,17 @@ function parseHitmotopSearch(html,base,limit){
   const images=collect(/<div\b[^>]*class=["'][^"']*\btrack__img\b[^"']*["'][^>]*>/gi);
   const downloads=collect(/<a\b[^>]*class=["'][^"']*\btrack__download-btn\b[^"']*["'][^>]*>/gi);
   const infoLinks=collect(/<a\b[^>]*class=["'][^"']*\btrack__info-l\b[^"']*["'][^>]*>/gi);
-  const count=Math.min(limit,titles.length,artists.length,durations.length,downloads.length,infoLinks.length);
-  const out=[];
-  const seen=new Set();
-
+  const count=Math.min(limit,titles.length);
+  const out=[],seen=new Set();
   for(let i=0;i<count;i++){
-    const downloadHref=hitmotopExtractAttr(downloads[i],"href");
-    const infoHref=hitmotopExtractAttr(infoLinks[i],"href");
+    const downloadHref=hitmotopExtractAttr(downloads[i]||"","href");
+    const infoHref=hitmotopExtractAttr(infoLinks[i]||"","href");
     const urlDown=hitmotopAbsoluteUrl(downloadHref,base);
     const pageUrl=hitmotopAbsoluteUrl(infoHref,base);
     if(!urlDown)continue;
-
     const title=stripHtml(titles[i]).replace(/[/\\:*?"<>|]/g,"").trim()||"Без названия";
-    const artist=stripHtml(artists[i])||"Неизвестный исполнитель";
-    const durationText=stripHtml(durations[i]);
+    const artist=stripHtml(artists[i]||"")||"Неизвестный исполнитель";
+    const durationText=stripHtml(durations[i]||"");
     const duration=parseDuration(durationText.match(/\b\d{1,2}:\d{2}(?::\d{2})?\b/)?.[0]||"");
     const image=hitmotopExtractImageFromTag(images[i]||"",base);
     const key=pageUrl||urlDown;
@@ -222,18 +219,9 @@ function parseHitmotopSearch(html,base,limit){
     if(seen.has(id))continue;
     seen.add(id);
     out.push({
-      id,
-      title,
-      artist,
-      album:"",
-      image,
+      id,title,artist,album:"",image,
       audio:"/api/hitmotop/play?url="+encodeURIComponent(urlDown)+"&page="+encodeURIComponent(pageUrl||""),
-      duration,
-      license:"",
-      source:"Hitmotop",
-      sourceUrl:pageUrl||urlDown,
-      genre:"",
-      downloadUrl:urlDown
+      duration,license:"",source:"Hitmotop",sourceUrl:pageUrl||urlDown,genre:"",downloadUrl:urlDown
     });
   }
   // HitMoz's current HTML can expose the real MP3 as /get/music/*.mp3
@@ -265,13 +253,32 @@ function parseHitmotopSearch(html,base,limit){
 }
 
 async function hitmotopSearchRequest(searchUrl,headers,limit){
-  const response=await fetch(searchUrl,{headers,redirect:"follow"});
+  const response=await fetch(searchUrl,{headers,redirect:"follow",signal:AbortSignal.timeout(4_500)});
   const html=await response.text();
   if(!response.ok)throw Error("Hitmo search HTTP "+response.status);
   const finalBase=new URL(response.url||searchUrl).origin;
   const tracks=parseHitmotopSearch(html,finalBase,limit);
   if(!tracks.length)throw Error("Hitmo search returned no parsable tracks");
   return tracks;
+}
+async function hitmotopHtmlProviderSearch(base,q,limit){
+  const home=await fetch(base+"/",{headers:HITMOTOP_HEADERS,redirect:"follow",signal:AbortSignal.timeout(4_500)});
+  if(!home.ok)throw Error("Hitmo home HTTP "+home.status);
+  const origin=new URL(home.url||base).origin;
+  let cookie=hitmotopCookieHeader(home);
+  const headers={...HITMOTOP_HEADERS,referer:origin+"/"};
+  if(cookie)headers.cookie=cookie;
+  const params=["q","search","query"];
+  let lastError=null;
+  for(const key of params){
+    try{
+      const search=new URL("/search",origin);
+      search.searchParams.set(key,q);
+      const tracks=await hitmotopSearchRequest(search.href,headers,limit);
+      if(tracks.length)return tracks;
+    }catch(error){lastError=error}
+  }
+  throw lastError||Error("Hitmo search unavailable");
 }
 
 function normalizeHitmozParserSongs(data,limit){
@@ -340,30 +347,16 @@ async function fetchHitmozParserApi(q,limit){
 
 async function fetchHitmotopSearch(q,limit,env){
   let lastError=null;
+  // Primary path follows JoyHubN/pars_hitmotop: search the site HTML and
+  // extract title/artist/duration/cover/download link from the result cards.
+  const bases=HITMOTOP_BASES.slice(0,3);
+  const attempts=await Promise.allSettled(bases.map(base=>hitmotopHtmlProviderSearch(base,q,limit)));
+  for(const attempt of attempts){
+    if(attempt.status==="fulfilled"&&attempt.value?.length)return attempt.value;
+    if(attempt.status==="rejected")lastError=attempt.reason;
+  }
   try{return await fetchHitmozPython(q,limit,env)}catch(error){lastError=error}
   try{return await fetchHitmozParserApi(q,limit)}catch(error){lastError=error}
-  // One lightweight HTML fallback only. Do not fan out over five mirrors
-  // during autoplay; a slow mirror must not hold the whole Worker request.
-  const configuredBase=HITMOTOP_BASES[0];
-  try{
-    const home=await fetch(configuredBase+"/",{headers:HITMOTOP_HEADERS,redirect:"follow",signal:AbortSignal.timeout(4_500)});
-    const base=new URL(home.url||configuredBase).origin;
-    let cookie=hitmotopCookieHeader(home);
-    const sessionHeaders={...HITMOTOP_HEADERS,referer:base+"/"};
-    if(cookie)sessionHeaders.cookie=cookie;
-    const warm=await fetch(base+"/",{headers:sessionHeaders,redirect:"follow",signal:AbortSignal.timeout(4_500)});
-    const warmCookie=hitmotopCookieHeader(warm);
-    if(warmCookie)cookie=warmCookie;
-    const headers={...HITMOTOP_HEADERS,referer:base+"/"};
-    if(cookie)headers.cookie=cookie;
-    headers["sec-fetch-dest"]="document";
-    headers["sec-fetch-mode"]="navigate";
-    headers["sec-fetch-site"]="same-origin";
-    headers["upgrade-insecure-requests"]="1";
-    const search=new URL("/search",base);
-    search.searchParams.set("q",q);
-    return await hitmotopSearchRequest(search.href,headers,limit);
-  }catch(error){lastError=error}
   throw lastError||Error("Hitmo unavailable");
 }
 
