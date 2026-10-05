@@ -1,4 +1,4 @@
-const HITMOTOP_BASES=["https://hitmos.fm","https://hitmos.me"];
+const HITMOTOP_BASES=["https://eu.hitmoz.com","https://hitmos.fm","https://hitmos.me"];
 export const HITMOTOP_HEADERS={
   accept:"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
   "accept-language":"ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3",
@@ -101,70 +101,141 @@ function buildTrack({title,artist,duration,image,download,info},base){
     downloadUrl
   };
 }
-function extractElementTexts(source,tagName,className){
-  const re=new RegExp("<"+tagName+"\\b[^>]*class=[\\\"']([^\\\"']*\\b"+className+"\\b[^\\\"']*)[\\\"'][^>]*>([\\s\\S]*?)</"+tagName+">","gi");
-  return [...String(source||"").matchAll(re)].map(match=>match[2]);
+function decodeHtml(value){
+  return String(value||"")
+    .replace(/&nbsp;/gi," ")
+    .replace(/&amp;/gi,"&")
+    .replace(/&quot;/gi,'\"')
+    .replace(/&#39;/gi,"'")
+    .replace(/&lt;/gi,"<")
+    .replace(/&gt;/gi,">");
 }
-function extractElementTags(source,tagName,className){
-  const re=new RegExp("<"+tagName+"\\b[^>]*class=[\\\"']([^\\\"']*\\b"+className+"\\b[^\\\"']*)[\\\"'][^>]*>","gi");
-  return [...String(source||"").matchAll(re)].map(match=>match[0]);
+function textOnly(value){
+  return decodeHtml(String(value||"")
+    .replace(/<script[\\s\\S]*?<\\/script>/gi," ")
+    .replace(/<style[\\s\\S]*?<\\/style>/gi," ")
+    .replace(/<[^>]+>/g," "))
+    .replace(/\\s+/g," ")
+    .trim();
 }
-function extractElementTextsAny(source,className){
-  const re=new RegExp("<[a-z][a-z0-9:-]*\\b[^>]*class=[\\\"']([^\\\"']*\\b"+className+"\\b[^\\\"']*)[\\\"'][^>]*>([\\s\\S]*?)</[a-z][a-z0-9:-]*>","gi");
-  return [...String(source||"").matchAll(re)].map(match=>match[2]);
+function parseHitmoMp3Href(value){
+  const href=String(value||"").trim();
+  return /(?:^|\\/)get\\/music\\/[^"'<>\\s]+\\.mp3(?:[?#].*)?$/i.test(href)
+    || /(?:^|\\/)get\\/[^"'<>\\s]+\\.mp3(?:[?#].*)?$/i.test(href)
+    || /\\.mp3(?:[?#].*)?$/i.test(href);
 }
-function extractElementTagsAny(source,className){
-  const re=new RegExp("<[a-z][a-z0-9:-]*\\b[^>]*class=[\\\"']([^\\\"']*\\b"+className+"\\b[^\\\"']*)[\\\"'][^>]*>","gi");
-  return [...String(source||"").matchAll(re)].map(match=>match[0]);
-}
-function extractFallbackDownloadTags(source){
-  const tagged=extractElementTags(source,"a","track__download-btn");
-  if(tagged.length)return tagged;
-  const out=[];
-  const re=/<a\\b[^>]*href=[\\\"']([^\\\"']+)[\\\"'][^>]*>/gi;
-  for(const match of String(source||"").matchAll(re)){
-    const href=String(match[1]||"");
-    if(/(?:^|\\/)get\\//i.test(href)||/\\.mp3(?:[?#]|$)/i.test(href))out.push(match[0]);
+function findTrackContainer(source,startIndex){
+  const before=source.slice(0,startIndex);
+  const openTags=[...before.matchAll(/<([a-z][a-z0-9:-]*)\\b[^>]*>/gi)];
+  const stack=[];
+  for(const tag of openTags){
+    const raw=tag[0];
+    const name=String(tag[1]).toLowerCase();
+    if(/^<\\//.test(raw)||/\\/\\s*>$/.test(raw))continue;
+    if(/<input\\b/i.test(raw))continue;
+    stack.push(name);
+    if(stack.length>12)stack.shift();
   }
-  return out;
+  let pos=startIndex;
+  for(let depth=0;depth<8;depth++){
+    const open=source.lastIndexOf("<",pos-1);
+    if(open<0)break;
+    const close=source.indexOf(">",open);
+    if(close<0)break;
+    const tag=source.slice(open,close+1);
+    const name=tag.match(/^<([a-z][a-z0-9:-]*)\\b/i)?.[1]?.toLowerCase();
+    if(!name){pos=open;continue;}
+    if(/^(a|img|source|button|span|strong|b|small|time|div|p)$/i.test(name)){
+      const closeRe=new RegExp("<\\/"+name+"\\s*>","ig");
+      closeRe.lastIndex=close+1;
+      const rest=source.slice(close+1);
+      const m=closeRe.exec(rest);
+      if(m){
+        return source.slice(open,close+1+m.index+m[0].length);
+      }
+    }
+    pos=open;
+  }
+  return source.slice(Math.max(0,startIndex-1200),Math.min(source.length,startIndex+2500));
 }
-
+function extractContainerField(row,className){
+  const re=new RegExp("<[a-z][a-z0-9:-]*\\b[^>]*class=[\\\"']([^\\\"']*\\b"+className+"\\b[^\\\"']*)[\\\"'][^>]*>([\\s\\S]*?)</[a-z][a-z0-9:-]*>","i");
+  const m=String(row||"").match(re);
+  return m?textOnly(m[2]):"";
+}
+function extractContainerImage(row,base){
+  const source=String(row||"");
+  for(const tag of source.matchAll(/<(?:img|source|div|span)[^>]*>/gi)){
+    const raw=tag[0];
+    const direct=raw.match(/(?:src|data-src|data-lazy-src|data-original|data-bg|data-image|data-thumb)=[\\\"']([^\\\"']+)[\\\"']/i)?.[1];
+    const style=raw.match(/background(?:-image)?\\s*:[^;]*url\\(\\s*[\\\"']?([^\\\"')]+)[\\\"']?\\s*\\)/i)?.[1];
+    const candidate=direct||style;
+    if(candidate&&!/^data:/i.test(candidate))return absoluteUrl(candidate,base);
+  }
+  return "";
+}
+function filenameMetaFromMp3(url,base){
+  try{
+    const filename=decodeURIComponent(new URL(url,base).pathname.split("/").pop()||"").replace(/\\.mp3$/i,"");
+    const cleaned=filename.replace(/[_-]?(\\d{6,})$/,"");
+    const parts=cleaned.split("_-_");
+    if(parts.length>=2){
+      return {artist:parts[0].replace(/_/g," ").trim(),title:parts.slice(1).join(" - ").replace(/_/g," ").trim()};
+    }
+    return {artist:"",title:cleaned.replace(/_/g," ").trim()};
+  }catch{return {artist:"",title:""}}
+}
 export function parseHitmotopSearch(html,base,limit=10){
   const source=String(html||"");
-
-  let titles=extractElementTexts(source,"div","track__title");
-  let artists=extractElementTexts(source,"div","track__desc");
-  let durations=extractElementTexts(source,"div","track__fulltime");
-  let images=extractElementTags(source,"div","track__img");
-  const downloads=extractFallbackDownloadTags(source);
-  let infos=extractElementTags(source,"a","track__info-l");
-
-  // Mirrors occasionally change the tag name while keeping the class names.
-  if(!titles.length)titles=extractElementTextsAny(source,"track__title");
-  if(!artists.length)artists=extractElementTextsAny(source,"track__desc");
-  if(!durations.length)durations=extractElementTextsAny(source,"track__fulltime");
-  if(!images.length)images=extractElementTagsAny(source,"track__img");
-  if(!infos.length)infos=extractElementTagsAny(source,"track__info-l");
-
-  // The info link is optional: the Python parser uses it for metadata, but
-  // the download link itself is sufficient to return a playable track.
-  const count=Math.min(limit,titles.length,downloads.length);
   const out=[];
   const seen=new Set();
-  for(let idx=0;idx<count;idx++){
-    const track=buildTrack({
-      title:titles[idx],
-      artist:artists[idx]||"",
-      duration:durations[idx]||"",
-      image:images[idx]||"",
-      download:downloads[idx]||"",
-      info:infos[idx]||""
-    },base);
-    if(track&&!seen.has(track.id)){
-      seen.add(track.id);
-      out.push(track);
-    }
+  const hrefRe=/<a\\b[^>]*href=[\\\"']([^\\\"']+)[\\\"'][^>]*>/gi;
+
+  for(const match of source.matchAll(hrefRe)){
+    const rawHref=String(match[1]||"").trim();
+    if(!parseHitmoMp3Href(rawHref))continue;
+    const downloadUrl=absoluteUrl(rawHref,base);
+    if(!downloadUrl||seen.has(downloadUrl))continue;
+
+    const row=findTrackContainer(source,match.index??0);
+    const title=extractContainerField(row,"track__title")||"";
+    const artist=extractContainerField(row,"track__desc")||"";
+    const duration=extractContainerField(row,"track__fulltime")||"";
+    const image=extractContainerImage(row,base);
+    const meta=filenameMetaFromMp3(downloadUrl,base);
+
+    let trackTitle=cleanTitle(title)||meta.title||"Без названия";
+    let trackArtist=stripHtml(artist)||meta.artist||"Неизвестный исполнитель";
+    const rowText=textOnly(row);
+    const durationValue=duration.match(/\\b\\d{1,2}:\\d{2}(?::\\d{2})?\\b/)?.[0]
+      ||rowText.match(/\\b\\d{1,2}:\\d{2}(?::\\d{2})?\\b/)?.[0]
+      ||"";
+    const infoHref=row.match(/<a\\b[^>]*class=[\\\"'][^\\\"']*\\btrack__info-l\\b[^\\\"']*[\\\"'][^>]*href=[\\\"']([^\\\"']+)[\\\"']/i)?.[1]
+      ||row.match(/<a\\b[^>]*href=[\\\"']([^\\\"']+)[\\\"'][^>]*class=[\\\"'][^\\\"']*\\btrack__info-l\\b[^\\\"']*/i)?.[1]
+      ||"";
+    const pageUrl=absoluteUrl(infoHref,base);
+    if(trackTitle===trackArtist&&meta.title)trackTitle=meta.title;
+
+    const sourceUrl=pageUrl||downloadUrl;
+    const track={
+      id:"hitmotop-"+hashId(sourceUrl),
+      title:trackTitle,
+      artist:trackArtist,
+      album:"",
+      image,
+      audio:"/api/hitmotop/play?url="+encodeURIComponent(downloadUrl)+"&page="+encodeURIComponent(pageUrl),
+      duration:parseDuration(durationValue),
+      license:"",
+      source:"Hitmotop",
+      sourceUrl,
+      genre:"",
+      downloadUrl
+    };
+    seen.add(downloadUrl);
+    out.push(track);
+    if(out.length>=limit)break;
   }
+
   return out;
 }
 
