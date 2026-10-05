@@ -112,41 +112,32 @@ function decodeHtml(value){
 }
 function textOnly(value){
   return decodeHtml(String(value||"")
-    .replace(/<script[\\s\\S]*?<\\/script>/gi," ")
-    .replace(/<style[\\s\\S]*?<\\/style>/gi," ")
+    .replace(/<script[\s\S]*?<\/script>/gi," ")
+    .replace(/<style[\s\S]*?<\/style>/gi," ")
     .replace(/<[^>]+>/g," "))
-    .replace(/\\s+/g," ")
+    .replace(/\s+/g," ")
     .trim();
 }
 function parseHitmoMp3Href(value){
   const href=String(value||"").trim();
-  return /(?:^|\\/)get\\/music\\/[^"'<>\\s]+\\.mp3(?:[?#].*)?$/i.test(href)
-    || /(?:^|\\/)get\\/[^"'<>\\s]+\\.mp3(?:[?#].*)?$/i.test(href)
-    || /\\.mp3(?:[?#].*)?$/i.test(href);
+  return /(?:^|\/)get\/music\/[^"'<>\s]+\.mp3(?:[?#].*)?$/i.test(href)
+    || /(?:^|\/)get\/[^"'<>\s]+\.mp3(?:[?#].*)?$/i.test(href)
+    || /\.mp3(?:[?#].*)?$/i.test(href);
 }
 function findTrackContainer(source,startIndex){
   const before=source.slice(0,startIndex);
-  const openTags=[...before.matchAll(/<([a-z][a-z0-9:-]*)\\b[^>]*>/gi)];
-  const stack=[];
-  for(const tag of openTags){
-    const raw=tag[0];
-    const name=String(tag[1]).toLowerCase();
-    if(/^<\\//.test(raw)||/\\/\\s*>$/.test(raw))continue;
-    if(/<input\\b/i.test(raw))continue;
-    stack.push(name);
-    if(stack.length>12)stack.shift();
-  }
   let pos=startIndex;
-  for(let depth=0;depth<8;depth++){
-    const open=source.lastIndexOf("<",pos-1);
+  for(let depth=0;depth<10;depth++){
+    const open=before.lastIndexOf("<",pos-1);
     if(open<0)break;
     const close=source.indexOf(">",open);
     if(close<0)break;
     const tag=source.slice(open,close+1);
-    const name=tag.match(/^<([a-z][a-z0-9:-]*)\\b/i)?.[1]?.toLowerCase();
+    if(/^<\/[^>]+>/.test(tag)){pos=open;continue;}
+    const name=tag.match(/^<([a-z][a-z0-9:-]*)\b/i)?.[1]?.toLowerCase();
     if(!name){pos=open;continue;}
-    if(/^(a|img|source|button|span|strong|b|small|time|div|p)$/i.test(name)){
-      const closeRe=new RegExp("<\\/"+name+"\\s*>","ig");
+    if(name!=="a"&&name!=="img"&&name!=="source"){
+      const closeRe=new RegExp("</"+name+"\\s*>","ig");
       closeRe.lastIndex=close+1;
       const rest=source.slice(close+1);
       const m=closeRe.exec(rest);
@@ -156,10 +147,10 @@ function findTrackContainer(source,startIndex){
     }
     pos=open;
   }
-  return source.slice(Math.max(0,startIndex-1200),Math.min(source.length,startIndex+2500));
+  return source.slice(Math.max(0,startIndex-1600),Math.min(source.length,startIndex+2600));
 }
 function extractContainerField(row,className){
-  const re=new RegExp("<[a-z][a-z0-9:-]*\\b[^>]*class=[\\\"']([^\\\"']*\\b"+className+"\\b[^\\\"']*)[\\\"'][^>]*>([\\s\\S]*?)</[a-z][a-z0-9:-]*>","i");
+  const re=new RegExp("<[a-z][a-z0-9:-]*\\b[^>]*class=[\"']([^\"']*\\b"+className+"\\b[^\"']*)[\"'][^>]*>([\\s\\S]*?)</[a-z][a-z0-9:-]*>","i");
   const m=String(row||"").match(re);
   return m?textOnly(m[2]):"";
 }
@@ -167,8 +158,8 @@ function extractContainerImage(row,base){
   const source=String(row||"");
   for(const tag of source.matchAll(/<(?:img|source|div|span)[^>]*>/gi)){
     const raw=tag[0];
-    const direct=raw.match(/(?:src|data-src|data-lazy-src|data-original|data-bg|data-image|data-thumb)=[\\\"']([^\\\"']+)[\\\"']/i)?.[1];
-    const style=raw.match(/background(?:-image)?\\s*:[^;]*url\\(\\s*[\\\"']?([^\\\"')]+)[\\\"']?\\s*\\)/i)?.[1];
+    const direct=raw.match(/(?:src|data-src|data-lazy-src|data-original|data-bg|data-image|data-thumb)=[\"']([^\"']+)[\"']/i)?.[1];
+    const style=raw.match(/background(?:-image)?\s*:[^;]*url\(\s*[\"']?([^\"')]+)[\"']?\s*\)/i)?.[1];
     const candidate=direct||style;
     if(candidate&&!/^data:/i.test(candidate))return absoluteUrl(candidate,base);
   }
@@ -176,8 +167,8 @@ function extractContainerImage(row,base){
 }
 function filenameMetaFromMp3(url,base){
   try{
-    const filename=decodeURIComponent(new URL(url,base).pathname.split("/").pop()||"").replace(/\\.mp3$/i,"");
-    const cleaned=filename.replace(/[_-]?(\\d{6,})$/,"");
+    const filename=decodeURIComponent(new URL(url,base).pathname.split("/").pop()||"").replace(/\.mp3$/i,"");
+    const cleaned=filename.replace(/[_-]?(\d{6,})$/,"");
     const parts=cleaned.split("_-_");
     if(parts.length>=2){
       return {artist:parts[0].replace(/_/g," ").trim(),title:parts.slice(1).join(" - ").replace(/_/g," ").trim()};
@@ -189,7 +180,7 @@ export function parseHitmotopSearch(html,base,limit=10){
   const source=String(html||"");
   const out=[];
   const seen=new Set();
-  const hrefRe=/<a\\b[^>]*href=[\\\"']([^\\\"']+)[\\\"'][^>]*>/gi;
+  const hrefRe=/<a\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>/gi;
 
   for(const match of source.matchAll(hrefRe)){
     const rawHref=String(match[1]||"").trim();
@@ -203,19 +194,17 @@ export function parseHitmotopSearch(html,base,limit=10){
     const duration=extractContainerField(row,"track__fulltime")||"";
     const image=extractContainerImage(row,base);
     const meta=filenameMetaFromMp3(downloadUrl,base);
-
-    let trackTitle=cleanTitle(title)||meta.title||"Без названия";
-    let trackArtist=stripHtml(artist)||meta.artist||"Неизвестный исполнитель";
     const rowText=textOnly(row);
-    const durationValue=duration.match(/\\b\\d{1,2}:\\d{2}(?::\\d{2})?\\b/)?.[0]
-      ||rowText.match(/\\b\\d{1,2}:\\d{2}(?::\\d{2})?\\b/)?.[0]
+    const durationValue=duration.match(/\b\d{1,2}:\d{2}(?::\d{2})?\b/)?.[0]
+      ||rowText.match(/\b\d{1,2}:\d{2}(?::\d{2})?\b/)?.[0]
       ||"";
-    const infoHref=row.match(/<a\\b[^>]*class=[\\\"'][^\\\"']*\\btrack__info-l\\b[^\\\"']*[\\\"'][^>]*href=[\\\"']([^\\\"']+)[\\\"']/i)?.[1]
-      ||row.match(/<a\\b[^>]*href=[\\\"']([^\\\"']+)[\\\"'][^>]*class=[\\\"'][^\\\"']*\\btrack__info-l\\b[^\\\"']*/i)?.[1]
+    const infoHref=row.match(/<a\b[^>]*class=[\"'][^\"']*\btrack__info-l\b[^\"']*[\"'][^>]*href=[\"']([^\"']+)[\"']/i)?.[1]
+      ||row.match(/<a\b[^>]*href=[\"']([^\"']+)[\"'][^>]*class=[\"'][^\"']*\btrack__info-l\b[^\"']*/i)?.[1]
       ||"";
     const pageUrl=absoluteUrl(infoHref,base);
-    if(trackTitle===trackArtist&&meta.title)trackTitle=meta.title;
 
+    const trackTitle=cleanTitle(title)||meta.title||"Без названия";
+    const trackArtist=stripHtml(artist)||meta.artist||"Неизвестный исполнитель";
     const sourceUrl=pageUrl||downloadUrl;
     const track={
       id:"hitmotop-"+hashId(sourceUrl),
@@ -235,7 +224,6 @@ export function parseHitmotopSearch(html,base,limit=10){
     out.push(track);
     if(out.length>=limit)break;
   }
-
   return out;
 }
 
