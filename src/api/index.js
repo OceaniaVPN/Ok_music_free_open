@@ -1,5 +1,6 @@
 import { LOCAL_MUSIC } from "../local-music.js";
 import recommendationArtists from "../data/recommendation-artists.json" with { type: "json" };
+import { HITMOTOP_HEADERS, hitmotopCookieHeader, searchHitmotop, resolveHitmotopPlaybackUrl } from "./providers/hitmotop.js";
 const LOCAL_MUSIC_CATALOG=Array.isArray(LOCAL_MUSIC)?LOCAL_MUSIC:[];
 
 const ZAYCEV_BASE="https://zaycev.net";
@@ -171,10 +172,6 @@ async function zaycevPlay(id,pageUrl=""){
   throw Error("Zaycev playback URL missing");
 }
 
-const HITMOTOP_BASES=["https://hitmos.me","https://hitmos.fm","https://eu.hitmoz.com","https://ru.hitmoz.org","https://rus.hitmoz.org"];
-// Public deployment of the open-source Shukurov777/hitmoz-parser project.
-// It runs the original Python + BeautifulSoup parser outside the Cloudflare Worker.
-const HITMOZ_PARSER_API_BASE="https://bakha.me/";
 const PROVIDER_CACHE=new Map();
 const PROVIDER_CACHE_TTL=45_000;
 const PROVIDER_TIMEOUT_MS=6_500;
@@ -207,266 +204,6 @@ async function cachedProviderSearch(provider,q,limit,loader,timeoutMs=PROVIDER_T
   })();
   PROVIDER_CACHE.set(key,{time:now,promise});
   return promise;
-}
-
-const HITMOTOP_HEADERS={
-  "accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-  "accept-language":"ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3",
-  "cache-control":"no-cache",
-  "user-agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36"
-};
-
-function hitmotopAbsoluteUrl(value,base){
-  const raw=String(value||"").trim();
-  if(!raw)return "";
-  try{return new URL(raw,base).href}catch{return ""}
-}
-
-function hitmotopCookieHeader(response){
-  try{
-    const values=typeof response.headers.getSetCookie==="function"?response.headers.getSetCookie():[response.headers.get("set-cookie")||""];
-    return values
-      .flatMap(value=>String(value||"").split(/,(?=[^;,=]+=[^;,]+)/))
-      .map(value=>value.trim().split(";",1)[0])
-      .filter(value=>/^[^=;]+=[^=;]*$/.test(value))
-      .join("; ");
-  }catch{return ""}
-}
-
-function hitmotopExtractAttr(tag,name){
-  const wanted=String(name||"").toLowerCase();
-  for(const match of String(tag||"").matchAll(/([A-Za-z0-9:-]+)\s*=\s*["']([^"']+)["']/g)){
-    if(String(match[1]).toLowerCase()===wanted)return match[2];
-  }
-  return "";
-}
-
-function hitmotopExtractImageFromTag(tag,base){
-  const style=hitmotopExtractAttr(tag,"style");
-  const direct=hitmotopExtractAttr(tag,"src")||hitmotopExtractAttr(tag,"data-src")||hitmotopExtractAttr(tag,"data-original");
-  const fromStyle=style.match(/url\(\s*["']?([^"')]+)["']?\s*\)/i);
-  const image=fromStyle?.[1]||direct;
-  return image?hitmotopAbsoluteUrl(image,base):"";
-}
-
-function hitmotopFilenameMeta(downloadUrl){
-  try{
-    const url=new URL(downloadUrl);
-    let filename=decodeURIComponent(url.pathname.split("/").pop()||"").replace(/\.mp3$/i,"");
-    filename=filename.replace(/_\d{6,}$/,"").trim();
-    const parts=filename.split(/_-_| - |—/).map(x=>x.replace(/_/g," ").trim()).filter(Boolean);
-    if(parts.length>=2){
-      return {artist:parts[0],title:parts.slice(1).join(" - ")};
-    }
-    return {artist:"",title:filename.replace(/_/g," ").trim()};
-  }catch{return {artist:"",title:""}}
-}
-function hitmotopBuildTrack(raw,base){
-  const downloadHref=hitmotopExtractAttr(raw.download||"","href")||String(raw.download||"");
-  const infoHref=hitmotopExtractAttr(raw.info||"","href")||String(raw.info||"");
-  const urlDown=hitmotopAbsoluteUrl(downloadHref,base);
-  const pageUrl=hitmotopAbsoluteUrl(infoHref,base);
-  if(!urlDown)return null;
-  let title=stripHtml(raw.title||"").replace(/[/\\:*?"<>|]/g,"").trim();
-  let artist=stripHtml(raw.artist||"").trim();
-  const fallback=hitmotopFilenameMeta(urlDown);
-  if(!title||title==="Без названия"||title==="Неизвестный исполнитель"||recommendationText(title)===recommendationText(artist)){
-    title=fallback.title||title||"Без названия";
-  }
-  if(!artist||artist==="Неизвестный исполнитель"||recommendationText(title)===recommendationText(artist)){
-    artist=fallback.artist||artist||"Неизвестный исполнитель";
-  }
-  const duration=parseDuration(String(raw.duration||"").match(/\b\d{1,2}:\d{2}(?::\d{2})?\b/)?.[0]||"");
-  const image=hitmotopExtractImageFromTag(raw.image||"",base);
-  const key=pageUrl||urlDown;
-  const idPart=(key.match(/\/([^/?#]+)(?:[?#]|$)/)?.[1]||key).replace(/[^a-zA-Z0-9_-]/g,"-").slice(-140);
-  return {id:"hitmotop-"+idPart,title,artist,album:"",image,audio:"/api/hitmotop/play?url="+encodeURIComponent(urlDown)+"&page="+encodeURIComponent(pageUrl||""),duration,license:"",source:"Hitmotop",sourceUrl:pageUrl||urlDown,genre:"",downloadUrl:urlDown};
-}
-function parseHitmotopSearch(html,base,limit){
-  const source=String(html||""),out=[],seen=new Set();
-  const cards=source.match(/<li\b[^>]*class=["'][^"']*\btracks__item\b[^"']*["'][\s\S]*?<\/li>/gi)||[];
-  for(const card of cards){
-    if(out.length>=limit)break;
-    const title=card.match(/<div\b[^>]*class=["'][^"']*\btrack__title\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)?.[1]||"";
-    const artist=card.match(/<div\b[^>]*class=["'][^"']*\btrack__desc\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)?.[1]||"";
-    const duration=card.match(/<div\b[^>]*class=["'][^"']*\btrack__fulltime\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)?.[1]||"";
-    const image=card.match(/<div\b[^>]*class=["'][^"']*\btrack__img\b[^"']*["'][^>]*>/i)?.[0]||"";
-    const download=card.match(/<a\b[^>]*class=["'][^"']*\btrack__download-btn\b[^"']*["'][^>]*>/i)?.[0]||"";
-    const info=card.match(/<a\b[^>]*class=["'][^"']*\btrack__info-l\b[^"']*["'][^>]*>/i)?.[0]||"";
-    const track=hitmotopBuildTrack({title,artist,duration,image,download,info},base);
-    if(track&&!seen.has(track.id)){seen.add(track.id);out.push(track)}
-  }
-  if(out.length>=limit)return out;
-  const collect=(re)=>[...source.matchAll(re)].map(m=>m[1]);
-  const titles=collect(/<div\b[^>]*class=["'][^"']*\btrack__title\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi);
-  const artists=collect(/<div\b[^>]*class=["'][^"']*\btrack__desc\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi);
-  const durations=collect(/<div\b[^>]*class=["'][^"']*\btrack__fulltime\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi);
-  const images=collect(/<div\b[^>]*class=["'][^"']*\btrack__img\b[^"']*["'][^>]*>/gi);
-  const downloads=collect(/<a\b[^>]*class=["'][^"']*\btrack__download-btn\b[^"']*["'][^>]*>/gi);
-  const infoLinks=collect(/<a\b[^>]*class=["'][^"']*\btrack__info-l\b[^"']*["'][^>]*>/gi);
-  const count=Math.min(limit,titles.length,artists.length,durations.length,images.length,downloads.length,infoLinks.length);
-  for(let i=0;i<count&&out.length<limit;i++){
-    const track=hitmotopBuildTrack({title:titles[i],artist:artists[i],duration:durations[i],image:images[i],download:downloads[i],info:infoLinks[i]},base);
-    if(track&&!seen.has(track.id)){seen.add(track.id);out.push(track)}
-  }
-  if(out.length<limit){
-    const seenUrls=new Set(out.map(t=>t.downloadUrl).filter(Boolean));
-    for(const match of source.matchAll(/href=["']([^"']+)["']/gi)){
-      if(out.length>=limit)break;
-      const rawHref=match[1]||"";
-      if(!/\/get\/music\/[^"']+\.mp3(?:[?#]|$)/i.test(rawHref))continue;
-      const urlDown=hitmotopAbsoluteUrl(rawHref,base);
-      if(!urlDown||seenUrls.has(urlDown))continue;
-      seenUrls.add(urlDown);
-      const fallback=hitmotopFilenameMeta(urlDown);
-      const key=urlDown,id="hitmotop-"+Math.abs([...key].reduce((h,c)=>((h<<5)-h+c.charCodeAt(0))|0,0));
-      out.push({id,title:fallback.title||"Без названия",artist:fallback.artist||"Неизвестный исполнитель",album:"",image:"",audio:"/api/hitmotop/play?url="+encodeURIComponent(urlDown),duration:0,license:"",source:"Hitmotop",sourceUrl:urlDown,genre:"",downloadUrl:urlDown});
-    }
-  }
-  return out;
-}
-
-async function hitmotopSearchRequest(searchUrl,headers,limit){
-  const response=await fetch(searchUrl,{headers,redirect:"follow",signal:AbortSignal.timeout(4_500)});
-  const html=await response.text();
-  if(!response.ok)throw Error("Hitmo search HTTP "+response.status);
-  const finalBase=new URL(response.url||searchUrl).origin;
-  const tracks=parseHitmotopSearch(html,finalBase,limit);
-  if(!tracks.length)throw Error("Hitmo search returned no parsable tracks");
-  return tracks;
-}
-async function hitmotopHtmlProviderSearch(base,q,limit){
-  const home=await fetch(base+"/",{headers:HITMOTOP_HEADERS,redirect:"follow",signal:AbortSignal.timeout(4_500)});
-  if(!home.ok)throw Error("Hitmo home HTTP "+home.status);
-  const origin=new URL(home.url||base).origin;
-  let cookie=hitmotopCookieHeader(home);
-  const headers={...HITMOTOP_HEADERS,referer:origin+"/"};
-  if(cookie)headers.cookie=cookie;
-  const params=["q","search","query"];
-  let lastError=null;
-  for(const key of params){
-    try{
-      const search=new URL("/search",origin);
-      search.searchParams.set(key,q);
-      const tracks=await hitmotopSearchRequest(search.href,headers,limit);
-      if(tracks.length)return tracks;
-    }catch(error){lastError=error}
-  }
-  throw lastError||Error("Hitmo search unavailable");
-}
-
-function normalizeHitmozParserSongs(data,limit){
-  if(data?.success!==true||!Array.isArray(data.songs))throw Error(data?.error||"HitMoz parser returned no songs");
-  const out=[],seen=new Set();
-  for(const song of data.songs.slice(0,limit)){
-    const downloadUrl=hitmotopAbsoluteUrl(song?.download,"https://eu.hitmoz.com");
-    const sourceUrl=hitmotopAbsoluteUrl(song?.link,"https://eu.hitmoz.com");
-    if(!downloadUrl||seen.has(downloadUrl))continue;
-    const target=new URL(downloadUrl);
-    const host=target.hostname.toLowerCase();
-    const audioAllowed=host==="eu.hitmoz.com"||host.endsWith(".eu.hitmoz.com")||host==="ru.hitmoz.org"||host.endsWith(".ru.hitmoz.org")||host==="rus.hitmoz.org"||host.endsWith(".rus.hitmoz.org")||host==="hitmos.me"||host.endsWith(".hitmos.me")||host==="hitmos.fm"||host.endsWith(".hitmos.fm");
-    if(!audioAllowed||!target.pathname.toLowerCase().startsWith("/get/music/")||!target.pathname.toLowerCase().endsWith(".mp3"))continue;
-    seen.add(downloadUrl);
-    const idMatch=sourceUrl.match(/\/song\/(\d+)/i);
-    const fileId=downloadUrl.match(/_(\d{6,})\.mp3(?:$|[?#])/i)?.[1];
-    const id=idMatch?.[1]||fileId||String(out.length+1);
-    let image="";
-    const cover=String(song?.cover||song?.image||song?.cover_url||song?.thumbnail||song?.album_image||"").trim();
-    if(cover){
-      try{
-        const u=new URL(cover,downloadUrl),h=u.hostname.toLowerCase();
-        if(h==="eu.hitmoz.com"||h.endsWith(".eu.hitmoz.com")||h==="statcore.hitmcdn.com"||h.endsWith(".hitmcdn.com"))image=u.href;
-      }catch{}
-    }
-    const filenameMeta=hitmotopFilenameMeta(downloadUrl);
-    let title=stripHtml(song?.title||song?.name)||"Без названия";
-    let artist=stripHtml(song?.artist||song?.author||song?.artist_name)||"Неизвестный исполнитель";
-    if(!title||title==="Без названия"||recommendationText(title)===recommendationText(artist))title=filenameMeta.title||title;
-    if(!artist||artist==="Неизвестный исполнитель"||recommendationText(title)===recommendationText(artist))artist=filenameMeta.artist||artist;
-    out.push({
-      id:"hitmotop-"+id,
-      title,
-      artist,
-      album:"",
-      image,
-      audio:"/api/hitmotop/play?url="+encodeURIComponent(downloadUrl)+"&page="+encodeURIComponent(sourceUrl||""),
-      duration:parseDuration(String(song?.duration||"")),
-      license:"",
-      source:"Hitmotop",
-      sourceUrl:sourceUrl||downloadUrl,
-      genre:"",
-      downloadUrl
-    });
-  }
-  if(!out.length)throw Error("HitMoz parser returned no usable tracks");
-  return out;
-}
-
-async function fetchHitmozPython(q,limit,env){
-  const rpc=env?.HITMOZ_PYTHON;
-  if(!rpc||typeof rpc.search!=="function")throw Error("HitMoz Python service is not configured");
-  const data=await withTimeout(rpc.search(q,limit),5_500,"HitMoz Python service");
-  return normalizeHitmozParserSongs(data,limit);
-}
-
-async function fetchHitmozParserApi(q,limit){
-  const api=new URL(HITMOZ_PARSER_API_BASE);
-  api.searchParams.set("search",q);
-  const response=await fetch(api.href,{signal:AbortSignal.timeout(5_500),headers:{
-    accept:"application/json",
-    "accept-language":"ru-RU,ru;q=0.9,en;q=0.7",
-    "user-agent":HITMOTOP_HEADERS["user-agent"]
-  },redirect:"follow"});
-  const body=await response.text();
-  if(!response.ok)throw Error("HitMoz parser API HTTP "+response.status);
-  let data;
-  try{data=JSON.parse(body)}catch{throw Error("HitMoz parser API returned invalid JSON")}
-  return normalizeHitmozParserSongs(data,limit);
-}
-
-async function fetchHitmotopSearch(q,limit,env){
-  let lastError=null;
-  // Parser API is preferred because it returns the title/artist/cover/file as
-  // one record. HTML array-parsing can mix metadata when cards are lazy-loaded.
-  try{return await fetchHitmozParserApi(q,limit)}catch(error){lastError=error}
-  try{return await fetchHitmozPython(q,limit,env)}catch(error){lastError=error}
-  const bases=HITMOTOP_BASES.slice(0,3);
-  const attempts=await Promise.allSettled(bases.map(base=>hitmotopHtmlProviderSearch(base,q,limit)));
-  for(const attempt of attempts){
-    if(attempt.status==="fulfilled"&&attempt.value?.length)return attempt.value;
-    if(attempt.status==="rejected")lastError=attempt.reason;
-  }
-  throw lastError||Error("Hitmo unavailable");
-}
-
-async function hitmotopPlaybackUrl(rawUrl){
-  let target;
-  try{target=new URL(rawUrl)}catch{throw Error("Invalid Hitmotop audio URL")}
-  const host=target.hostname.toLowerCase();
-  const allowed=host==="eu.hitmoz.com"||host.endsWith(".eu.hitmoz.com")||
-    host==="ru.hitmoz.org"||host.endsWith(".ru.hitmoz.org")||
-    host==="rus.hitmoz.org"||host.endsWith(".rus.hitmoz.org")||
-    host==="hitmos.me"||host.endsWith(".hitmos.me")||
-    host==="hitmos.fm"||host.endsWith(".hitmos.fm")||
-    host==="hitmotop.com"||host.endsWith(".hitmotop.com");
-  if(!allowed||!/^https?:$/.test(target.protocol))throw Error("Hitmotop audio host is not allowed");
-  try{
-    const probe=await fetch(target.href,{
-      method:"HEAD",
-      headers:{...HITMOTOP_HEADERS,accept:"audio/mpeg,audio/*,*/*;q=0.8"},
-      redirect:"follow",signal:AbortSignal.timeout(4_500)
-    });
-    if(probe.ok)return probe.url||target.href;
-  }catch{}
-  try{
-    const probe=await fetch(target.href,{
-      headers:{...HITMOTOP_HEADERS,accept:"audio/mpeg,audio/*,*/*;q=0.8",range:"bytes=0-0"},
-      redirect:"follow",signal:AbortSignal.timeout(4_500)
-    });
-    const finalUrl=probe.url||target.href;
-    try{await probe.body?.cancel()}catch{}
-    return finalUrl;
-  }catch{return target.href}
 }
 
 function trackDedupeKey(track) {
@@ -802,7 +539,7 @@ function chooseRecommendations(pool,limit,context){
 
 export async function handleApi(request,env){
   const url=new URL(request.url);
-  if(url.pathname==="/api/health")return Response.json({ok:true,service:env.APP_NAME||"Ok Music",version:"7.0",providers:["Zaycev.net","Jamendo","Hitmotop"],zaycev:{configured:true,mode:"current-web-api"},jamendo:{configured:Boolean(String(env.JAMENDO_CLIENT_ID||"").trim())},hitmotop:{configured:true,mode:"Python parser RPC + open-source parser API + HTML fallback",pythonRpc:Boolean(env.HITMOZ_PYTHON)}});
+  if(url.pathname==="/api/health")return Response.json({ok:true,service:env.APP_NAME||"Ok Music",version:"7.0",providers:["Zaycev.net","Jamendo","Hitmotop"],zaycev:{configured:true,mode:"current-web-api"},jamendo:{configured:Boolean(String(env.JAMENDO_CLIENT_ID||"").trim())},hitmotop:{configured:true,mode:"direct-js-html"}});
   if(url.pathname==="/api/hitmotop/test"){
     const q=(url.searchParams.get("q")||"Linkin Park").trim().slice(0,160);
     try{
@@ -826,7 +563,7 @@ export async function handleApi(request,env){
     const [z,j,h]=await Promise.allSettled([
       cachedProviderSearch("zaycev",q,providerLimit,()=>fetchZaycevSearch(q,providerLimit)),
       cachedProviderSearch("jamendo",q,providerLimit,()=>searchJamendo(q,providerLimit,env)),
-      cachedProviderSearch("hitmotop",q,providerLimit,()=>fetchHitmotopSearch(q,providerLimit,env))
+      cachedProviderSearch("hitmotop",q,providerLimit,()=>searchHitmotop(q,providerLimit))
     ]);
     const zTracks=z.status==="fulfilled"?z.value:[],jTracks=j.status==="fulfilled"?j.value:[],hTracks=h.status==="fulfilled"?h.value:[];
     const localTracks=searchLocalTracks(q,limit);
@@ -910,7 +647,7 @@ export async function handleApi(request,env){
     const raw=(url.searchParams.get("url")||"").trim();
     const page=(url.searchParams.get("page")||"").trim();
     try{
-      const target=await hitmotopPlaybackUrl(raw);
+      const target=await resolveHitmotopPlaybackUrl(raw);
       const range=request.headers.get("range")||"";
       const targetUrl=new URL(target);
       let cookie="";
@@ -1155,7 +892,7 @@ export async function handleApi(request,env){
       const [z,j,h]=await Promise.allSettled([
         cachedProviderSearch("zaycev",q,providerLimit,()=>fetchZaycevSearch(q,providerLimit)),
         cachedProviderSearch("jamendo",q,providerLimit,()=>searchJamendo(q,providerLimit,env)),
-        cachedProviderSearch("hitmotop",q,providerLimit,()=>fetchHitmotopSearch(q,providerLimit,env))
+        cachedProviderSearch("hitmotop",q,providerLimit,()=>searchHitmotop(q,providerLimit))
       ]);
       if(z.status==="fulfilled")addList(z.value,"z",q);else errors.push("Zaycev.net: "+(z.reason?.message||"ошибка"));
       if(j.status==="fulfilled")addList(j.value,"j",q);else errors.push("Jamendo: "+(j.reason?.message||"ошибка"));
@@ -1169,7 +906,7 @@ export async function handleApi(request,env){
          const [z,j,h]=await Promise.allSettled([
            cachedProviderSearch("zaycev",q,providerLimit,()=>fetchZaycevSearch(q,providerLimit)),
            cachedProviderSearch("jamendo",q,providerLimit,()=>searchJamendo(q,providerLimit,env)),
-           cachedProviderSearch("hitmotop",q,providerLimit,()=>fetchHitmotopSearch(q,providerLimit,env))
+           cachedProviderSearch("hitmotop",q,providerLimit,()=>searchHitmotop(q,providerLimit))
          ]);
          if(z.status==="fulfilled")addList(z.value,"z",q);else errors.push("Zaycev.net: "+(z.reason?.message||"ошибка"));
          if(j.status==="fulfilled")addList(j.value,"j",q);else errors.push("Jamendo: "+(j.reason?.message||"ошибка"));
