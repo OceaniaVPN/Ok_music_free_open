@@ -200,7 +200,7 @@ function parseHitmotopSearch(html,base,limit){
   const images=collect(/<div\b[^>]*class=["'][^"']*\btrack__img\b[^"']*["'][^>]*>/gi);
   const downloads=collect(/<a\b[^>]*class=["'][^"']*\btrack__download-btn\b[^"']*["'][^>]*>/gi);
   const infoLinks=collect(/<a\b[^>]*class=["'][^"']*\btrack__info-l\b[^"']*["'][^>]*>/gi);
-  const count=Math.min(limit,titles.length);
+  const count=Math.min(limit,titles.length,artists.length,durations.length,images.length,downloads.length,infoLinks.length);
   const out=[],seen=new Set();
   for(let i=0;i<count;i++){
     const downloadHref=hitmotopExtractAttr(downloads[i]||"","href");
