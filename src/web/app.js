@@ -497,10 +497,16 @@ async function fillQueue(extra={},signal){
 
 async function ensureRecommendationWindow(extra={}){
  const remaining=playbackQueue.length-queueIndex-1;
- // Keep five tracks queued ahead of the current one. As soon as four remain,
- // request the next batch of five so the queue never collapses to four.
- if(recommendationLoading||remaining>4)return;
- await fetchRecommendationBatch({...extra,refresh:String(Date.now())},undefined,{force:true});
+ // Pick five tracks. After four of that batch have played, keep one cached
+ // track ahead and fetch the next five so autoplay stays seamless.
+ if(recommendationLoading||remaining>1)return;
+ for(let round=0;round<3&&(playbackQueue.length-queueIndex-1)<5;round++){
+  const added=await fetchRecommendationBatch(
+   {...extra,refresh:String(Date.now())+"-"+round},
+   undefined,{force:true}
+  );
+  if(!added?.length)await new Promise(resolve=>setTimeout(resolve,180));
+ }
 }
 
 async function startRecommendationFromContext(extra={}){
@@ -931,7 +937,7 @@ audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaS
  setTimeout(()=>void playNext(),60);
 };
 nextAudio.onerror=()=>{nextAudio.removeAttribute("src")};
-audio.addEventListener("canplay",()=>{preloadNext();const remaining=playbackQueue.length-queueIndex-1;if(remaining<=1)void fetchRecommendationBatch()});
+audio.addEventListener("canplay",()=>{preloadNext();void ensureRecommendationWindow()});
 document.querySelector("#closeModal").onclick=()=>modal.classList.remove("open");modal.onclick=e=>{if(e.target===modal)modal.classList.remove("open")};
 document.querySelector("#createPlaylist").onclick=()=>{const name=document.querySelector("#playlistName").value.trim();if(!name)return toast("Введи название");state.playlists.unshift({id:"pl-"+Date.now(),name,tracks:[]});save();document.querySelector("#playlistName").value="";modal.classList.remove("open");library();toast("Плейлист создан ✨")}
 function render(name){document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===name));({home,mood,search:searchView,library}[name]||home)()}
