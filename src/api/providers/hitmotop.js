@@ -1,4 +1,4 @@
-const HITMOTOP_BASES=["https://rus.hitmos.fm","https://hitmos.me"];
+const HITMOTOP_BASES=["https://hitmos.fm","https://hitmos.me"];
 export const HITMOTOP_HEADERS={
   accept:"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
   "accept-language":"ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3",
@@ -327,14 +327,16 @@ async function searchOnBase(base,q,limit){
 export async function searchHitmotop(q,limit=10){
   const query=String(q||"").trim();
   if(!query)return [];
-  let lastError=null;
+  const errors=[];
   for(const base of HITMOTOP_BASES){
     try{
       const tracks=await searchOnBase(base,query,limit);
       if(tracks.length)return tracks;
-    }catch(error){lastError=error}
+    }catch(error){
+      errors.push(new URL(base).hostname+": "+(error?.message||"request failed"));
+    }
   }
-  throw lastError||Error("Hitmo unavailable");
+  throw Error("Hitmo unavailable ("+errors.join("; ")+")");
 }
 export async function resolveHitmotopPlaybackUrl(rawUrl){
   let target;
