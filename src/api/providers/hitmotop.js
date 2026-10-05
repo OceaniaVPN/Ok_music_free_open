@@ -1,4 +1,4 @@
-const HITMOTOP_BASES=["https://hitmos.me","https://hitmos.fm","https://eu.hitmoz.com","https://ru.hitmoz.org","https://rus.hitmoz.org"];
+const HITMOTOP_BASES=["https://rus.hitmotop.com","https://hitmotop.com","https://hitmos.me","https://hitmos.fm","https://eu.hitmoz.com","https://ru.hitmoz.org","https://rus.hitmoz.org"];
 export const HITMOTOP_HEADERS={
   accept:"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
   "accept-language":"ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3",
@@ -125,16 +125,28 @@ export function parseHitmotopSearch(html,base,limit=10){
   return out;
 }
 async function searchOnBase(base,q,limit){
-  const home=await fetch(base+"/",{
-    headers:HITMOTOP_HEADERS,
-    redirect:"follow",
-    signal:AbortSignal.timeout(5000)
-  });
-  if(!home.ok)throw Error("Hitmo home HTTP "+home.status);
-  const origin=new URL(home.url||base).origin;
-  const headers={...HITMOTOP_HEADERS,referer:origin+"/"};
-  const cookie=hitmotopCookieHeader(home);
+  const origin = new URL(base).origin;
+  let cookie="";
+  let referer=origin+"/";
+
+  // Some mirrors return 403 for their landing page while the public
+  // search endpoint remains available. The landing-page request is only
+  // best-effort for session cookies and must not block search.
+  try{
+    const home=await fetch(origin+"/",{
+      headers:HITMOTOP_HEADERS,
+      redirect:"follow",
+      signal:AbortSignal.timeout(3500)
+    });
+    if(home.ok){
+      referer=new URL(home.url||origin).origin+"/";
+      cookie=hitmotopCookieHeader(home);
+    }
+  }catch{}
+
+  const headers={...HITMOTOP_HEADERS,referer};
   if(cookie)headers.cookie=cookie;
+
   const search=new URL("/search",origin);
   search.searchParams.set("q",q);
   const response=await fetch(search.href,{
@@ -165,7 +177,7 @@ export async function resolveHitmotopPlaybackUrl(rawUrl){
   try{target=new URL(rawUrl)}catch{throw Error("Invalid Hitmotop audio URL")}
   const host=target.hostname.toLowerCase();
   const allowed=[
-    "hitmos.me","hitmos.fm","eu.hitmoz.com","ru.hitmoz.org","rus.hitmoz.org","hitmotop.com"
+    "rus.hitmotop.com","hitmotop.com","hitmos.me","hitmos.fm","eu.hitmoz.com","ru.hitmoz.org","rus.hitmoz.org"
   ].some(base=>host===base||host.endsWith("."+base));
   if(!allowed||!/^https?:$/.test(target.protocol))throw Error("Hitmotop audio host is not allowed");
   try{
