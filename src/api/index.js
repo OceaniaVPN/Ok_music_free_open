@@ -29,23 +29,63 @@ function parseDuration(value){
 function zaycevExtractImage(source,base=ZAYCEV_BASE){
   const text=String(source||"");
   const candidates=[];
-  const push=value=>{
+  const push=(value,score=0,index=0)=>{
     const raw=String(value||"").replace(/&amp;/gi,"&").replace(/\\\//g,"/").trim();
-    if(!raw)return;
-    try{candidates.push(new URL(raw,base).href)}catch{}
+    if(!raw||/^data:/i.test(raw))return;
+    try{
+      const url=new URL(raw,base).href;
+      if(!/\\.(?:jpe?g|png|webp)(?:[?#]|$)/i.test(url)&&
+         !/cdnimg\\.zaycev\\.net\\/commonImage\\/album\\//i.test(url))return;
+      let bonus=score;
+      if(/cdnimg\\.zaycev\\.net\\/commonImage\\/album\\//i.test(url))bonus+=100;
+      if(/zaycev\\.net\\/.*(?:album|cover|image)/i.test(url))bonus+=60;
+      if(/(?:logo|favicon|sprite|icon|avatar|placeholder)/i.test(url))bonus-=80;
+      candidates.push({url,score:bonus,index});
+    }catch{}
   };
   for(const tag of text.matchAll(/<(?:img|source|meta|div|span)\b[^>]*>/gi)){
-    const t=tag[0];
-    for(const m of t.matchAll(/(?:data-(?:src|original|lazy-src|image|cover)|poster|src|content)=["']([^"']+)["']/gi))push(m[1]);
+    const t=tag[0], index=tag.index||0;
+    for(const m of t.matchAll(/(?:data-(?:src|original|lazy-src|image|cover)|poster|src|content)=["']([^"']+)["']/gi))push(m[1],20,index);
+    const srcset=t.match(/(?:data-srcset|srcset)=["']([^"']+)["']/i)?.[1];
+    if(srcset){
+      const parts=srcset.split(",").map(x=>x.trim().split(/\s+/)[0]).filter(Boolean);
+      parts.forEach((value,n)=>push(value,10+n,index));
+    }
     const style=t.match(/style=["'][^"']*url\(\s*["']?([^"')]+)["']?\s*\)/i)?.[1];
-    if(style)push(style);
+    if(style)push(style,15,index);
   }
-  for(const m of text.matchAll(/https?:\/\/[^"'\s<>]+/gi))push(m[0]);
-  const preferred=candidates.find(url=>/cdnimg\.zaycev\.net\/commonImage\/album\//i.test(url))
-    ||candidates.find(url=>/zaycev\.net\/.*(?:album|cover|image)/i.test(url))
-    ||candidates.find(url=>/\.(?:jpe?g|png|webp)(?:[?#]|$)/i.test(url))
-    ||"";
-  return preferred;
+  const ordered=[...candidates].sort((a,b)=>b.score-a.score||a.index-b.index);
+  return ordered[0]?.url||"";
+}
+function zaycevExtractNearestImage(source,anchorIndex,base=ZAYCEV_BASE){
+  const text=String(source||"");
+  const candidates=[];
+  const push=(value,index,score=0)=>{
+    const raw=String(value||"").replace(/&amp;/gi,"&").replace(/\\\//g,"/").trim();
+    if(!raw||/^data:/i.test(raw))return;
+    try{
+      const url=new URL(raw,base).href;
+      if(!/\.(?:jpe?g|png|webp)(?:[?#]|$)/i.test(url))return;
+      let bonus=score;
+      if(/cdnimg\.zaycev\.net\/commonImage\/album\//i.test(url))bonus+=1000;
+      else if(/zaycev\.net\/.*(?:album|cover|image)/i.test(url))bonus+=500;
+      if(/(?:logo|favicon|sprite|icon|avatar|placeholder)/i.test(url))bonus-=1000;
+      candidates.push({url,distance:Math.abs((index||0)-(anchorIndex||0)),score:bonus});
+    }catch{}
+  };
+  for(const tag of text.matchAll(/<(?:img|source|meta|div|span)\b[^>]*>/gi)){
+    const t=tag[0], index=tag.index||0;
+    for(const m of t.matchAll(/(?:data-(?:src|original|lazy-src|image|cover)|poster|src|content)=["']([^"']+)["']/gi))push(m[1],index,20);
+    const srcset=t.match(/(?:data-srcset|srcset)=["']([^"']+)["']/i)?.[1];
+    if(srcset){
+      const parts=srcset.split(",").map(x=>x.trim().split(/\s+/)[0]).filter(Boolean);
+      parts.forEach((value,n)=>push(value,index,10+n));
+    }
+    const style=t.match(/style=["'][^"']*url\(\s*["']?([^"')]+)["']?\s*\)/i)?.[1];
+    if(style)push(style,index,15);
+  }
+  candidates.sort((a,b)=>b.score-a.score||a.distance-b.distance);
+  return candidates[0]?.url||"";
 }
 function parseZaycevSearch(html,limit){
   const out=[],seen=new Set();
@@ -59,12 +99,8 @@ function parseZaycevSearch(html,limit){
     const texts=links.map(x=>stripHtml(x[2])).filter(Boolean);
     const title=stripHtml(trackLink[2])||"Без названия";
     const artist=texts.find(x=>x!==title&&x.length<160)||"Неизвестный исполнитель";
-    const imgTag=chunk.match(/<(?:img|source)\b[^>]*>/i);
-    const attrs=imgTag?imgTag[0]:"";
-    const imageMatch=attrs.match(/(?:data-src|data-original|data-lazy-src|poster|src)=["']([^"']+)["']/i);
-    const srcsetMatch=attrs.match(/(?:data-srcset|srcset)=["']([^"']+)["']/i);
-    const imageCandidates=[imageMatch?.[1],srcsetMatch?srcsetMatch[1].split(",").pop().trim().split(/\s+/)[0]:""].filter(Boolean);
-    const image=imageCandidates.find(x=>/cdnimg\.zaycev\.net\/commonImage\/album\//i.test(x)||/\/album\//i.test(x))||imageCandidates[0]||"";
+    const trackAnchorIndex=chunk.indexOf(trackLink[0]);
+    const image=zaycevExtractNearestImage(chunk,trackAnchorIndex<0?0:trackAnchorIndex,ZAYCEV_BASE);
     const dm=stripHtml(chunk).match(/\b(\d{1,2}:\d{2})\b/);
     seen.add(id);out.push({id,title,artist,image,duration:dm?parseDuration(dm[1]):0,sourceUrl:new URL(trackLink[1],ZAYCEV_BASE).href});
     if(out.length>=limit)break;
@@ -73,8 +109,10 @@ function parseZaycevSearch(html,limit){
     const source=String(html||"");
     for(const m of source.matchAll(/href=["']([^"']*\/pages\/\d+\/\d+\.shtml[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi)){
       const idm=m[1].match(/\/(\d+)\.shtml/);if(!idm||seen.has(idm[1]))continue;
-      const nearby=String(html||"").slice(Math.max(0,m.index-900),Math.min(String(html||"").length,m.index+1800));
-      seen.add(idm[1]);out.push({id:idm[1],title:stripHtml(m[2])||"Без названия",artist:"Неизвестный исполнитель",image:zaycevExtractImage(nearby,ZAYCEV_BASE),duration:0,sourceUrl:new URL(m[1],ZAYCEV_BASE).href});
+      const nearby=String(html||"").slice(Math.max(0,m.index-1200),Math.min(String(html||"").length,m.index+1400));
+      const anchorIndex=Math.min(nearby.length,Math.max(0,(m[0]||"").indexOf("href=")));
+      const image=zaycevExtractNearestImage(nearby,anchorIndex,ZAYCEV_BASE)||zaycevExtractImage(nearby,ZAYCEV_BASE);
+      seen.add(idm[1]);out.push({id:idm[1],title:stripHtml(m[2])||"Без названия",artist:"Неизвестный исполнитель",image,duration:0,sourceUrl:new URL(m[1],ZAYCEV_BASE).href});
       if(out.length>=limit)break;
     }
   }
