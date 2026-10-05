@@ -1,4 +1,4 @@
-import recommendationArtistsCatalog from "../data/recommendation-artists.json";
+import recommendationArtistsCatalog from "../data/recommendation-artists.json" with { type: "json" };
 export function renderApp(request, env) {
   const appName = env.APP_NAME || "Ok Music";
   const html = String.raw`<!doctype html>
