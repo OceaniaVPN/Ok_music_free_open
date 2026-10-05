@@ -53,6 +53,7 @@ function setAutoNext(value){
  toast(autoNext?"Автопереход включён":"Автопереход выключен");
 }
 let tracks=[], localTracks=[], current=null, currentIndex=-1, audio=document.querySelector("#okAudio"), nextAudio=document.createElement("audio"), playing=false, autoNext=loadAutoNext(), nextPreloadToken=0;
+let playbackAttemptActive=false;
 audio.setAttribute("playsinline","");
 audio.preload="auto";
 audio.autoplay=false;
@@ -77,6 +78,7 @@ const eqBands=["60","250","1K","4K","12K"];
 let audioFx={eq:[0,0,0,0,0]};
 try{audioFx={...audioFx,...JSON.parse(localStorage.getItem(AUDIO_KEY)||"{}")}}catch{}
 let audioCtx=null,audioSource=null,eqPreGain=null,eqNodes=[],fxReady=false,showEq=false,eqEnabled=audioFx.eqEnabled!==false;
+let analyser=null,visualizerData=null,visualizerFrame=0;
 function saveAudioFx(){localStorage.setItem(AUDIO_KEY,JSON.stringify(audioFx))}
 let eqLimiter=null,spatial3dNode=null,spatial3dFrame=0;
 let spatial3d=0;
@@ -180,6 +182,62 @@ function eqPanel(){
  return '<div class="fx-panel"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><strong>🎚 Эквалайзер</strong><label class="eq-switch"><input data-eq-enabled type="checkbox" '+(eqEnabled?"checked":"")+'><span>'+(eqEnabled?"ВКЛ":"ВЫКЛ")+'</span></label></div><div class="eq-grid">'+eqBands.map((b,i)=>'<label class="eq-band"><input data-eq="'+i+'" type="range" min="-12" max="12" step="1" value="'+Number(audioFx.eq[i]||0)+'" '+(eqEnabled?"":"disabled")+'><small>'+b+' Hz</small></label>').join("")+'</div><div class="spatial3d"><div class="spatial3d-head"><strong>🌀 3D звук</strong><span>'+Math.round(spatial3d*100)+'%</span></div><input data-spatial3d type="range" min="0" max="1" step="0.01" value="'+spatial3d+'"><small>HRTF · пространственное вращение</small></div></div>';
 }
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
+function ensureVisualizer(){
+ if(!fxReady&&!initAudioFx())return false;
+ if(!analyser){
+  try{
+   analyser=audioCtx.createAnalyser();
+   analyser.fftSize=128;
+   analyser.smoothingTimeConstant=.84;
+   eqNodes[eqNodes.length-1].connect(analyser);
+   visualizerData=new Uint8Array(analyser.frequencyBinCount);
+  }catch(error){console.warn("Ok Music visualizer:",error);return false}
+ }
+ if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});
+ if(!visualizerFrame)visualizerFrame=requestAnimationFrame(drawVisualizer);
+ return true;
+}
+function drawVisualizer(){
+ visualizerFrame=0;
+ if(!analyser||!visualizerData||!playing){
+  document.documentElement.style.setProperty("--sound-level","0");
+  if(!playing)document.querySelectorAll("[data-visualizer]").forEach(canvas=>{
+   const ctx=canvas.getContext("2d");if(ctx)ctx.clearRect(0,0,canvas.width,canvas.height);
+  });
+  return;
+ }
+ analyser.getByteFrequencyData(visualizerData);
+ const n=visualizerData.length;
+ let low=0,mid=0,high=0;
+ for(let i=0;i<n;i++){
+  const v=visualizerData[i]/255;
+  if(i<n*.18)low+=v;else if(i<n*.55)mid+=v;else high+=v;
+ }
+ low/=Math.max(1,Math.floor(n*.18));mid/=Math.max(1,Math.floor(n*.37));high/=Math.max(1,Math.floor(n*.45));
+ const level=Math.min(1,(low*.5+mid*.32+high*.18)*1.32);
+ const hue=Math.round(238+high*78-low*34);
+ document.documentElement.style.setProperty("--sound-level",level.toFixed(3));
+ document.documentElement.style.setProperty("--sound-low",low.toFixed(3));
+ document.documentElement.style.setProperty("--sound-mid",mid.toFixed(3));
+ document.documentElement.style.setProperty("--sound-high",high.toFixed(3));
+ document.documentElement.style.setProperty("--sound-hue",String(hue));
+ document.querySelectorAll("[data-visualizer]").forEach(canvas=>{
+  const rect=canvas.getBoundingClientRect(),dpr=Math.max(1,Math.min(2,window.devicePixelRatio||1));
+  const w=Math.max(1,Math.floor(rect.width*dpr)),h=Math.max(1,Math.floor(rect.height*dpr));
+  if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}
+  const ctx=canvas.getContext("2d");if(!ctx)return;
+  ctx.clearRect(0,0,w,h);
+  const bars=Math.min(40,n),step=w/bars;
+  for(let i=0;i<bars;i++){
+   const v=Math.pow(visualizerData[Math.floor(i*n/bars)]/255,1.15);
+   const bh=Math.max(2,v*h*.92),x=i*step+1,y=(h-bh)/2;
+   ctx.fillStyle="hsla("+((hue+i*2.4)%360)+",92%,"+(62+v*22)+"%,"+(.16+v*.84)+")";
+   ctx.fillRect(x,y,Math.max(1,step-2),bh);
+  }
+ });
+ visualizerFrame=requestAnimationFrame(drawVisualizer);
+}
+
 function save(){localStorage.setItem(KEY,JSON.stringify(state))}
 function toast(s){toastEl.textContent=s;toastEl.classList.add("show");clearTimeout(window._toast);window._toast=setTimeout(()=>toastEl.classList.remove("show"),1800)}
 function fmt(n){return Number.isFinite(n)&&n>0?Math.floor(n/60)+":"+String(Math.floor(n%60)).padStart(2,"0"):"0:00"}
@@ -192,10 +250,14 @@ function playableAudioCandidates(t){
  };
  // Hitmotop exposes a direct MP3 URL in its parser response. Prefer it for autoplay,
  // but keep the Worker proxy as a fallback in case the direct file is unavailable.
- if(String(t.source||"")==="Hitmotop")add(t.downloadUrl);
- if(t.zaycevId)add("/api/zaycev/play?id="+encodeURIComponent(String(t.zaycevId)));
- add(t.audio);
- add(t.src);
+ if(String(t.source||"")==="Hitmotop"){
+  if(t.audio)add(t.audio);
+  if(t.downloadUrl)add(t.downloadUrl);
+ }else{
+  if(t.zaycevId)add("/api/zaycev/play?id="+encodeURIComponent(String(t.zaycevId)));
+  add(t.audio);
+  add(t.src);
+ }
  return out;
 }
 function playableAudio(t){return playableAudioCandidates(t)[0]||"";}
@@ -585,6 +647,7 @@ function play(t,{fromEnded=false,keepQueue=false,fromBootstrap=false}={}){
   return;
  }
  const token=++window.__okPlayToken;
+ playbackAttemptActive=true;
  let candidateIndex=0;
  const tryCandidate=()=>{
   if(token!==window.__okPlayToken||current?.id!==t.id)return;
@@ -617,6 +680,7 @@ function play(t,{fromEnded=false,keepQueue=false,fromBootstrap=false}={}){
      tryCandidate();
      return;
     }
+    playbackAttemptActive=false;
     console.warn("Ok Music playback:",{error,current:t,candidates});
     const failedIndex=playbackQueue.findIndex(x=>String(x?.id||"")===String(t.id||""));
     if(failedIndex>=0){
@@ -637,8 +701,10 @@ function play(t,{fromEnded=false,keepQueue=false,fromBootstrap=false}={}){
     if(settled)return;
     settled=true;
     cleanup();
-    if(token!==window.__okPlayToken||current?.id!==t.id)return;
+    if(token!==window.__okPlayToken||current?.id!==t.id){playbackAttemptActive=false;return}
+    playbackAttemptActive=false;
     playing=true;
+    ensureVisualizer();
     updateMediaSession();
     drawPlayer();
     preloadNext();
@@ -646,6 +712,7 @@ function play(t,{fromEnded=false,keepQueue=false,fromBootstrap=false}={}){
    }).catch(fail);
   }catch(error){
    if(candidateIndex<candidates.length-1){candidateIndex++;tryCandidate();return;}
+   playbackAttemptActive=false;
    console.warn("Ok Music playback:",error);
    current=null;
    playing=false;
@@ -784,7 +851,7 @@ function drawPlayer(){if(!current){
   return;
  }
  playerEl.className="player on";
- playerEl.innerHTML='<div class="pcover" data-player-profile="1" title="Открыть плеер на весь экран">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="prev" class="icon" title="Предыдущий">⏮</button><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button><button id="next" class="icon" title="Следующий">⏭</button><button id="eqToggle" class="icon eq-toggle" title="Эквалайзер">EQ</button><button id="autoNextToggle" class="icon" title="Автопереход">'+(autoNext?"AUTO":"A×")+'</button><button id="trackInfo" class="icon" title="Информация о треке">ⓘ</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>'+eqPanel();
+ playerEl.innerHTML='<div class="pcover" data-player-profile="1" title="Открыть плеер на весь экран">'+(current.image?'<img src="'+esc(current.image)+'">':"♫")+'</div><div class="pmeta"><strong>'+esc(current.title)+'</strong><span>'+esc(current.artist)+'</span></div><div class="pc"><button id="prev" class="icon" title="Предыдущий">⏮</button><button id="pause" class="big">'+(playing?"Ⅱ":"▶")+'</button><button id="next" class="icon" title="Следующий">⏭</button><button id="eqToggle" class="icon eq-toggle" title="Эквалайзер">EQ</button><button id="autoNextToggle" class="icon auto-toggle" title="Автопереход" aria-label="Автопереход">'+(autoNext?"↻":"×")+'</button><button id="trackInfo" class="icon" title="Информация о треке">ⓘ</button></div><input id="seek" class="seek" type="range" min="0" max="100" value="0"><span class="time" id="ptime">'+fmt(audio.currentTime)+' / '+fmt(audio.duration)+'</span>'+eqPanel();
  document.querySelector("#pause").onclick=()=>{
   if(playing){audio.pause();return}
   const promise=audio.play();
@@ -804,8 +871,9 @@ function drawPlayer(){if(!current){
  if(spatial)spatial.oninput=e=>{setSpatial3d(e.target.value);const out=spatial.closest(".spatial3d")?.querySelector("span");if(out)out.textContent=Math.round(spatial3d*100)+"%"};
 }
  syncFullscreenPlayer();
-audio.onplay=()=>{playing=true;if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});if(spatial3d)updateSpatial3d();if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer()};audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime"),fsSeek=document.querySelector("#fsSeek"),fsCur=document.querySelector("#fsCur"),fsDur=document.querySelector("#fsDur");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if(fsSeek)fsSeek.value=audio.duration?audio.currentTime/audio.duration*100:0;if(fsCur)fsCur.textContent=fmt(audio.currentTime);if(fsDur)fsDur.textContent=fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
+audio.onplay=()=>{playing=true;ensureVisualizer();if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});if(spatial3d)updateSpatial3d();if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer()};audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime"),fsSeek=document.querySelector("#fsSeek"),fsCur=document.querySelector("#fsCur"),fsDur=document.querySelector("#fsDur");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if(fsSeek)fsSeek.value=audio.duration?audio.currentTime/audio.duration*100:0;if(fsCur)fsCur.textContent=fmt(audio.currentTime);if(fsDur)fsDur.textContent=fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
 audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer()};audio.onended=()=>{playing=false;if(autoNext)void playNext();else{if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()}};audio.onerror=()=>{
+ if(playbackAttemptActive)return;
  const code=audio.error?.code||0;
  console.warn("Ok Music audio error",{code,src:audio.src,current:current?.id,source:current?.source});
  playing=false;
