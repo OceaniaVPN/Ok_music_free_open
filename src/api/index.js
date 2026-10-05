@@ -26,7 +26,7 @@ function parseDuration(value){
 }
 function parseZaycevSearch(html,limit){
   const out=[],seen=new Set();
-  const chunks=String(html||"").match(/<li\b[^>]*>[\s\S]*?<\/li>/gi)||[String(html||"")];
+  const chunks=String(html||"").match(/<(?:li|article|div)\b[^>]*(?:class=["'][^"']*(?:track|song|search|music)[^"']*["'])?[^>]*>[\s\S]*?<\/(?:li|article|div)>/gi)||[String(html||"")];
   for(const chunk of chunks){
     const links=[...chunk.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)];
     const trackLink=links.find(x=>/\/pages\/\d+\/\d+\.shtml(?:[?#]|$)/i.test(x[1]));
@@ -46,8 +46,9 @@ function parseZaycevSearch(html,limit){
     seen.add(id);out.push({id,title,artist,image,duration:dm?parseDuration(dm[1]):0,sourceUrl:new URL(trackLink[1],ZAYCEV_BASE).href});
     if(out.length>=limit)break;
   }
-  if(!out.length){
-    for(const m of String(html||"").matchAll(/href=["']([^"']*\/pages\/\d+\/\d+\.shtml[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi)){
+  if(out.length<limit){
+    const source=String(html||"");
+    for(const m of source.matchAll(/href=["']([^"']*\/pages\/\d+\/\d+\.shtml[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi)){
       const idm=m[1].match(/\/(\d+)\.shtml/);if(!idm||seen.has(idm[1]))continue;
       seen.add(idm[1]);out.push({id:idm[1],title:stripHtml(m[2])||"Без названия",artist:"Неизвестный исполнитель",image:"",duration:0,sourceUrl:new URL(m[1],ZAYCEV_BASE).href});
       if(out.length>=limit)break;
@@ -248,9 +249,55 @@ function hitmotopExtractImageFromTag(tag,base){
   return image?hitmotopAbsoluteUrl(image,base):"";
 }
 
+function hitmotopFilenameMeta(downloadUrl){
+  try{
+    const url=new URL(downloadUrl);
+    let filename=decodeURIComponent(url.pathname.split("/").pop()||"").replace(/\.mp3$/i,"");
+    filename=filename.replace(/_\d{6,}$/,"").trim();
+    const parts=filename.split(/_-_| - |—/).map(x=>x.replace(/_/g," ").trim()).filter(Boolean);
+    if(parts.length>=2){
+      return {artist:parts[0],title:parts.slice(1).join(" - ")};
+    }
+    return {artist:"",title:filename.replace(/_/g," ").trim()};
+  }catch{return {artist:"",title:""}}
+}
+function hitmotopBuildTrack(raw,base){
+  const downloadHref=hitmotopExtractAttr(raw.download||"","href")||String(raw.download||"");
+  const infoHref=hitmotopExtractAttr(raw.info||"","href")||String(raw.info||"");
+  const urlDown=hitmotopAbsoluteUrl(downloadHref,base);
+  const pageUrl=hitmotopAbsoluteUrl(infoHref,base);
+  if(!urlDown)return null;
+  let title=stripHtml(raw.title||"").replace(/[/\\:*?"<>|]/g,"").trim();
+  let artist=stripHtml(raw.artist||"").trim();
+  const fallback=hitmotopFilenameMeta(urlDown);
+  if(!title||title==="Без названия"||title==="Неизвестный исполнитель"||recommendationText(title)===recommendationText(artist)){
+    title=fallback.title||title||"Без названия";
+  }
+  if(!artist||artist==="Неизвестный исполнитель"||recommendationText(title)===recommendationText(artist)){
+    artist=fallback.artist||artist||"Неизвестный исполнитель";
+  }
+  const duration=parseDuration(String(raw.duration||"").match(/\b\d{1,2}:\d{2}(?::\d{2})?\b/)?.[0]||"");
+  const image=hitmotopExtractImageFromTag(raw.image||"",base);
+  const key=pageUrl||urlDown;
+  const idPart=(key.match(/\/([^/?#]+)(?:[?#]|$)/)?.[1]||key).replace(/[^a-zA-Z0-9_-]/g,"-").slice(-140);
+  return {id:"hitmotop-"+idPart,title,artist,album:"",image,audio:"/api/hitmotop/play?url="+encodeURIComponent(urlDown)+"&page="+encodeURIComponent(pageUrl||""),duration,license:"",source:"Hitmotop",sourceUrl:pageUrl||urlDown,genre:"",downloadUrl:urlDown};
+}
 function parseHitmotopSearch(html,base,limit){
-  const source=String(html||"");
-  const collect=(re)=>[...source.matchAll(re)].map(match=>match[1]);
+  const source=String(html||""),out=[],seen=new Set();
+  const cards=source.match(/<li\b[^>]*class=["'][^"']*\btracks__item\b[^"']*["'][\s\S]*?<\/li>/gi)||[];
+  for(const card of cards){
+    if(out.length>=limit)break;
+    const title=card.match(/<div\b[^>]*class=["'][^"']*\btrack__title\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)?.[1]||"";
+    const artist=card.match(/<div\b[^>]*class=["'][^"']*\btrack__desc\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)?.[1]||"";
+    const duration=card.match(/<div\b[^>]*class=["'][^"']*\btrack__fulltime\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)?.[1]||"";
+    const image=card.match(/<div\b[^>]*class=["'][^"']*\btrack__img\b[^"']*["'][^>]*>/i)?.[0]||"";
+    const download=card.match(/<a\b[^>]*class=["'][^"']*\btrack__download-btn\b[^"']*["'][^>]*>/i)?.[0]||"";
+    const info=card.match(/<a\b[^>]*class=["'][^"']*\btrack__info-l\b[^"']*["'][^>]*>/i)?.[0]||"";
+    const track=hitmotopBuildTrack({title,artist,duration,image,download,info},base);
+    if(track&&!seen.has(track.id)){seen.add(track.id);out.push(track)}
+  }
+  if(out.length>=limit)return out;
+  const collect=(re)=>[...source.matchAll(re)].map(m=>m[1]);
   const titles=collect(/<div\b[^>]*class=["'][^"']*\btrack__title\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi);
   const artists=collect(/<div\b[^>]*class=["'][^"']*\btrack__desc\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi);
   const durations=collect(/<div\b[^>]*class=["'][^"']*\btrack__fulltime\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/gi);
@@ -258,54 +305,24 @@ function parseHitmotopSearch(html,base,limit){
   const downloads=collect(/<a\b[^>]*class=["'][^"']*\btrack__download-btn\b[^"']*["'][^>]*>/gi);
   const infoLinks=collect(/<a\b[^>]*class=["'][^"']*\btrack__info-l\b[^"']*["'][^>]*>/gi);
   const count=Math.min(limit,titles.length,artists.length,durations.length,images.length,downloads.length,infoLinks.length);
-  const out=[],seen=new Set();
-  for(let i=0;i<count;i++){
-    const downloadHref=hitmotopExtractAttr(downloads[i]||"","href");
-    const infoHref=hitmotopExtractAttr(infoLinks[i]||"","href");
-    const urlDown=hitmotopAbsoluteUrl(downloadHref,base);
-    const pageUrl=hitmotopAbsoluteUrl(infoHref,base);
-    if(!urlDown)continue;
-    const title=stripHtml(titles[i]).replace(/[/\\:*?"<>|]/g,"").trim()||"Без названия";
-    const artist=stripHtml(artists[i]||"")||"Неизвестный исполнитель";
-    const durationText=stripHtml(durations[i]||"");
-    const duration=parseDuration(durationText.match(/\b\d{1,2}:\d{2}(?::\d{2})?\b/)?.[0]||"");
-    const image=hitmotopExtractImageFromTag(images[i]||"",base);
-    const key=pageUrl||urlDown;
-    const idPart=(key.match(/\/([^/?#]+)(?:[?#]|$)/)?.[1]||key).replace(/[^a-zA-Z0-9_-]/g,"-").slice(-140);
-    const id="hitmotop-"+idPart;
-    if(seen.has(id))continue;
-    seen.add(id);
-    out.push({
-      id,title,artist,album:"",image,
-      audio:"/api/hitmotop/play?url="+encodeURIComponent(urlDown)+"&page="+encodeURIComponent(pageUrl||""),
-      duration,license:"",source:"Hitmotop",sourceUrl:pageUrl||urlDown,genre:"",downloadUrl:urlDown
-    });
+  for(let i=0;i<count&&out.length<limit;i++){
+    const track=hitmotopBuildTrack({title:titles[i],artist:artists[i],duration:durations[i],image:images[i],download:downloads[i],info:infoLinks[i]},base);
+    if(track&&!seen.has(track.id)){seen.add(track.id);out.push(track)}
   }
-  // HitMoz's current HTML can expose the real MP3 as /get/music/*.mp3
-  // without the older track__download-btn markup. Parse those links as a fallback.
   if(out.length<limit){
     const seenUrls=new Set(out.map(t=>t.downloadUrl).filter(Boolean));
-    // Simple href scan avoids complex regex escaping inside the generated Worker source.
-    const links=[...source.matchAll(/href=["']([^"']+)["']/gi)];
-    for(const match of links){
+    for(const match of source.matchAll(/href=["']([^"']+)["']/gi)){
       if(out.length>=limit)break;
       const rawHref=match[1]||"";
-      if(!rawHref.toLowerCase().includes("/get/music/")||!rawHref.toLowerCase().includes(".mp3"))continue;
+      if(!/\/get\/music\/[^"']+\.mp3(?:[?#]|$)/i.test(rawHref))continue;
       const urlDown=hitmotopAbsoluteUrl(rawHref,base);
       if(!urlDown||seenUrls.has(urlDown))continue;
       seenUrls.add(urlDown);
-      let filename=urlDown.split("/").pop().split("?")[0];
-      try{filename=decodeURIComponent(filename)}catch{}
-      if(filename.toLowerCase().endsWith(".mp3"))filename=filename.slice(0,-4);
-      const clean=filename.replace(/_/g," ").trim();
-      let artist="Неизвестный исполнитель", title=clean||"Без названия";
-      const parts=clean.split(" - ");
-      if(parts.length>=2){artist=parts[0].trim()||artist;title=parts.slice(1).join(" - ").trim()||title}
-      const idPart=filename.split("_").pop()||"";
-      const id=/^\d{6,}$/.test(idPart)?"hitmotop-"+idPart:"hitmotop-"+Math.abs([...urlDown].reduce((h,c)=>((h<<5)-h+c.charCodeAt(0))|0,0));
-      out.push({id,title,artist,album:"",image:"",audio:"/api/hitmotop/play?url="+encodeURIComponent(urlDown),duration:0,license:"",source:"Hitmotop",sourceUrl:urlDown,genre:"",downloadUrl:urlDown});
+      const fallback=hitmotopFilenameMeta(urlDown);
+      const key=urlDown,id="hitmotop-"+Math.abs([...key].reduce((h,c)=>((h<<5)-h+c.charCodeAt(0))|0,0));
+      out.push({id,title:fallback.title||"Без названия",artist:fallback.artist||"Неизвестный исполнитель",album:"",image:"",audio:"/api/hitmotop/play?url="+encodeURIComponent(urlDown),duration:0,license:"",source:"Hitmotop",sourceUrl:urlDown,genre:"",downloadUrl:urlDown});
     }
-    }
+  }
   return out;
 }
 
@@ -354,17 +371,22 @@ function normalizeHitmozParserSongs(data,limit){
     const fileId=downloadUrl.match(/_(\d{6,})\.mp3(?:$|[?#])/i)?.[1];
     const id=idMatch?.[1]||fileId||String(out.length+1);
     let image="";
-    const cover=String(song?.cover||"").trim();
+    const cover=String(song?.cover||song?.image||song?.cover_url||song?.thumbnail||song?.album_image||"").trim();
     if(cover){
       try{
         const u=new URL(cover,downloadUrl),h=u.hostname.toLowerCase();
         if(h==="eu.hitmoz.com"||h.endsWith(".eu.hitmoz.com")||h==="statcore.hitmcdn.com"||h.endsWith(".hitmcdn.com"))image=u.href;
       }catch{}
     }
+    const filenameMeta=hitmotopFilenameMeta(downloadUrl);
+    let title=stripHtml(song?.title||song?.name)||"Без названия";
+    let artist=stripHtml(song?.artist||song?.author||song?.artist_name)||"Неизвестный исполнитель";
+    if(!title||title==="Без названия"||recommendationText(title)===recommendationText(artist))title=filenameMeta.title||title;
+    if(!artist||artist==="Неизвестный исполнитель"||recommendationText(title)===recommendationText(artist))artist=filenameMeta.artist||artist;
     out.push({
       id:"hitmotop-"+id,
-      title:stripHtml(song?.title)||"Без названия",
-      artist:stripHtml(song?.artist)||"Неизвестный исполнитель",
+      title,
+      artist,
       album:"",
       image,
       audio:"/api/hitmotop/play?url="+encodeURIComponent(downloadUrl)+"&page="+encodeURIComponent(sourceUrl||""),
@@ -404,16 +426,16 @@ async function fetchHitmozParserApi(q,limit){
 
 async function fetchHitmotopSearch(q,limit,env){
   let lastError=null;
-  // Primary path follows JoyHubN/pars_hitmotop: search the site HTML and
-  // extract title/artist/duration/cover/download link from the result cards.
+  // Parser API is preferred because it returns the title/artist/cover/file as
+  // one record. HTML array-parsing can mix metadata when cards are lazy-loaded.
+  try{return await fetchHitmozParserApi(q,limit)}catch(error){lastError=error}
+  try{return await fetchHitmozPython(q,limit,env)}catch(error){lastError=error}
   const bases=HITMOTOP_BASES.slice(0,3);
   const attempts=await Promise.allSettled(bases.map(base=>hitmotopHtmlProviderSearch(base,q,limit)));
   for(const attempt of attempts){
     if(attempt.status==="fulfilled"&&attempt.value?.length)return attempt.value;
     if(attempt.status==="rejected")lastError=attempt.reason;
   }
-  try{return await fetchHitmozPython(q,limit,env)}catch(error){lastError=error}
-  try{return await fetchHitmozParserApi(q,limit)}catch(error){lastError=error}
   throw lastError||Error("Hitmo unavailable");
 }
 
@@ -748,6 +770,21 @@ function chooseRecommendations(pool,limit,context){
     delete best.__queryScore;
     selected.push(best);
   }
+  // Every autoplay batch should use the providers that actually returned
+  // playable tracks. Reserve one slot for Zaycev and one for Hitmotop when
+  // both are available; the remaining slots are scored normally.
+  for(const requiredSource of ["Zaycev.net","Hitmotop"]){
+    if(selected.length>=limit)break;
+    const best=pickBest(t=>String(t?.source||"")===requiredSource);
+    if(!best)continue;
+    used.add(best.id);
+    const artist=recommendationText(best.artist),source=String(best.source||"");
+    artistCounts.set(artist,(artistCounts.get(artist)||0)+1);
+    sourceCounts.set(source,(sourceCounts.get(source)||0)+1);
+    delete best.__score;
+    delete best.__queryScore;
+    selected.push(best);
+  }
   while(selected.length<limit){
     const nonKnownAvailable=pool.some(t=>t?.id&&!used.has(t.id)&&!recommendationArtistMatches(t.artist,knownArtists));
     const best=pickBest(t=>!nonKnownAvailable||!recommendationArtistMatches(t.artist,knownArtists));
@@ -785,7 +822,7 @@ export async function handleApi(request,env){
   if(url.pathname==="/api/search"){
     const q=(url.searchParams.get("q")||"").trim(),limit=Math.min(Math.max(Number(url.searchParams.get("limit")||24),1),50);
     if(!q)return Response.json({ok:true,query:"",tracks:[],providers:[]});
-    const providerLimit=Math.min(20,Math.max(8,Math.ceil(limit/3)+4));
+    const providerLimit=Math.min(30,Math.max(10,Math.ceil(limit/2)+8));
     const [z,j,h]=await Promise.allSettled([
       cachedProviderSearch("zaycev",q,providerLimit,()=>fetchZaycevSearch(q,providerLimit)),
       cachedProviderSearch("jamendo",q,providerLimit,()=>searchJamendo(q,providerLimit,env)),
