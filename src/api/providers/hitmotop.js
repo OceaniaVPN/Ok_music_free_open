@@ -1,4 +1,4 @@
-const HITMOTOP_BASES=["https://hitmos.me"];
+const HITMOTOP_BASES=["https://rus.hitmos.fm","https://hitmos.me"];
 export const HITMOTOP_HEADERS={
   accept:"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
   "accept-language":"ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3",
@@ -288,7 +288,7 @@ export async function getHitmotopSessionInfo(rawUrl){
   let target;
   try{target=new URL(rawUrl)}catch{throw Error("Invalid Hitmotop URL")}
   const allowed=[
-    "rus.hitmotop.com","hitmotop.com","hitmos.me","hitmos.fm","eu.hitmoz.com","ru.hitmoz.org","rus.hitmoz.org"
+    "rus.hitmotop.com","hitmotop.com","hitmos.me","hitmos.fm","rus.hitmos.fm","eu.hitmoz.com","ru.hitmoz.org","rus.hitmoz.org"
   ].some(base=>target.hostname.toLowerCase()===base||target.hostname.toLowerCase().endsWith("."+base));
   if(!allowed||!/^https?:$/.test(target.protocol))throw Error("Hitmotop URL host is not allowed");
   const session=await createHitmotopSession(target.origin);
@@ -341,7 +341,7 @@ export async function resolveHitmotopPlaybackUrl(rawUrl){
   try{target=new URL(rawUrl)}catch{throw Error("Invalid Hitmotop audio URL")}
   const host=target.hostname.toLowerCase();
   const allowed=[
-    "rus.hitmotop.com","hitmotop.com","hitmos.me","hitmos.fm","eu.hitmoz.com","ru.hitmoz.org","rus.hitmoz.org"
+    "rus.hitmotop.com","hitmotop.com","hitmos.me","hitmos.fm","rus.hitmos.fm","eu.hitmoz.com","ru.hitmoz.org","rus.hitmoz.org"
   ].some(base=>host===base||host.endsWith("."+base));
   if(!allowed||!/^https?:$/.test(target.protocol))throw Error("Hitmotop audio host is not allowed");
 
