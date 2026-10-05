@@ -543,7 +543,7 @@ export async function handleApi(request,env){
   if(url.pathname==="/api/hitmotop/test"){
     const q=(url.searchParams.get("q")||"Linkin Park").trim().slice(0,160);
     try{
-      const tracks=await fetchHitmotopSearch(q,5,env);
+      const tracks=await searchHitmotop(q,5);
       return Response.json({
         ok:true,
         provider:"Hitmotop",
