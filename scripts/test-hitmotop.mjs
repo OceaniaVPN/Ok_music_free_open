@@ -1,4 +1,4 @@
-import {parseHitmotopSearch} from "../src/api/providers/hitmotop.js";
+import {searchHitmotop,parseHitmotopSearch} from "../src/api/providers/hitmotop.js";
 
 const html=`
 <ul>
@@ -102,6 +102,39 @@ if(sessionInfo.cookie!=="sid=ready456")throw new Error("cached Hitmotop session 
 if(calls.length!==3)throw new Error("session info unexpectedly created a second network session");
 
 globalThis.fetch=realFetch;
+
+const savedFetch=globalThis.fetch;
+globalThis.fetch=async (input,options={})=>{
+  const href=String(input);
+  if(href.startsWith("https://eu.hitmoz.com/search")){
+    throw new Error("direct Hitmoz intentionally unavailable");
+  }
+  if(href.startsWith("https://hitmos.fm/search")){
+    return new Response("",{status:200,headers:{"content-type":"text/html"}});
+  }
+  if(href==="https://hitmos.me/search"){
+    return new Response("",{status:403});
+  }
+  if(href.startsWith("https://bakha.me/?search=")){
+    return new Response(JSON.stringify({
+      success:true,
+      songs:[{
+        title:"Scatman",
+        artist:"Scatman John",
+        duration:"03:31",
+        cover:"https://eu.hitmoz.com/cover/scatman.jpg",
+        download:"https://eu.hitmoz.com/get/music/scatman_john_-_scatman_123456.mp3",
+        link:"https://eu.hitmoz.com/song/333"
+      }]
+    }),{status:200,headers:{"content-type":"application/json"}});
+  }
+  throw new Error("unexpected fallback fetch: "+href+" "+(options.method||"GET"));
+};
+const fallbackTracks=await searchHitmotop("Scatman",1);
+if(fallbackTracks.length!==1||fallbackTracks[0].artist!=="Scatman John"||!fallbackTracks[0].audio.includes("/api/hitmotop/play?url=")){
+  throw new Error("HitMoz parser API fallback failed");
+}
+globalThis.fetch=savedFetch;
 
 console.log(JSON.stringify({
   ok:true,
