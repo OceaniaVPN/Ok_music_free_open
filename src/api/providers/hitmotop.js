@@ -248,7 +248,8 @@ async function createHitmotopSession(base,{refresh=false}={}){
           headers:HITMOTOP_HEADERS,
           signal:AbortSignal.timeout(5000)
         });
-        if(jar.size===0)continue;
+        // Keep the Python lifecycle: the same session performs both GETs.
+        // Do not reject the session only because the Worker hides Set-Cookie.
         rememberHitmotopSid(origin,jar);
         const session={
           origin,
