@@ -20,6 +20,21 @@ const html=`
 </li>
 </ul>`;
 
+const currentMarkup=`
+<section>
+  <article class="result-item">
+    <a href="/song/333">Scatman</a>
+    <div>Scatman John</div>
+    <span>03:31</span>
+    <button>Скачать</button>
+    <a href="/get/music/scatman_john_-_scatman_123456.mp3">MP3</a>
+  </article>
+</section>`;
+const currentTracks=parseHitmotopSearch(currentMarkup,"https://eu.hitmoz.com",5);
+if(currentTracks.length!==1||currentTracks[0].downloadUrl!=="https://eu.hitmoz.com/get/music/scatman_john_-_scatman_123456.mp3"){
+  throw new Error("current Hitmoz MP3-link parser failed");
+}
+
 const tracks=parseHitmotopSearch(html,"https://hitmos.me",5);
 if(tracks.length!==2)throw new Error("expected 2 tracks");
 if(tracks[0].title!=="Artist One — Track One"||tracks[0].artist!=="Artist One"||tracks[0].duration!==222)throw new Error("track 1 metadata failed");
