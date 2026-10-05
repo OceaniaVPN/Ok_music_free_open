@@ -180,25 +180,59 @@ export async function resolveHitmotopPlaybackUrl(rawUrl){
     "rus.hitmotop.com","hitmotop.com","hitmos.me","hitmos.fm","eu.hitmoz.com","ru.hitmoz.org","rus.hitmoz.org"
   ].some(base=>host===base||host.endsWith("."+base));
   if(!allowed||!/^https?:$/.test(target.protocol))throw Error("Hitmotop audio host is not allowed");
+
+  // Mirror the Python parser: the download request is made through the same
+  // session that first opens the site. A fresh request without the sid cookie
+  // can return a page/403 instead of the actual MP3 redirect.
+  let cookie="";
+  let referer=target.origin+"/";
+  try{
+    const home=await fetch(target.origin+"/",{
+      headers:HITMOTOP_HEADERS,
+      redirect:"follow",
+      signal:AbortSignal.timeout(4500)
+    });
+    referer=new URL(home.url||target.origin).origin+"/";
+    cookie=hitmotopCookieHeader(home);
+  }catch{}
+
+  const headers={
+    ...HITMOTOP_HEADERS,
+    accept:"audio/mpeg,audio/*,*/*;q=0.8",
+    referer
+  };
+  if(cookie)headers.cookie=cookie;
+
   try{
     const probe=await fetch(target.href,{
       method:"HEAD",
-      headers:{...HITMOTOP_HEADERS,accept:"audio/mpeg,audio/*,*/*;q=0.8"},
+      headers,
       redirect:"follow",
       signal:AbortSignal.timeout(4500)
     });
     if(probe.ok)return probe.url||target.href;
   }catch{}
+
   try{
     const probe=await fetch(target.href,{
-      headers:{...HITMOTOP_HEADERS,accept:"audio/mpeg,audio/*,*/*;q=0.8",range:"bytes=0-0"},
+      headers:{...headers,range:"bytes=0-0"},
       redirect:"follow",
       signal:AbortSignal.timeout(4500)
     });
     const finalUrl=probe.url||target.href;
+    const contentType=(probe.headers.get("content-type")||"").toLowerCase();
+    const audioLike=probe.ok && (
+      contentType.startsWith("audio/") ||
+      contentType.includes("mpeg") ||
+      contentType.includes("octet-stream") ||
+      !contentType
+    );
     try{await probe.body?.cancel()}catch{}
-    return finalUrl;
-  }catch{
-    return target.href;
-  }
+    if(audioLike)return finalUrl;
+  }catch{}
+
+  // Keep the same fallback semantics as the Python implementation: the
+  // original download endpoint is still the best candidate when probing is
+  // blocked by a mirror.
+  return target.href;
 }
