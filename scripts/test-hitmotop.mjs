@@ -35,7 +35,7 @@ if(divTracks.length!==2||divTracks[0].title!=="Artist One — Track One"||divTra
 }
 
 
-import {resolveHitmotopPlaybackUrl,getHitmotopSessionInfo} from "../src/api/providers/hitmotop.js";
+import {searchHitmotop,resolveHitmotopPlaybackUrl,getHitmotopSessionInfo} from "../src/api/providers/hitmotop.js";
 
 const realFetch=globalThis.fetch;
 const calls=[];
@@ -44,6 +44,21 @@ globalThis.fetch=async (input,options={})=>{
   const cookie=options.headers?.cookie||"";
   const method=options.method||"GET";
   calls.push({href,method,cookie});
+
+  if(href==="https://rus.hitmos.fm/"){
+    return new Response("",{status:403});
+  }
+  if(href.startsWith("https://rus.hitmos.fm/search?q=")){
+    const html=`
+      <div class="track__img" style="background-image: url('/cover/scatman.jpg');"></div>
+      <div class="track__title">Scatman</div>
+      <div class="track__desc">Scatman John</div>
+      <div class="track__fulltime">03:31</div>
+      <a class="track__download-btn" href="/get/music/scatman_123456.mp3">x</a>
+      <a class="track__info-l" href="/song/333">i</a>`;
+    return new Response(html,{status:200,headers:{"content-type":"text/html; charset=utf-8"}});
+  }
+
   if(href==="https://hitmos.me/"){
     const bootstrapCount=calls.filter(call=>call.href===href).length;
     if(bootstrapCount===1){
@@ -71,6 +86,16 @@ globalThis.fetch=async (input,options={})=>{
   throw new Error("unexpected test fetch: "+href);
 };
 
+const searchBootstrapCalls=calls.length;
+const searchTracks=await searchHitmotop("Scatman",1);
+if(searchTracks.length!==1||searchTracks[0].title!=="Scatman"||searchTracks[0].artist!=="Scatman John"){
+  throw new Error("Hitmotop direct-search fallback failed");
+}
+if(!calls.some(call=>call.href.startsWith("https://rus.hitmos.fm/search?q="))){
+  throw new Error("Hitmotop direct-search fallback was not used");
+}
+calls.length=0;
+
 const resolved=await resolveHitmotopPlaybackUrl(
   "https://hitmos.me/get/music/artist_one_-_track_one_123456.mp3"
 );
@@ -91,6 +116,8 @@ globalThis.fetch=realFetch;
 console.log(JSON.stringify({
   ok:true,
   count:tracks.length,
+  searchFallback:true,
+  searchBootstrapCalls:searchBootstrapCalls,
   resolved,
   sessionBootstrapRetry:true,
   sessionCacheReused:true
