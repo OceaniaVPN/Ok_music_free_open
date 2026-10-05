@@ -445,42 +445,31 @@ async function searchOnBase(base,q,limit){
     }
   }
 }
-async function searchHitmozParserApi(query,limit){
-  const endpoint=new URL("https://bakha.me/");
-  endpoint.searchParams.set("search",query);
-  const response=await fetch(endpoint.href,{
-    headers:{
-      accept:"application/json,text/plain,*/*",
-      "accept-language":"ru-RU,ru;q=0.9,en;q=0.7",
-      "user-agent":HITMOTOP_HEADERS["user-agent"]
-    },
-    redirect:"follow",
-    signal:AbortSignal.timeout(7_000)
-  });
-  const text=await response.text();
-  if(!response.ok)throw Error("HitMoz parser HTTP "+response.status);
-  let data;
-  try{data=JSON.parse(text)}catch{throw Error("HitMoz parser returned invalid JSON")}
-  const songs=Array.isArray(data?.songs)?data.songs:[];
-  if(!songs.length)throw Error("HitMoz parser returned no tracks");
+const HITMOZ_PARSER_ENDPOINTS=[
+  "https://bakha.me/",
+  "https://bakha.me/index.php",
+  "https://bakha.me/hitmoz.php"
+];
+
+function mapHitmozSongs(songs,limit){
   const out=[];
   const seen=new Set();
-  for(const song of songs){
-    const download=absoluteUrl(song?.download||"", "https://eu.hitmoz.com");
+  for(const song of Array.isArray(songs)?songs:[]){
+    const download=absoluteUrl(song?.download||"","https://eu.hitmoz.com");
     if(!download||seen.has(download))continue;
-    const page=absoluteUrl(song?.link||"", "https://eu.hitmoz.com");
-    const title=cleanTitle(song?.title)||filenameMeta(download,"https://eu.hitmoz.com").title||"Без названия";
-    const artist=stripHtml(song?.artist)||filenameMeta(download,"https://eu.hitmoz.com").artist||"Неизвестный исполнитель";
-    const duration=String(song?.duration||"");
+    const page=absoluteUrl(song?.link||"","https://eu.hitmoz.com");
+    const fallbackMeta=filenameMeta(download,"https://eu.hitmoz.com");
+    const title=cleanTitle(song?.title)||fallbackMeta.title||"Без названия";
+    const artist=stripHtml(song?.artist)||fallbackMeta.artist||"Неизвестный исполнитель";
     const sourceUrl=page||download;
     out.push({
       id:"hitmotop-"+hashId(sourceUrl),
       title,
       artist,
       album:"",
-      image:absoluteUrl(song?.cover||"", "https://eu.hitmoz.com"),
+      image:absoluteUrl(song?.cover||"","https://eu.hitmoz.com"),
       audio:"/api/hitmotop/play?url="+encodeURIComponent(download)+"&page="+encodeURIComponent(page),
-      duration:parseDuration(duration),
+      duration:parseDuration(String(song?.duration||"")),
       license:"",
       source:"Hitmotop",
       sourceUrl,
@@ -490,10 +479,91 @@ async function searchHitmozParserApi(query,limit){
     seen.add(download);
     if(out.length>=limit)break;
   }
-  if(!out.length)throw Error("HitMoz parser returned unusable tracks");
   return out;
 }
 
+async function fetchHitmozJson(url,timeoutMs=1200){
+  const response=await fetch(url,{
+    headers:{
+      accept:"application/json,text/plain,*/*",
+      "accept-language":"ru-RU,ru;q=0.9,en;q=0.7",
+      "user-agent":HITMOTOP_HEADERS["user-agent"]
+    },
+    redirect:"follow",
+    cache:"no-store",
+    signal:AbortSignal.timeout(timeoutMs)
+  });
+  const text=await response.text();
+  if(!response.ok)throw Error("HitMoz parser HTTP "+response.status);
+  try{return JSON.parse(text)}catch{throw Error("HitMoz parser returned invalid JSON")}
+}
+
+async function searchHitmozParserApi(query,limit){
+  const errors=[];
+  for(const base of HITMOZ_PARSER_ENDPOINTS){
+    try{
+      const endpoint=new URL(base);
+      endpoint.searchParams.set("search",query);
+      const data=await fetchHitmozJson(endpoint.href,1200);
+      const tracks=mapHitmozSongs(data?.songs,limit);
+      if(tracks.length)return tracks;
+      errors.push(new URL(base).pathname+": no tracks");
+    }catch(error){
+      errors.push(new URL(base).pathname+": "+(error?.message||"request failed"));
+    }
+  }
+  throw Error("HitMoz search API failed ("+errors.join("; ")+")");
+}
+
+async function searchHitmozParserTopToday(query,limit){
+  const endpoint=new URL("https://bakha.me/");
+  endpoint.searchParams.set("top-today","");
+  const data=await fetchHitmozJson(endpoint.href,1800);
+  const tracks=mapHitmozSongs(data?.songs,Math.max(24,limit*4));
+  if(!tracks.length)throw Error("HitMoz top API returned no tracks");
+  const terms=String(query||"").toLocaleLowerCase("ru-RU").split(/\\s+/).filter(x=>x.length>1);
+  if(!terms.length)return tracks.slice(0,limit);
+  const scored=tracks.map(track=>{
+    const hay=(String(track.title||"")+" "+String(track.artist||"")).toLocaleLowerCase("ru-RU");
+    const score=terms.reduce((sum,term)=>sum+(hay.includes(term)?1:0),0);
+    return {track,score};
+  }).filter(item=>item.score>0).sort((a,b)=>b.score-a.score);
+  if(!scored.length)throw Error("HitMoz top chart has no tracks for query");
+  return scored.slice(0,limit).map(item=>item.track);
+}
+
+export async function searchHitmotop(q,limit=10){
+  const query=String(q||"").trim();
+  if(!query)return [];
+
+  let parserError=null;
+  try{
+    const tracks=await searchHitmozParserApi(query,limit);
+    if(tracks.length)return tracks;
+  }catch(error){parserError=error}
+
+  try{
+    const tracks=await searchHitmozParserTopToday(query,limit);
+    if(tracks.length)return tracks;
+  }catch(error){
+    parserError=Error([parserError?.message,error?.message].filter(Boolean).join("; "));
+  }
+
+  // Keep the old site mirrors as a last-resort fallback only. They are
+  // intentionally tried after the lightweight parser API so a blocked mirror
+  // cannot hide a valid HitMoz result.
+  const errors=[];
+  for(const base of HITMOTOP_BASES){
+    try{
+      const tracks=await searchOnBase(base,query,limit);
+      if(tracks.length)return tracks;
+    }catch(error){
+      errors.push(new URL(base).hostname+": "+(error?.message||"request failed"));
+    }
+  }
+
+  throw Error("Hitmo unavailable ("+[parserError?.message,...errors].filter(Boolean).join("; ")+")");
+}
 export async function searchHitmotop(q,limit=10){
   const query=String(q||"").trim();
   if(!query)return [];
