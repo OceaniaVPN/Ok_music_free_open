@@ -26,7 +26,7 @@ function parseDuration(value){
 }
 function parseZaycevSearch(html,limit){
   const out=[],seen=new Set();
-  const chunks=String(html||"").match(/<li\b[^>]*>[\s\S]*?<\/li>/gi)||[String(html||"")];
+  const chunks=String(html||"").match(/<(?:li|article|div)\b[^>]*(?:class=["'][^"']*(?:track|song|search|music)[^"']*["'])?[^>]*>[\s\S]*?<\/(?:li|article|div)>/gi)||[String(html||"")];
   for(const chunk of chunks){
     const links=[...chunk.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)];
     const trackLink=links.find(x=>/\/pages\/\d+\/\d+\.shtml(?:[?#]|$)/i.test(x[1]));
@@ -46,8 +46,9 @@ function parseZaycevSearch(html,limit){
     seen.add(id);out.push({id,title,artist,image,duration:dm?parseDuration(dm[1]):0,sourceUrl:new URL(trackLink[1],ZAYCEV_BASE).href});
     if(out.length>=limit)break;
   }
-  if(!out.length){
-    for(const m of String(html||"").matchAll(/href=["']([^"']*\/pages\/\d+\/\d+\.shtml[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi)){
+  if(out.length<limit){
+    const source=String(html||"");
+    for(const m of source.matchAll(/href=["']([^"']*\/pages\/\d+\/\d+\.shtml[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi)){
       const idm=m[1].match(/\/(\d+)\.shtml/);if(!idm||seen.has(idm[1]))continue;
       seen.add(idm[1]);out.push({id:idm[1],title:stripHtml(m[2])||"Без названия",artist:"Неизвестный исполнитель",image:"",duration:0,sourceUrl:new URL(m[1],ZAYCEV_BASE).href});
       if(out.length>=limit)break;
@@ -354,7 +355,7 @@ function normalizeHitmozParserSongs(data,limit){
     const fileId=downloadUrl.match(/_(\d{6,})\.mp3(?:$|[?#])/i)?.[1];
     const id=idMatch?.[1]||fileId||String(out.length+1);
     let image="";
-    const cover=String(song?.cover||"").trim();
+    const cover=String(song?.cover||song?.image||song?.cover_url||song?.thumbnail||song?.album_image||"").trim();
     if(cover){
       try{
         const u=new URL(cover,downloadUrl),h=u.hostname.toLowerCase();
@@ -363,8 +364,8 @@ function normalizeHitmozParserSongs(data,limit){
     }
     out.push({
       id:"hitmotop-"+id,
-      title:stripHtml(song?.title)||"Без названия",
-      artist:stripHtml(song?.artist)||"Неизвестный исполнитель",
+      title:stripHtml(song?.title||song?.name)||"Без названия",
+      artist:stripHtml(song?.artist||song?.author||song?.artist_name)||"Неизвестный исполнитель",
       album:"",
       image,
       audio:"/api/hitmotop/play?url="+encodeURIComponent(downloadUrl)+"&page="+encodeURIComponent(sourceUrl||""),
@@ -404,16 +405,16 @@ async function fetchHitmozParserApi(q,limit){
 
 async function fetchHitmotopSearch(q,limit,env){
   let lastError=null;
-  // Primary path follows JoyHubN/pars_hitmotop: search the site HTML and
-  // extract title/artist/duration/cover/download link from the result cards.
+  // Parser API is preferred because it returns the title/artist/cover/file as
+  // one record. HTML array-parsing can mix metadata when cards are lazy-loaded.
+  try{return await fetchHitmozParserApi(q,limit)}catch(error){lastError=error}
+  try{return await fetchHitmozPython(q,limit,env)}catch(error){lastError=error}
   const bases=HITMOTOP_BASES.slice(0,3);
   const attempts=await Promise.allSettled(bases.map(base=>hitmotopHtmlProviderSearch(base,q,limit)));
   for(const attempt of attempts){
     if(attempt.status==="fulfilled"&&attempt.value?.length)return attempt.value;
     if(attempt.status==="rejected")lastError=attempt.reason;
   }
-  try{return await fetchHitmozPython(q,limit,env)}catch(error){lastError=error}
-  try{return await fetchHitmozParserApi(q,limit)}catch(error){lastError=error}
   throw lastError||Error("Hitmo unavailable");
 }
 
@@ -744,6 +745,21 @@ function chooseRecommendations(pool,limit,context){
     artistCounts.set(artist,(artistCounts.get(artist)||0)+1);
     sourceCounts.set(source,(sourceCounts.get(source)||0)+1);
     knownSelected++;
+    delete best.__score;
+    delete best.__queryScore;
+    selected.push(best);
+  }
+  // Every autoplay batch should use the providers that actually returned
+  // playable tracks. Reserve one slot for Zaycev and one for Hitmotop when
+  // both are available; the remaining slots are scored normally.
+  for(const requiredSource of ["Zaycev.net","Hitmotop"]){
+    if(selected.length>=limit)break;
+    const best=pickBest(t=>String(t?.source||"")===requiredSource);
+    if(!best)continue;
+    used.add(best.id);
+    const artist=recommendationText(best.artist),source=String(best.source||"");
+    artistCounts.set(artist,(artistCounts.get(artist)||0)+1);
+    sourceCounts.set(source,(sourceCounts.get(source)||0)+1);
     delete best.__score;
     delete best.__queryScore;
     selected.push(best);
