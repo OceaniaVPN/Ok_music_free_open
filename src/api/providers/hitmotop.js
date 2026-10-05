@@ -142,36 +142,127 @@ export function parseHitmotopSearch(html,base,limit=10){
   }
   return out;
 }
-async function searchOnBase(base,q,limit){
-  const origin = new URL(base).origin;
-  let cookie="";
-  let referer=origin+"/";
 
-  // Some mirrors return 403 for their landing page while the public
-  // search endpoint remains available. The landing-page request is only
-  // best-effort for session cookies and must not block search.
+function cookieJarFromHeader(value){
+  const jar=new Map();
+  for(const part of String(value||"").split(/;\\s*/)){
+    const idx=part.indexOf("=");
+    if(idx<=0)continue;
+    const name=part.slice(0,idx).trim();
+    const cookieValue=part.slice(idx+1).trim();
+    if(name)jar.set(name,cookieValue);
+  }
+  return jar;
+}
+
+function mergeHitmotopResponseCookies(jar,response){
   try{
-    const home=await fetch(origin+"/",{
-      headers:HITMOTOP_HEADERS,
-      redirect:"follow",
-      signal:AbortSignal.timeout(3500)
-    });
-    if(home.ok){
-      referer=new URL(home.url||origin).origin+"/";
-      cookie=hitmotopCookieHeader(home);
+    const values=typeof response.headers.getSetCookie==="function"
+      ? response.headers.getSetCookie()
+      : [response.headers.get("set-cookie")||""];
+    for(const raw of values.flatMap(value=>String(value||"").split(/,(?=[^;,=]+=[^;,]+)/))){
+      const pair=String(raw||"").trim().split(";",1)[0];
+      const idx=pair.indexOf("=");
+      if(idx<=0)continue;
+      const name=pair.slice(0,idx).trim();
+      const value=pair.slice(idx+1).trim();
+      if(!name)continue;
+      if(value)jar.set(name,value);
+      else jar.delete(name);
     }
   }catch{}
+}
 
-  const headers={...HITMOTOP_HEADERS,referer};
-  if(cookie)headers.cookie=cookie;
+function hitmotopCookieHeaderFromJar(jar){
+  return [...jar.entries()].map(([name,value])=>name+"="+value).join("; ");
+}
 
+async function fetchHitmotopSession(url,jar,allowedOrigin,options={}){
+  const baseOptions={...options};
+  delete baseOptions.redirect;
+  let currentUrl=String(url);
+  for(let redirects=0;redirects<=8;redirects++){
+    const cookie=hitmotopCookieHeaderFromJar(jar);
+    const headers={...(baseOptions.headers||{})};
+    if(cookie)headers.cookie=cookie;
+    const response=await fetch(currentUrl,{
+      ...baseOptions,
+      headers,
+      redirect:"manual"
+    });
+    mergeHitmotopResponseCookies(jar,response);
+    
+    const location=response.headers.get("location");
+    if(response.status>=300&&response.status<400&&location){
+      const nextUrl=new URL(location,currentUrl);
+      if(nextUrl.origin===allowedOrigin){
+        currentUrl=nextUrl.href;
+        continue;
+      }
+      // Do not leak the session cookie to another origin such as a CDN.
+      const crossOriginHeaders={...headers};
+      delete crossOriginHeaders.cookie;
+      return await fetch(nextUrl.href,{
+        ...baseOptions,
+        headers:crossOriginHeaders,
+        redirect:"follow"
+      });
+    }
+    return response;
+  }
+  throw Error("Hitmo redirect limit exceeded");
+}
+
+async function createHitmotopSession(base){
+  const origin=new URL(base).origin;
+  const jar=new Map();
+
+  // requests.Session() keeps cookies even when the first request is 403.
+  // Retry through the same session so a sid issued on that response is
+  // available to the next request.
+  const first=await fetchHitmotopSession(origin+"/",jar,origin,{
+    headers:HITMOTOP_HEADERS,
+    signal:AbortSignal.timeout(4500)
+  });
+
+  let last=first;
+  if(!first.ok){
+    last=await fetchHitmotopSession(origin+"/",jar,origin,{
+      headers:HITMOTOP_HEADERS,
+      signal:AbortSignal.timeout(4500)
+    });
+  }
+
+  if(!last.ok&&jar.size===0){
+    throw Error("Hitmo session bootstrap HTTP "+last.status);
+  }
+
+  return {
+    origin,
+    jar,
+    referer:new URL(last.url||origin).origin+"/"
+  };
+}
+
+async function searchOnBase(base,q,limit){
+  const origin=new URL(base).origin;
+  let session=await createHitmotopSession(origin);
   const search=new URL("/search",origin);
   search.searchParams.set("q",q);
-  const response=await fetch(search.href,{
-    headers,
-    redirect:"follow",
+
+  let response=await fetchHitmotopSession(search.href,session.jar,origin,{
+    headers:{...HITMOTOP_HEADERS,referer:session.referer},
     signal:AbortSignal.timeout(6500)
   });
+
+  if(response.status===403){
+    session=await createHitmotopSession(origin);
+    response=await fetchHitmotopSession(search.href,session.jar,origin,{
+      headers:{...HITMOTOP_HEADERS,referer:session.referer},
+      signal:AbortSignal.timeout(6500)
+    });
+  }
+
   const html=await response.text();
   if(!response.ok)throw Error("Hitmo search HTTP "+response.status);
   const tracks=parseHitmotopSearch(html,new URL(response.url||search.href).origin,limit);
@@ -199,58 +290,52 @@ export async function resolveHitmotopPlaybackUrl(rawUrl){
   ].some(base=>host===base||host.endsWith("."+base));
   if(!allowed||!/^https?:$/.test(target.protocol))throw Error("Hitmotop audio host is not allowed");
 
-  // Mirror the Python parser: the download request is made through the same
-  // session that first opens the site. A fresh request without the sid cookie
-  // can return a page/403 instead of the actual MP3 redirect.
-  let cookie="";
-  let referer=target.origin+"/";
-  try{
-    const home=await fetch(target.origin+"/",{
-      headers:HITMOTOP_HEADERS,
-      redirect:"follow",
-      signal:AbortSignal.timeout(4500)
-    });
-    referer=new URL(home.url||target.origin).origin+"/";
-    cookie=hitmotopCookieHeader(home);
-  }catch{}
-
+  let session=await createHitmotopSession(target.origin);
   const headers={
     ...HITMOTOP_HEADERS,
     accept:"audio/mpeg,audio/*,*/*;q=0.8",
-    referer
+    referer:session.referer
   };
-  if(cookie)headers.cookie=cookie;
 
   try{
-    const probe=await fetch(target.href,{
+    let probe=await fetchHitmotopSession(target.href,session.jar,target.origin,{
       method:"HEAD",
       headers,
-      redirect:"follow",
       signal:AbortSignal.timeout(4500)
     });
+    if(probe.status===403){
+      session=await createHitmotopSession(target.origin);
+      probe=await fetchHitmotopSession(target.href,session.jar,target.origin,{
+        method:"HEAD",
+        headers:{...headers,referer:session.referer},
+        signal:AbortSignal.timeout(4500)
+      });
+    }
     if(probe.ok)return probe.url||target.href;
   }catch{}
 
   try{
-    const probe=await fetch(target.href,{
-      headers:{...headers,range:"bytes=0-0"},
-      redirect:"follow",
+    session=await createHitmotopSession(target.origin);
+    const probe=await fetchHitmotopSession(target.href,session.jar,target.origin,{
+      headers:{
+        ...HITMOTOP_HEADERS,
+        accept:"audio/mpeg,audio/*,*/*;q=0.8",
+        range:"bytes=0-0",
+        referer:session.referer
+      },
       signal:AbortSignal.timeout(4500)
     });
     const finalUrl=probe.url||target.href;
     const contentType=(probe.headers.get("content-type")||"").toLowerCase();
-    const audioLike=probe.ok && (
-      contentType.startsWith("audio/") ||
-      contentType.includes("mpeg") ||
-      contentType.includes("octet-stream") ||
+    const audioLike=probe.ok&&(
+      contentType.startsWith("audio/")||
+      contentType.includes("mpeg")||
+      contentType.includes("octet-stream")||
       !contentType
     );
     try{await probe.body?.cancel()}catch{}
     if(audioLike)return finalUrl;
   }catch{}
 
-  // Keep the same fallback semantics as the Python implementation: the
-  // original download endpoint is still the best candidate when probing is
-  // blocked by a mirror.
   return target.href;
 }
