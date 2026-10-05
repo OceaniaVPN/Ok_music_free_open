@@ -431,7 +431,6 @@ function playableAudioCandidates(t){
  if(t.zaycevId)add("/api/zaycev/play?id="+encodeURIComponent(String(t.zaycevId)));
  add(t.audio);
  add(t.src);
- if(String(t.source||"")==="Hitmotop")add(t.downloadUrl);
  return out;
 }
 function playableAudio(t){return playableAudioCandidates(t)[0]||"";}
@@ -672,7 +671,6 @@ function prepareHomeQueue(){
     remoteTracks=await fetchRecommendationBatch({refresh:String(Date.now())},undefined,{force:true});
     if(remoteTracks.length<5)await new Promise(resolve=>setTimeout(resolve,180));
    }
-   playbackQueue=[...new Map(remoteTracks.filter(t=>t?.id&&t?.source).map(t=>[String(t.id),t])).values()];
    if(playbackQueue.length){
     queueIndex=-1;
     const first=playbackQueue[0],src=playableAudio(first);
@@ -723,7 +721,6 @@ async function initializeHomePlayer({force=false}={}){
     remote=await fetchRecommendationBatch({refresh:String(Date.now())},controller.signal,{force:true});
     if(remote.length<5)await new Promise(resolve=>setTimeout(resolve,180));
    }
-   playbackQueue=[...new Map(remote.filter(t=>t?.id&&t?.source).map(t=>[String(t.id),t])).values()];
    if(playbackQueue.length){
     queueIndex=0;
     recommendationSeen=new Set(playbackQueue.map(t=>String(t?.id||"")));
@@ -799,6 +796,7 @@ function preloadNext(){
  if(nextAudio.src===absolute)return;
  nextAudio.src=src;nextAudio.load();void token;
 }
+window.__okPlayToken=Number(window.__okPlayToken)||0;
 function play(t,{fromEnded=false,keepQueue=false,fromBootstrap=false}={}){
  if(!t)return;
  let idx=playbackQueue.findIndex(x=>String(x?.id||"")===String(t.id||""));
@@ -984,7 +982,22 @@ function openFullscreenPlayer(){
  const seek=fs.querySelector("#fsSeek");if(seek)seek.oninput=e=>{if(audio.duration)audio.currentTime=audio.duration*Number(e.target.value)/100};
 }
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeFullscreenPlayer()});
+function syncFullscreenPlayer(){
+ const fs=document.querySelector("#fullscreenPlayer");
+ if(!fs||!fs.classList.contains("open"))return;
+ if(!current){closeFullscreenPlayer();return}
+ const art=mediaArtworkUrl(current.image);
+ const artWrap=fs.querySelector(".fs-art-wrap");
+ if(artWrap)artWrap.innerHTML=art?'<img class="fs-art" src="'+esc(art)+'" alt="'+esc(current.title||"Обложка")+'">':'<div class="fs-art-fallback">♫</div>';
+ const title=fs.querySelector(".fs-title");
+ const artist=fs.querySelector(".fs-artist");
+ const playButton=fs.querySelector("#fsPlay");
+ if(title)title.textContent=current.title||"Без названия";
+ if(artist)artist.textContent=current.artist||"Неизвестный исполнитель";
+ if(playButton)playButton.textContent=playing?"Ⅱ":"▶";
+}
 function drawPlayer(){if(!current){
+ closeFullscreenPlayer();
  const busy=homeBootstrapBusy;
  playerEl.className="player on";
  playerEl.innerHTML='<div class="pcover">♫</div><div class="pmeta"><strong>Ok Music</strong><span>'+(busy?"Подбираю 5 треков со всех площадок…":"Нажми ▶ — начну искать музыку")+'</span></div><div class="pc"><button class="icon" disabled>⏮</button><button id="startAutoPlay" class="big" '+(busy?"disabled":"")+' title="Начать автоматический поиск">'+(busy?"…":"▶")+'</button><button class="icon" disabled>⏭</button><button class="icon" disabled>EQ</button></div><input class="seek" type="range" min="0" max="100" value="0" disabled><span class="time">'+(busy?"Жду ответы каталогов":"Готов к подбору")+'</span>';
@@ -1019,6 +1032,7 @@ function drawPlayer(){if(!current){
  const spatial=document.querySelector("[data-spatial3d]");
  if(spatial)spatial.oninput=e=>{setSpatial3d(e.target.value);const out=spatial.closest(".spatial3d")?.querySelector("span");if(out)out.textContent=Math.round(spatial3d*100)+"%"};
 }
+ syncFullscreenPlayer();
 audio.onplay=()=>{playing=true;if(audioCtx?.state==="suspended")audioCtx.resume().catch(()=>{});if(spatial3d)updateSpatial3d();if("mediaSession" in navigator)navigator.mediaSession.playbackState="playing";updateMediaSession();drawPlayer()};audio.ontimeupdate=()=>{const s=document.querySelector("#seek"),t=document.querySelector("#ptime"),fsSeek=document.querySelector("#fsSeek"),fsCur=document.querySelector("#fsCur"),fsDur=document.querySelector("#fsDur");if(s)s.value=audio.duration?audio.currentTime/audio.duration*100:0;if(t)t.textContent=fmt(audio.currentTime)+" / "+fmt(audio.duration);if(fsSeek)fsSeek.value=audio.duration?audio.currentTime/audio.duration*100:0;if(fsCur)fsCur.textContent=fmt(audio.currentTime);if(fsDur)fsDur.textContent=fmt(audio.duration);if("mediaSession" in navigator&&audio.duration)try{navigator.mediaSession.setPositionState({duration:audio.duration,playbackRate:audio.playbackRate,position:Math.min(audio.currentTime,audio.duration)})}catch{}}
 audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaSession.playbackState="paused";drawPlayer()};audio.onended=()=>{playing=false;if(autoNext)void playNext();else{if("mediaSession" in navigator)navigator.mediaSession.playbackState="none";drawPlayer()}};audio.onerror=()=>{
  const code=audio.error?.code||0;
@@ -1034,6 +1048,7 @@ audio.onpause=()=>{playing=false;if("mediaSession" in navigator)navigator.mediaS
   }
  }
  current=null;
+ closeFullscreenPlayer();
  toast("Поток не ответил — переключаюсь");
  setTimeout(()=>void playNext(),60);
 };
