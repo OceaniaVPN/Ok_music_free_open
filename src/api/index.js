@@ -1,6 +1,7 @@
 import { LOCAL_MUSIC } from "../local-music.js";
 import recommendationArtists from "../data/recommendation-artists.json" with { type: "json" };
 import { HITMOTOP_HEADERS, hitmotopCookieHeader, searchHitmotop, resolveHitmotopPlaybackUrl } from "./providers/hitmotop.js";
+import { detectKnownArtist, stripKnownArtistPrefix } from "../data/artist-detector.js";
 const LOCAL_MUSIC_CATALOG=Array.isArray(LOCAL_MUSIC)?LOCAL_MUSIC:[];
 
 const ZAYCEV_BASE="https://zaycev.net";
@@ -334,7 +335,14 @@ async function searchJamendo(q, limit, env) {
   const response = await fetch(api, { headers: { accept: "application/json" } });
   if (!response.ok) throw new Error("Jamendo HTTP " + response.status);
   const data = await response.json();
-  return (data.results || []).filter(t => !isChartLikeTrack(t)).map(normalizeJamendo).filter(t => t.audio);
+  const status = String(data?.headers?.status || "").toLowerCase();
+  if (status && status !== "success") {
+    throw new Error("Jamendo API: " + String(data?.headers?.error_message || status));
+  }
+  const results = Array.isArray(data?.results) ? data.results : [];
+  const tracks = results.filter(t => !isChartLikeTrack(t)).map(normalizeJamendo).filter(t => t.audio);
+  if (!tracks.length) throw new Error("Jamendo API returned no playable tracks");
+  return tracks;
 }
 
 function isChartLikeTrack(t){
@@ -431,6 +439,15 @@ function normalizeRecommendationTrack(track){
       const parts=filename.split(/_-_| - |—/).map(x=>x.replace(/_/g," ").trim()).filter(Boolean);
       if(parts.length>=2)title=parts.slice(1).join(" - ").trim();
     }catch{}
+  }
+  const weakArtist=!artist||!title||/^(?:ключник|неизвестный исполнитель)$/i.test(artist)||recommendationText(artist)===recommendationText(title);
+  if(weakArtist){
+    const detected=detectKnownArtist([artist,title,track.downloadUrl||"",track.sourceUrl||""].join(" "));
+    if(detected){
+      const split=stripKnownArtistPrefix(title,detected);
+      track.artist=detected;
+      if(split.title)title=split.title;
+    }
   }
   if(title)track.title=title;
   return track;
@@ -618,7 +635,7 @@ export async function handleApi(request,env){
       api.searchParams.set("client_id",clientId);
       api.searchParams.set("id",id);
       api.searchParams.set("action","stream");
-      api.searchParams.set("audioformat","mp31");
+      api.searchParams.set("audioformat","mp32");
       const range=request.headers.get("range")||"";
       const upstream=await fetch(api.href,{headers:{
         ...(range?{range}:{}),
