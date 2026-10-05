@@ -106,34 +106,60 @@ globalThis.fetch=realFetch;
 const savedFetch=globalThis.fetch;
 globalThis.fetch=async (input,options={})=>{
   const href=String(input);
-  if(href.startsWith("https://eu.hitmoz.com/search")){
-    throw new Error("direct Hitmoz intentionally unavailable");
-  }
-  if(href.startsWith("https://hitmos.fm/search")){
-    return new Response("",{status:200,headers:{"content-type":"text/html"}});
-  }
-  if(href==="https://hitmos.me/search"){
-    return new Response("",{status:403});
-  }
   if(href.startsWith("https://bakha.me/?search=")){
+    return new Response("<html>not-json</html>",{status:200,headers:{"content-type":"text/html"}});
+  }
+  if(href.startsWith("https://bakha.me/index.php?search=")){
     return new Response(JSON.stringify({
       success:true,
       songs:[{
         title:"Scatman",
         artist:"Scatman John",
         duration:"03:31",
-        cover:"https://eu.hitmoz.com/cover/scatman.jpg",
+        cover:"https://eu.hitmoz.com/img/songs/333.jpg",
         download:"https://eu.hitmoz.com/get/music/scatman_john_-_scatman_123456.mp3",
         link:"https://eu.hitmoz.com/song/333"
       }]
     }),{status:200,headers:{"content-type":"application/json"}});
   }
+  if(href.startsWith("https://eu.hitmoz.com/search")||href.startsWith("https://hitmos.fm/search")){
+    return new Response("",{status:200,headers:{"content-type":"text/html"}});
+  }
+  if(href==="https://hitmos.me/search"){
+    return new Response("",{status:403});
+  }
   throw new Error("unexpected fallback fetch: "+href+" "+(options.method||"GET"));
 };
 const fallbackTracks=await searchHitmotop("Scatman",1);
-if(fallbackTracks.length!==1||fallbackTracks[0].artist!=="Scatman John"||!fallbackTracks[0].audio.includes("/api/hitmotop/play?url=")){
-  throw new Error("HitMoz parser API fallback failed");
+if(fallbackTracks.length!==1||fallbackTracks[0].artist!=="Scatman John"||!fallbackTracks[0].image.endsWith("/img/songs/333.jpg")||!fallbackTracks[0].audio.includes("/api/hitmotop/play?url=")){
+  throw new Error("HitMoz parser API alternate endpoint failed");
 }
+
+globalThis.fetch=async (input,options={})=>{
+  const href=String(input);
+  if(href.startsWith("https://bakha.me/?search=")||href.startsWith("https://bakha.me/index.php?search=")||href.startsWith("https://bakha.me/hitmoz.php?search=")){
+    return new Response(JSON.stringify({success:false,error:"no search result"}),{status:200,headers:{"content-type":"application/json"}});
+  }
+  if(href.startsWith("https://bakha.me/?top-today")){
+    return new Response(JSON.stringify({
+      success:true,
+      songs:[
+        {title:"Купер",artist:"SQWOZ BAB",duration:"02:40",cover:"https://eu.hitmoz.com/img/songs/25059693.jpg",download:"https://eu.hitmoz.com/get/music/20260410/SQWOZ_BAB_-_Kuper_25059693.mp3",link:"https://eu.hitmoz.com/song/25059693"},
+        {title:"Other",artist:"Other",duration:"03:00",cover:"https://eu.hitmoz.com/img/songs/2.jpg",download:"https://eu.hitmoz.com/get/music/20260410/Other_-_Other_2.mp3",link:"https://eu.hitmoz.com/song/2"}
+      ]
+    }),{status:200,headers:{"content-type":"application/json"}});
+  }
+  if(href.startsWith("https://eu.hitmoz.com/search")||href.startsWith("https://hitmos.fm/search")){
+    return new Response("",{status:200,headers:{"content-type":"text/html"}});
+  }
+  if(href==="https://hitmos.me/search")return new Response("",{status:403});
+  throw new Error("unexpected top fallback fetch: "+href);
+};
+const topTracks=await searchHitmotop("Купер",1);
+if(topTracks.length!==1||topTracks[0].title!=="Купер"||!topTracks[0].image.endsWith("/img/songs/25059693.jpg")){
+  throw new Error("HitMoz top-today fallback failed");
+}
+
 globalThis.fetch=savedFetch;
 
 console.log(JSON.stringify({
