@@ -26,6 +26,14 @@ if(tracks[0].title!=="Artist One — Track One"||tracks[0].artist!=="Artist One"
 if(!tracks[0].image.endsWith("/cover/a.jpg"))throw new Error("track 1 cover failed");
 if(!tracks[0].audio.includes("/api/hitmotop/play?url="))throw new Error("track audio proxy failed");
 if(tracks[1].title!=="Track Two"||tracks[1].artist!=="Artist Two"||tracks[1].duration!==245)throw new Error("track 2 metadata failed");
+const divWrappedHtml=html
+  .replace('<li class="tracks__item">','<div class="tracks__item">')
+  .replace('</li>','</div>');
+const divTracks=parseHitmotopSearch(divWrappedHtml,"https://hitmos.me",5);
+if(divTracks.length!==2||divTracks[0].title!=="Artist One — Track One"||divTracks[1].artist!=="Artist Two"){
+  throw new Error("parser must not depend on a surrounding li.tracks__item");
+}
+
 
 import {resolveHitmotopPlaybackUrl} from "../src/api/providers/hitmotop.js";
 

@@ -102,20 +102,38 @@ function buildTrack({title,artist,duration,image,download,info},base){
     downloadUrl
   };
 }
+function extractElementTexts(source,tagName,className){
+  const re=new RegExp("<"+tagName+"\\b[^>]*class=[\\\"']([^\\\"']*\\b"+className+"\\b[^\\\"']*)[\\\"'][^>]*>([\\s\\S]*?)</"+tagName+">","gi");
+  return [...String(source||"").matchAll(re)].map(match=>match[2]);
+}
+function extractElementTags(source,tagName,className){
+  const re=new RegExp("<"+tagName+"\\b[^>]*class=[\\\"']([^\\\"']*\\b"+className+"\\b[^\\\"']*)[\\\"'][^>]*>","gi");
+  return [...String(source||"").matchAll(re)].map(match=>match[0]);
+}
+
 export function parseHitmotopSearch(html,base,limit=10){
   const source=String(html||"");
+
+  // Match the Python parser: collect the actual track fields by class name
+  // instead of depending on a particular parent element such as <li>.
+  const titles=extractElementTexts(source,"div","track__title");
+  const artists=extractElementTexts(source,"div","track__desc");
+  const durations=extractElementTexts(source,"div","track__fulltime");
+  const images=extractElementTags(source,"div","track__img");
+  const downloads=extractElementTags(source,"a","track__download-btn");
+  const infos=extractElementTags(source,"a","track__info-l");
+
+  const count=Math.min(limit,titles.length,downloads.length,infos.length);
   const out=[];
   const seen=new Set();
-  const cards=[...source.matchAll(/<li\b[^>]*class=["'][^"']*\btracks__item\b[^"']*["'][\s\S]*?<\/li>/gi)].map(match=>match[0]);
-  for(const card of cards){
-    if(out.length>=limit)break;
+  for(let idx=0;idx<count;idx++){
     const track=buildTrack({
-      title:card.match(/<div\b[^>]*class=["'][^"']*\btrack__title\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)?.[1],
-      artist:card.match(/<div\b[^>]*class=["'][^"']*\btrack__desc\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)?.[1],
-      duration:card.match(/<div\b[^>]*class=["'][^"']*\btrack__fulltime\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i)?.[1],
-      image:card.match(/<div\b[^>]*class=["'][^"']*\btrack__img\b[^"']*["'][^>]*>/i)?.[0],
-      download:card.match(/<a\b[^>]*class=["'][^"']*\btrack__download-btn\b[^"']*["'][^>]*>/i)?.[0],
-      info:card.match(/<a\b[^>]*class=["'][^"']*\btrack__info-l\b[^"']*["'][^>]*>/i)?.[0]
+      title:titles[idx],
+      artist:artists[idx]||"",
+      duration:durations[idx]||"",
+      image:images[idx]||"",
+      download:downloads[idx]||"",
+      info:infos[idx]||""
     },base);
     if(track&&!seen.has(track.id)){
       seen.add(track.id);
