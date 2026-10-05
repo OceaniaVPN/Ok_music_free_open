@@ -497,6 +497,15 @@ async function searchHitmozParserApi(query,limit){
 export async function searchHitmotop(q,limit=10){
   const query=String(q||"").trim();
   if(!query)return [];
+
+  // The parser API is the lightweight path for the current HitMoz markup.
+  // Try it first so Cloudflare/403 responses from mirrors cannot consume the
+  // provider timeout before a valid result is available.
+  try{
+    const fallback=await searchHitmozParserApi(query,limit);
+    if(fallback.length)return fallback;
+  }catch(error){}
+
   const errors=[];
   for(const base of HITMOTOP_BASES){
     try{
@@ -506,12 +515,7 @@ export async function searchHitmotop(q,limit=10){
       errors.push(new URL(base).hostname+": "+(error?.message||"request failed"));
     }
   }
-  try{
-    const fallback=await searchHitmozParserApi(query,limit);
-    if(fallback.length)return fallback;
-  }catch(error){
-    errors.push("parser-api: "+(error?.message||"request failed"));
-  }
+
   throw Error("Hitmo unavailable ("+errors.join("; ")+")");
 }
 export async function resolveHitmotopPlaybackUrl(rawUrl){
