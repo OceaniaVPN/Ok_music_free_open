@@ -463,8 +463,10 @@ async function fillQueue(extra={},signal){
 
 async function ensureRecommendationWindow(extra={}){
  const remaining=playbackQueue.length-queueIndex-1;
- if(recommendationLoading||remaining>1)return;
- await fetchRecommendationBatch(extra);
+ // Keep five tracks queued ahead of the current one. As soon as four remain,
+ // request the next batch of five so the queue never collapses to four.
+ if(recommendationLoading||remaining>4)return;
+ await fetchRecommendationBatch({...extra,refresh:String(Date.now())},undefined,{force:true});
 }
 
 async function startRecommendationFromContext(extra={}){
@@ -542,10 +544,10 @@ async function initializeHomePlayer({force=false}={}){
    recommendationSeen=new Set();
    recommendationLastPrefetchIndex=-1;
    let remote=[];
-   for(let round=0;round<3&&remote.length<5;round++){
+   for(let round=0;round<3&&playbackQueue.length<5;round++){
     if(controller.signal.aborted)throw new DOMException("Aborted","AbortError");
     remote=await fetchRecommendationBatch({refresh:String(Date.now())},controller.signal,{force:true});
-    if(remote.length<5)await new Promise(resolve=>setTimeout(resolve,180));
+    if(playbackQueue.length<5)await new Promise(resolve=>setTimeout(resolve,180));
    }
    if(playbackQueue.length){
     queueIndex=0;
