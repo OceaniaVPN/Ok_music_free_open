@@ -33,16 +33,16 @@ function zaycevExtractImage(source,base=ZAYCEV_BASE){
     if(!raw)return;
     try{candidates.push(new URL(raw,base).href)}catch{}
   };
-  for(const tag of text.matchAll(/<(?:img|source|meta|div|span)\\b[^>]*>/gi)){
+  for(const tag of text.matchAll(/<(?:img|source|meta|div|span)\b[^>]*>/gi)){
     const t=tag[0];
     for(const m of t.matchAll(/(?:data-(?:src|original|lazy-src|image|cover)|poster|src|content)=["']([^"']+)["']/gi))push(m[1]);
-    const style=t.match(/style=["'][^"']*url\\(\\s*["']?([^"')]+)["']?\\s*\\)/i)?.[1];
+    const style=t.match(/style=["'][^"']*url\(\s*["']?([^"')]+)["']?\s*\)/i)?.[1];
     if(style)push(style);
   }
-  for(const m of text.matchAll(/https?:\\/\\/[^"'\\s<>]+/gi))push(m[0]);
-  const preferred=candidates.find(url=>/cdnimg\\.zaycev\\.net\\/commonImage\\/album\\//i.test(url))
-    ||candidates.find(url=>/zaycev\\.net\\/.*(?:album|cover|image)/i.test(url))
-    ||candidates.find(url=>/\\.(?:jpe?g|png|webp)(?:[?#]|$)/i.test(url))
+  for(const m of text.matchAll(/https?:\/\/[^"'\s<>]+/gi))push(m[0]);
+  const preferred=candidates.find(url=>/cdnimg\.zaycev\.net\/commonImage\/album\//i.test(url))
+    ||candidates.find(url=>/zaycev\.net\/.*(?:album|cover|image)/i.test(url))
+    ||candidates.find(url=>/\.(?:jpe?g|png|webp)(?:[?#]|$)/i.test(url))
     ||"";
   return preferred;
 }
