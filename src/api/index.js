@@ -1,6 +1,6 @@
 import { LOCAL_MUSIC } from "../local-music.js";
 import recommendationArtists from "../data/recommendation-artists.json" with { type: "json" };
-import { HITMOTOP_HEADERS, hitmotopCookieHeader, searchHitmotop, resolveHitmotopPlaybackUrl } from "./providers/hitmotop.js";
+import { HITMOTOP_HEADERS, searchHitmotop, resolveHitmotopPlaybackUrl, getHitmotopSessionInfo } from "./providers/hitmotop.js";
 import { detectKnownArtist, stripKnownArtistPrefix } from "../data/artist-detector.js";
 const LOCAL_MUSIC_CATALOG=Array.isArray(LOCAL_MUSIC)?LOCAL_MUSIC:[];
 
@@ -684,44 +684,25 @@ export async function handleApi(request,env){
 
   if(url.pathname==="/api/hitmotop/play"){
     const raw=(url.searchParams.get("url")||"").trim();
-    const page=(url.searchParams.get("page")||"").trim();
     try{
-      const target=await resolveHitmotopPlaybackUrl(raw);
       const range=request.headers.get("range")||"";
+      const target=await resolveHitmotopPlaybackUrl(raw);
       const targetUrl=new URL(target);
-      let cookie="";
-      let referer=targetUrl.origin+"/";
-
-      // HitMoz may require the session cookie from the track page before
-      // accepting the direct /get/music/*.mp3 request.
-      if(page){
-        try{
-          const pageUrl=new URL(page);
-          const pageHost=pageUrl.hostname.toLowerCase();
-          const allowedPage=pageHost==="eu.hitmoz.com"||pageHost.endsWith(".eu.hitmoz.com")||
-            pageHost==="ru.hitmoz.org"||pageHost.endsWith(".ru.hitmoz.org")||
-            pageHost==="rus.hitmoz.org"||pageHost.endsWith(".rus.hitmoz.org")||
-            pageHost==="hitmos.me"||pageHost.endsWith(".hitmos.me")||
-            pageHost==="hitmos.fm"||pageHost.endsWith(".hitmos.fm");
-          if(allowedPage){
-            referer=pageUrl.href;
-            const pageResponse=await fetch(pageUrl.href,{headers:HITMOTOP_HEADERS,redirect:"follow"});
-            cookie=hitmotopCookieHeader(pageResponse);
-          }
-        }catch{}
-      }
+      const sessionInfo=await getHitmotopSessionInfo(raw);
+      const referer=sessionInfo.referer||targetUrl.origin+"/";
+      const sameOriginCookie=targetUrl.origin===sessionInfo.origin?sessionInfo.cookie:"";
 
       const makeAudioHeaders=(withCookie=true)=>{
         const headers={
           "accept":"audio/mpeg,audio/*;q=0.9,*/*;q=0.8",
           "accept-language":"ru-RU,ru;q=0.9,en;q=0.7",
           "user-agent":HITMOTOP_HEADERS["user-agent"],
-          "referer":referer,
+          "referer",
           "sec-fetch-dest":"audio",
           "sec-fetch-mode":"no-cors",
           "sec-fetch-site":"cross-site"
         };
-        if(withCookie&&cookie)headers.cookie=cookie;
+        if(withCookie&&sameOriginCookie)headers.cookie=sameOriginCookie;
         if(range)headers.range=range;
         return headers;
       };
@@ -731,14 +712,23 @@ export async function handleApi(request,env){
         return Boolean(type.startsWith("audio/"))||type.includes("mpeg")||type.includes("octet-stream");
       };
 
-      // Try the direct MP3 first with the track-page session, then retry without
-      // the cookie. Some HitMoz mirrors reject one of these two request shapes.
-      let upstream=await fetch(target,{headers:makeAudioHeaders(true),redirect:"follow"});
+      // The Python parser performs the download probe through the same
+      // requests.Session(). Reuse the same cached Hitmotop sid here instead
+      // of starting an unrelated request from scratch.
+      let upstream=await fetch(target,{
+        headers:makeAudioHeaders(true),
+        redirect:"follow",
+        signal:AbortSignal.timeout(10_000)
+      });
       let contentType=(upstream.headers.get("content-type")||"").toLowerCase();
 
       if(!isAudioResponse(upstream)||!upstream.ok){
         if(upstream.body)try{await upstream.body.cancel()}catch{}
-        upstream=await fetch(target,{headers:makeAudioHeaders(false),redirect:"follow"});
+        upstream=await fetch(target,{
+          headers:makeAudioHeaders(false),
+          redirect:"follow",
+          signal:AbortSignal.timeout(10_000)
+        });
         contentType=(upstream.headers.get("content-type")||"").toLowerCase();
       }
 
@@ -752,14 +742,25 @@ export async function handleApi(request,env){
         let direct="";
         for(const pattern of patterns){
           const match=html.match(pattern);
-          if(match?.[1]){direct=hitmotopAbsoluteUrl(match[1],targetUrl.origin);if(direct)break;}
+          if(match?.[1]){
+            try{direct=new URL(match[1],targetUrl.origin).href}catch{direct=""}
+            if(direct)break;
+          }
         }
         if(!direct){
           const button=html.match(/<a\b[^>]*class=["'][^"']*track__download-btn[^"']*["'][^>]*>/i);
-          direct=hitmotopAbsoluteUrl(hitmotopExtractAttr(button?.[0],"href"),targetUrl.origin);
+          const href=button?.[0]?.match(/href=["']([^"']+)["']/i)?.[1]||"";
+          try{direct=new URL(href,targetUrl.origin).href}catch{direct=""}
         }
         if(!direct)throw Error("Hitmotop audio URL not found");
-        upstream=await fetch(direct,{headers:makeAudioHeaders(false),redirect:"follow"});
+
+        const directUrl=new URL(direct);
+        const directHeaders=makeAudioHeaders(directUrl.origin===sessionInfo.origin);
+        upstream=await fetch(direct,{
+          headers:directHeaders,
+          redirect:"follow",
+          signal:AbortSignal.timeout(10_000)
+        });
         contentType=(upstream.headers.get("content-type")||"").toLowerCase();
       }
 
@@ -773,7 +774,9 @@ export async function handleApi(request,env){
       headers.set("accept-ranges",headers.get("accept-ranges")||"bytes");
       headers.set("content-type",headers.get("content-type")||"audio/mpeg");
       return new Response(upstream.body,{status:upstream.status,headers});
-    }catch(e){return Response.json({ok:false,error:e?.message||"Hitmotop playback unavailable"},{status:502})}
+    }catch(e){
+      return Response.json({ok:false,error:e?.message||"Hitmotop playback unavailable"},{status:502})
+    }
   }
   if(url.pathname==="/api/zaycev/play"){
     const id=(url.searchParams.get("id")||"").trim();
